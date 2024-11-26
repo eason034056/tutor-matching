@@ -1,42 +1,45 @@
 import { tutors } from '../data/tutors'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import TutorRequestForm from '@/components/tutor-request-form'
 
 export default function TutorsPage() {
   return (
-    <div className="container mx-auto">
-      <h1 className="text-3xl font-bold mb-6">Available Tutors</h1>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {tutors.map((tutor) => (
-              <Card key={tutor.id}>
-                <CardHeader>
-                  <CardTitle>{tutor.name}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p><strong>Subject:</strong> {tutor.subject}</p>
-                  <p><strong>Experience:</strong> {tutor.experience} years</p>
-                  <p><strong>Hourly Rate:</strong> ${tutor.hourlyRate}</p>
-                  <Button className="mt-4">Request Tutor</Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-        <div>
-          <Card>
-            <CardHeader>
-              <CardTitle>Request a Tutor</CardTitle>
+    <div className="container mx-auto py-8">
+      <h1 className="text-4xl font-bold mb-8 text-center">尋找合適的家教老師</h1>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {tutors.map((tutor) => (
+          <Card key={tutor.id} className="hover:shadow-lg transition-shadow">
+            <CardHeader className="bg-gray-50">
+              <CardTitle className="text-2xl">{tutor.name}</CardTitle>
             </CardHeader>
-            <CardContent>
-              <TutorRequestForm />
+            <CardContent className="space-y-3 pt-4">
+              <div className="flex items-start gap-2">
+                <span className="font-semibold min-w-[80px]">教學科目:</span>
+                <span>{tutor.subjects.join(', ')}</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="font-semibold min-w-[80px]">教學經驗:</span>
+                <span>{tutor.experience}</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="font-semibold min-w-[80px]">學校:</span>
+                <span>{tutor.school}</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="font-semibold min-w-[80px]">科系:</span>
+                <span>{tutor.major}</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="font-semibold min-w-[80px]">地點:</span>
+                <span>{tutor.locations}</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="font-semibold min-w-[80px]">專長:</span>
+                <span>{tutor.expertise}</span>
+              </div>
             </CardContent>
           </Card>
-        </div>
+        ))}
       </div>
     </div>
   )
 }
-

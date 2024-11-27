@@ -6,8 +6,10 @@ export default function TutorRegistrationPage() {
     <div className="container mx-auto py-8">
       <Card className="max-w-2xl mx-auto">
         <CardHeader>
-          <CardTitle>家教註冊</CardTitle>
-          <CardDescription>請填寫以下表單以註冊成為家教</CardDescription>
+          <CardTitle>教師登錄</CardTitle>
+          <CardDescription>請填寫以下表單以登錄成為教師<br />
+          登錄完後會進行身份審核，審核時間大約1~2天，審核完畢後會收到email傳送教師編號<br />
+          請記得您的教師編號，後續接案都需使用教師編號進行應徵</CardDescription>
         </CardHeader>
         <CardContent>
           <TutorRegistrationForm />

@@ -9,10 +9,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { registerTutor } from '@/app/actions/register-tutor'
 
-const subjects = [
-  "數學", "英文", "自然", "歷史", "電腦",
-  "物理", "化學", "生物", "國文", "其他外語"
-]
 
 export default function TutorRegistrationForm() {
   const router = useRouter()
@@ -77,22 +73,24 @@ export default function TutorRegistrationForm() {
       </div>
       <div>
         <Label>可教授科目</Label>
-        <div className="grid grid-cols-2 gap-2">
-          {subjects.map((subject) => (
-            <div key={subject} className="flex items-center space-x-2">
-              <Checkbox
-                id={subject}
-                checked={formData.subjects.includes(subject)}
-                onCheckedChange={() => handleSubjectChange(subject)}
-              />
-              <label
-                htmlFor={subject}
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                {subject}
-              </label>
-            </div>
-          ))}
+        <div className="space-y-2">
+          <Input
+            id="subjects"
+            name="subjects" 
+            placeholder="請輸入科目，用空格分隔"
+            value={formData.subjects.join(' ')}
+            onChange={(e) => {
+              const subjects = e.target.value.split(',').map(s => s.trim()).filter(Boolean)
+              setFormData(prevState => ({
+                ...prevState,
+                subjects
+              }))
+            }}
+            required
+          />
+          <p className="text-sm text-muted-foreground">
+            請用空格分隔多個科目，例如：國文 國中英文 國中數學 高中數學
+          </p>
         </div>
       </div>
       <div>

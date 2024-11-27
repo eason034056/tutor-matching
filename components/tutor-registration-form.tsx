@@ -23,7 +23,6 @@ export default function TutorRegistrationForm() {
     experience: '',
     school: '',
     major: '',
-    locations: '',
     expertise: ''
   })
 
@@ -127,20 +126,11 @@ export default function TutorRegistrationForm() {
         />
       </div>
       <div>
-        <Label htmlFor="locations">可授課地區</Label>
-        <Input
-          id="locations"
-          name="locations"
-          value={formData.locations}
-          onChange={handleChange}
-          required
-        />
-      </div>
-      <div>
         <Label htmlFor="expertise">專長領域</Label>
         <Textarea
           id="expertise"
           name="expertise"
+          placeholder='例如：高中數學、大學微積分'
           value={formData.expertise}
           onChange={handleChange}
           required

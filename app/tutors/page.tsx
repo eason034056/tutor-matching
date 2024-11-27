@@ -29,10 +29,6 @@ export default function TutorsPage() {
                 <span>{tutor.major}</span>
               </div>
               <div className="flex items-start gap-2">
-                <span className="font-semibold min-w-[80px]">地點:</span>
-                <span>{tutor.locations}</span>
-              </div>
-              <div className="flex items-start gap-2">
                 <span className="font-semibold min-w-[80px]">專長:</span>
                 <span>{tutor.expertise}</span>
               </div>

@@ -181,17 +181,15 @@ export default function CaseUploadForm() {
             />
           </div>
           <div>
-            <Label>上課地點</Label>
-            <Select onValueChange={(value) => handleSelectChange('location', value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="請選擇上課地點" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="學生家">學生家</SelectItem>
-                <SelectItem value="教師家">教師家</SelectItem>
-                <SelectItem value="線上">線上</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label htmlFor="location">上課地點</Label>
+            <Input
+              id="location"
+              name="location"
+              value={formData.location}
+              onChange={handleChange}
+              placeholder="請輸入大概位置即可"
+              required
+            />
           </div>
           <div>
             <Label htmlFor="availableTime">可上課時段</Label>

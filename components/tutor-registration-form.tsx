@@ -1,141 +1,182 @@
 "use client"
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState } from "react"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import * as z from "zod"
 import { Button } from "@/components/ui/button"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Checkbox } from "@/components/ui/checkbox"
-import { registerTutor } from '@/app/actions/register-tutor'
+import { toast } from "sonner"
 
+// 定義表單驗證規則
+const formSchema = z.object({
+  name: z.string().min(2, { message: "姓名至少需要2個字" }),
+  phoneNumber: z.string().min(10, { message: "請輸入有效的電話號碼" }),
+  subjects: z.string().min(1, { message: "請輸入教學科目" }),
+  experience: z.string().min(1, { message: "請輸入教學經驗" }),
+  school: z.string().min(1, { message: "請輸入就讀學校" }),
+  major: z.string().min(1, { message: "請輸入主修科系" }),
+  expertise: z.string().min(1, { message: "請輸入專長" }),
+})
 
 export default function TutorRegistrationForm() {
-  const router = useRouter()
-  const [formData, setFormData] = useState({
-    name: '',
-    phoneNumber: '',
-    subjects: [] as string[],
-    experience: '',
-    school: '',
-    major: '',
-    expertise: ''
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: "",
+      phoneNumber: "",
+      subjects: "",
+      experience: "",
+      school: "",
+      major: "",
+      expertise: "",
+    },
   })
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
-    setFormData(prevState => ({ ...prevState, [name]: value }))
-  }
-
-  const handleSubjectChange = (subject: string) => {
-    setFormData(prevState => ({
-      ...prevState,
-      subjects: prevState.subjects.includes(subject)
-        ? prevState.subjects.filter(s => s !== subject)
-        : [...prevState.subjects, subject]
-    }))
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      await registerTutor(formData)
-      alert('註冊成功！')
-      router.push('/tutors')
+      setIsSubmitting(true)
+      
+      const tutorCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+      
+      const response = await fetch('/api/tutors/pending', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...values,
+          tutorCode,
+          isActive: false,
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+          subjects: values.subjects.split(' ').map(s => s.trim()),
+        }),
+      })
+      
+      const data = await response.json()
+
+      if (!response.ok) throw new Error('提交失敗')
+
+      toast.success("註冊成功！請等待管理員審核")
+      form.reset()
     } catch (error) {
-      console.error('註冊失敗:', error)
-      alert('註冊失敗，請重試。')
+      toast.error("提交失敗，請稍後再試")
+      console.error('Error:', error)
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label htmlFor="name">姓名</Label>
-        <Input
-          id="name"
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <FormField
+          control={form.control}
           name="name"
-          value={formData.name}
-          onChange={handleChange}
-          required
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>姓名</FormLabel>
+              <FormControl>
+                <Input {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
-      </div>
-      <div>
-        <Label htmlFor="phoneNumber">聯絡電話</Label>
-        <Input
-          id="phoneNumber"
+        
+        <FormField
+          control={form.control}
           name="phoneNumber"
-          type="tel"
-          value={formData.phoneNumber}
-          onChange={handleChange}
-          required
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>電話號碼</FormLabel>
+              <FormControl>
+                <Input {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
-      </div>
-      <div>
-        <Label>可教授科目</Label>
-        <div className="space-y-2">
-          <Input
-            id="subjects"
-            name="subjects" 
-            placeholder="請輸入科目，用空格分隔"
-            value={formData.subjects.join(' ')}
-            onChange={(e) => {
-              const subjects = e.target.value.split(',').map(s => s.trim()).filter(Boolean)
-              setFormData(prevState => ({
-                ...prevState,
-                subjects
-              }))
-            }}
-            required
-          />
-          <p className="text-sm text-muted-foreground">
-            請用空格分隔多個科目，例如：國文 國中英文 國中數學 高中數學
-          </p>
-        </div>
-      </div>
-      <div>
-        <Label htmlFor="experience">相關經驗</Label>
-        <Textarea
-          id="experience"
+
+        <FormField
+          control={form.control}
+          name="subjects"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>可教授科目</FormLabel>
+              <FormControl>
+                <Input {...field} placeholder="請用空格分隔多個科目，例如：國文 國中英文 國中數學 高中數學" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
           name="experience"
-          value={formData.experience}
-          onChange={handleChange}
-          required
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>教學經驗</FormLabel>
+              <FormControl>
+                <Input {...field} placeholder="例如：5年補教經驗，曾任職補習班講師"/>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
-      </div>
-      <div>
-        <Label htmlFor="school">就讀學校</Label>
-        <Input
-          id="school"
+
+        <FormField
+          control={form.control}
           name="school"
-          value={formData.school}
-          onChange={handleChange}
-          required
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>就讀學校</FormLabel>
+              <FormControl>
+                <Input {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
-      </div>
-      <div>
-        <Label htmlFor="major">主修科系</Label>
-        <Input
-          id="major"
+
+        <FormField
+          control={form.control}
           name="major"
-          value={formData.major}
-          onChange={handleChange}
-          required
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>主修科系</FormLabel>
+              <FormControl>
+                <Input {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
-      </div>
-      <div>
-        <Label htmlFor="expertise">專長領域</Label>
-        <Textarea
-          id="expertise"
+
+        <FormField
+          control={form.control}
           name="expertise"
-          placeholder='例如：高中數學、大學微積分'
-          value={formData.expertise}
-          onChange={handleChange}
-          required
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>專長</FormLabel>
+              <FormControl>
+                <Input {...field} placeholder="例如：高中數學、大學微積分"/>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
-      </div>
-      <Button type="submit">註冊成為家教</Button>
-    </form>
+
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? "提交中..." : "提交"}
+        </Button>
+      </form>
+    </Form>
   )
 }
 

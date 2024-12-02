@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { uploadCase } from '@/app/actions/upload-case'
 
 export default function CaseUploadForm() {
   const router = useRouter()
@@ -27,7 +26,8 @@ export default function CaseUploadForm() {
     availableTime: '',
     teacherRequirements: '',
     hourlyFee: '',
-    message: ''
+    message: '',
+    pending: 'pending',
   })
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -42,9 +42,30 @@ export default function CaseUploadForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      await uploadCase(formData)
-      alert('需求已成功送出！')
-      router.push('/tutor-cases')
+      const caseNumber = 'C' + Math.random().toString(36).substring(2, 8).toUpperCase()
+      
+      const response = await fetch('/api/cases/upload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...formData,
+          caseNumber,
+          status: '急徵',
+          createdAt: new Date().toISOString(),
+          hourlyFee: parseInt(formData.hourlyFee)
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('提交失敗')
+      }
+
+      const data = await response.json()
+      console.log('Response:', data)
+
+      alert('需求已成功送出！案件審核時間大約需要1-2天，請耐心等候。')
     } catch (error) {
       console.error('送出需求時發生錯誤:', error)
       alert('送出需求失敗，請重試。')

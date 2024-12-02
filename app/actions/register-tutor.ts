@@ -9,7 +9,6 @@ interface TutorData {
   experience: string
   school: string
   major: string
-  locations: string
   expertise: string
   tutorCode?: string
 }

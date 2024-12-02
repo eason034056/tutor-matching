@@ -7,9 +7,9 @@ export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   return (
-    <header className="bg-primary text-primary-foreground p-4">
+    <header className="bg-[#233B6E] text-primary-foreground p-4">
       <div className="container mx-auto flex flex-wrap justify-between items-center">
-        <Link href="/" className="text-2xl font-bold min-w-[140px]">家教媒合</Link>
+        <Link href="/" className="text-2xl font-bold min-w-[140px]">新竹家教網</Link>
         
         {/* 漢堡選單按鈕 - 只在小螢幕顯示 */}
         <button 
@@ -40,26 +40,26 @@ export default function Header() {
             <li><Link href="/tutor-registration" className="hover:underline block text-right md:text-left">教師登錄</Link></li>
             <li className="group relative">
               <span className="hover:underline cursor-pointer block text-right md:text-left">教師須知</span>
-              <div className="absolute right-0 top-full hidden group-hover:block bg-white text-primary rounded-md shadow-lg p-2 z-50 min-w-[120px] whitespace-nowrap">
-                <Link href="/process" className="block px-4 py-2 hover:bg-gray-100 rounded-sm text-right md:text-left">
+              <div className="absolute right-0 top-full hidden group-hover:block bg-[#415F9D] text-white rounded-md shadow-lg p-2 z-50 min-w-[120px] whitespace-nowrap">
+                <Link href="/process" className="block px-4 py-2 hover:bg-[#233B6E] rounded-sm text-right md:text-left">
                   接案流程
                 </Link>
               </div>
             </li>
             <li className="group relative">
               <span className="hover:underline cursor-pointer block text-right md:text-left">家長須知</span>
-              <div className="absolute right-0 top-full hidden group-hover:block bg-white text-primary rounded-md shadow-lg p-2 z-50 min-w-[140px] whitespace-nowrap">
-                <Link href="/notice" className="block px-4 py-2 hover:bg-gray-100 rounded-sm text-right md:text-left">
+              <div className="bg-[#415F9D] absolute right-0 top-full hidden group-hover:block text-white rounded-md shadow-lg p-2 z-50 min-w-[140px] whitespace-nowrap">
+                <Link href="/notice" className="block px-4 py-2 hover:bg-[#233B6E] rounded-sm text-right md:text-left">
                   注意事項
                 </Link>
-                <Link href="/comparison" className="block px-4 py-2 hover:bg-gray-100 rounded-sm text-right md:text-left">
+                <Link href="/comparison" className="block px-4 py-2 hover:bg-[#233B6E] rounded-sm text-right md:text-left">
                   與補習班之比較
                 </Link>
-                <Link href="/license" className="block px-4 py-2 hover:bg-gray-100 rounded-sm text-right md:text-left">
+                <Link href="/license" className="block px-4 py-2 hover:bg-[#233B6E] rounded-sm text-right md:text-left">
                   政府立案
                 </Link>
-                <Link href="/pricing" className="block px-4 py-2 hover:bg-gray-100 rounded-sm text-right md:text-left">
-                  家教費用
+                <Link href="/pricing" className="block px-4 py-2 hover:bg-[#233B6E] rounded-sm text-right md:text-left">
+                  家教費用參考
                 </Link>
               </div>
             </li>

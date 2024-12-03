@@ -12,6 +12,7 @@ import {
   QuerySnapshot,
   DocumentSnapshot
 } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -27,6 +28,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 
+// 初始化 Storage
+export const storage = getStorage(app);
+
 export const tutorsCollection = collection(db, 'tutors');
 export const casesCollection = collection(db, 'cases');
-export default db;
+export default app;

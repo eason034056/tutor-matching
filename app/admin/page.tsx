@@ -35,7 +35,7 @@ export default function AdminPage() {
     }
   }
 
-  // 處理���教審核
+  // 處理教審核
   const handleTutorApprove = async (id: string) => {
     try {
       const response = await fetch(`/api/admin/tutors/${id}/approve`, {
@@ -139,6 +139,24 @@ export default function AdminPage() {
                   <h3 className="font-bold">{tutor.name}</h3>
                   <p>電話：{tutor.phoneNumber}</p>
                   <p>科目：{tutor.subjects.join(', ')}</p>
+                  <div className="grid grid-cols-2 gap-4 mt-4">
+                    <div>
+                      <h4 className="font-semibold mb-2">學生證</h4>
+                      <img 
+                        src={tutor.studentIdCardUrl} 
+                        alt="學生證" 
+                        className="w-full rounded-lg shadow-md"
+                      />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold mb-2">身分證</h4>
+                      <img 
+                        src={tutor.idCardUrl} 
+                        alt="身分證" 
+                        className="w-full rounded-lg shadow-md"
+                      />
+                    </div>
+                  </div>
                   <div className="mt-2 flex gap-2">
                     <Button 
                       variant="destructive" 
@@ -175,6 +193,16 @@ export default function AdminPage() {
                   </div>
                   <p>地點：{case_.location}</p>
                   <p>時段：{case_.availableTime}</p>
+                  {case_.idCardUrl && (
+                    <div className="mt-4">
+                      <h4 className="font-semibold mb-2">身分證照片</h4>
+                      <img 
+                        src={case_.idCardUrl} 
+                        alt="身分證" 
+                        className="w-full rounded-lg shadow-md"
+                      />
+                    </div>
+                  )}
                   <div className="mt-4 flex gap-2">
                     <Button 
                       variant="destructive" 

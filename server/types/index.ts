@@ -10,6 +10,8 @@ export interface Tutor {
     tutorCode: string;
     status: 'pending' | 'approved' | 'rejected';
     isActive: boolean; 
+    studentIdCardUrl: string;
+    idCardUrl: string;
 }
 
 export interface TutorCase {
@@ -34,4 +36,5 @@ export interface TutorCase {
     status: '急徵' | '已徵到' | '有人接洽';
     createdAt: string;
     pending: 'pending' | 'approved' | 'rejected';
+    idCardUrl: string;
 }

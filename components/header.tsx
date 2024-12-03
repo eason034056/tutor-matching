@@ -7,7 +7,7 @@ export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   return (
-    <header className="bg-[#233B6E] text-primary-foreground p-4">
+    <header className="bg-[#233B6E] text-primary-foreground p-4 shadow-xl">
       <div className="container mx-auto flex flex-wrap justify-between items-center">
         <Link href="/" className="text-2xl font-bold min-w-[140px]">新竹家教網</Link>
         

@@ -1,15 +1,21 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { storage } from "@/server/config/firebase";
+import { addWatermark } from "@/lib/imageUtils";
+import { toast } from "sonner"
 
 export default function CaseUploadForm() {
   const router = useRouter()
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [preview, setPreview] = useState('')
   const [formData, setFormData] = useState({
     parentName: '',
     parentPhone: '',
@@ -28,6 +34,8 @@ export default function CaseUploadForm() {
     hourlyFee: '',
     message: '',
     pending: 'pending',
+    idCard: null as File | null,
+    idCardUrl: '',
   })
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -39,9 +47,38 @@ export default function CaseUploadForm() {
     setFormData(prevState => ({ ...prevState, [name]: value }))
   }
 
+  // 處理身分證預覽
+  const handleIdCardChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      try {
+        // 添加浮水印並預覽
+        const watermarkedBlob = await addWatermark(file)
+        const previewUrl = URL.createObjectURL(watermarkedBlob)
+        setPreview(previewUrl)
+        setFormData(prev => ({ ...prev, idCard: file }))
+      } catch (error) {
+        console.error('預覽圖片失敗:', error)
+        toast.error('預覽圖片失敗')
+      }
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsSubmitting(true)
+    
     try {
+      let idCardUrl = ''
+      
+      // 上傳身分證照片
+      if (formData.idCard) {
+        const watermarkedId = await addWatermark(formData.idCard)
+        const idRef = ref(storage, `cases/id-cards/${Date.now()}-${formData.idCard.name}`)
+        await uploadBytes(idRef, watermarkedId)
+        idCardUrl = await getDownloadURL(idRef)
+      }
+
       const caseNumber = 'C' + Math.random().toString(36).substring(2, 8).toUpperCase()
       
       const response = await fetch('/api/cases/upload', {
@@ -51,8 +88,10 @@ export default function CaseUploadForm() {
         },
         body: JSON.stringify({
           ...formData,
+          idCardUrl,  // 添加身分證 URL
           caseNumber,
           status: '急徵',
+          pending: 'pending',  // 添加審核狀態
           createdAt: new Date().toISOString(),
           hourlyFee: parseInt(formData.hourlyFee)
         }),
@@ -65,12 +104,49 @@ export default function CaseUploadForm() {
       const data = await response.json()
       console.log('Response:', data)
 
+      // 清空表單資料
+      setFormData({
+        parentName: '',
+        parentPhone: '',
+        parentEmail: '',
+        address: '',
+        idNumber: '',
+        studentGender: '',
+        lineId: '',
+        department: '',
+        grade: '',
+        studentDescription: '',
+        subject: '',
+        location: '',
+        availableTime: '',
+        teacherRequirements: '',
+        hourlyFee: '',
+        message: '',
+        pending: 'pending',
+        idCard: null,
+        idCardUrl: '',
+      })
+      setPreview('')
+
+      // 使用原生 alert
       alert('需求已成功送出！案件審核時間大約需要1-2天，請耐心等候。')
+      router.push('/case-upload')
     } catch (error) {
       console.error('送出需求時發生錯誤:', error)
       alert('送出需求失敗，請重試。')
+    } finally {
+      setIsSubmitting(false)
     }
   }
+
+  // 清理預覽 URL
+  useEffect(() => {
+    return () => {
+      if (preview) {
+        URL.revokeObjectURL(preview)
+      }
+    }
+  }, [preview])
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -259,7 +335,32 @@ export default function CaseUploadForm() {
         </div>
       </div>
 
-      <Button type="submit" className="w-full">送出需求</Button>
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">身分證上傳</h2>
+        <div>
+          <Label htmlFor="idCard">身分證照片</Label>
+          <Input
+            id="idCard"
+            type="file"
+            accept="image/*"
+            onChange={handleIdCardChange}
+            required
+          />
+          {preview && (
+            <div className="mt-2">
+              <img 
+                src={preview} 
+                alt="身分證預覽" 
+                className="w-full rounded-lg shadow-md"
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      <Button type="submit" disabled={isSubmitting}>
+        {isSubmitting ? "提交中..." : "送出需求"}
+      </Button>
     </form>
   )
 }

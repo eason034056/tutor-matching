@@ -1,22 +1,39 @@
 'use client'
 
-import { tutors } from '../data/tutors'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { collection, query, where, getDocs } from "firebase/firestore"
+import { db } from "@/server/config/firebase"
+import { Tutor } from '@/server/types/index'
 
 export default function TutorsPage() {
   const [currentPage, setCurrentPage] = useState(1)
+  const [approvedTutors, setApprovedTutors] = useState<Tutor[]>([])
   const itemsPerPage = 9 // 每頁顯示 9 位老師 (3x3 網格)
+
+  // 獲取 approved 狀態的老師資料
+  useEffect(() => {
+    const fetchApprovedTutors = async () => {
+      const q = query(collection(db, 'tutors'), where("status", "==", "approved"))
+      const querySnapshot = await getDocs(q)
+      const tutorsList: Tutor[] = querySnapshot.docs.map(doc => ({
+        ...(doc.data() as Tutor)
+      }))
+      setApprovedTutors(tutorsList)
+    }
+
+    fetchApprovedTutors()
+  }, [])
   
   // 計算總頁數
-  const totalPages = Math.ceil(tutors.length / itemsPerPage)
+  const totalPages = Math.ceil(approvedTutors.length / itemsPerPage)
   
   // 取得當前頁面要顯示的老師資料
   const getCurrentPageItems = () => {
     const startIndex = (currentPage - 1) * itemsPerPage
     const endIndex = startIndex + itemsPerPage
-    return tutors.slice(startIndex, endIndex)
+    return approvedTutors.slice(startIndex, endIndex)
   }
 
   // 分頁按鈕處理函數

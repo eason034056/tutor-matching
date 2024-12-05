@@ -120,6 +120,11 @@ export default function TutorRegistrationForm() {
 
       toast.success("註冊成功！請等待管理員審核")
       form.reset()
+      // 清空預覽圖片
+      setPreviews({
+        studentIdCard: '',
+        idCard: ''
+      })
     } catch (error) {
       toast.error("提交失敗，請稍後再試")
       console.error('Error:', error)
@@ -315,4 +320,3 @@ export default function TutorRegistrationForm() {
     </Form>
   )
 }
-

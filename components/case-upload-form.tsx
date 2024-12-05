@@ -226,7 +226,7 @@ export default function CaseUploadForm() {
             />
           </div>
           <div>
-            <Label htmlFor="department">就讀科系</Label>
+            <Label htmlFor="department">就讀學校</Label>
             <Input
               id="department"
               name="department"
@@ -242,10 +242,23 @@ export default function CaseUploadForm() {
                 <SelectValue placeholder="請選擇年級" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="國小">國小</SelectItem>
-                <SelectItem value="國中">國中</SelectItem>
-                <SelectItem value="高中">高中</SelectItem>
-                <SelectItem value="大學">大學</SelectItem>
+                <SelectItem value="小一">小一</SelectItem>
+                <SelectItem value="小二">小二</SelectItem>
+                <SelectItem value="小三">小三</SelectItem>
+                <SelectItem value="小四">小四</SelectItem>
+                <SelectItem value="小五">小五</SelectItem>
+                <SelectItem value="小六">小六</SelectItem>
+                <SelectItem value="國一">國一</SelectItem>
+                <SelectItem value="國二">國二</SelectItem>
+                <SelectItem value="國三">國三</SelectItem>
+                <SelectItem value="高一">高一</SelectItem>
+                <SelectItem value="高二">高二</SelectItem>
+                <SelectItem value="高三">高三</SelectItem>
+                <SelectItem value="大一">大一</SelectItem>
+                <SelectItem value="大二">大二</SelectItem>
+                <SelectItem value="大三">大三</SelectItem>
+                <SelectItem value="大四">大四</SelectItem>
+                <SelectItem value="成人">成人</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -258,7 +271,7 @@ export default function CaseUploadForm() {
             name="studentDescription"
             value={formData.studentDescription}
             onChange={handleChange}
-            placeholder="請描述學生的學習狀況、程度等"
+            placeholder="請描述學生的學習狀況、程度等，以方便家教老師根據學生程度調整教學方式"
             required
           />
         </div>
@@ -336,9 +349,9 @@ export default function CaseUploadForm() {
       </div>
 
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold">身分證上傳</h2>
+        <h2 className="text-lg font-semibold">家長身分證上傳</h2>
         <div>
-          <Label htmlFor="idCard">身分證照片</Label>
+          <Label htmlFor="idCard">若學生為大學以上，請上傳自己的身分證照片，證件皆會加上浮水印，僅供家教網審核使用</Label>
           <Input
             id="idCard"
             type="file"

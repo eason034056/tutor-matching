@@ -15,7 +15,7 @@ export const tutors: Tutor[] = [
   {
     id: 1,
     name: "王大明",
-    phoneNumber: "0912-345-678",
+    phoneNumber: "0912345678",
     subjects: ["數學", "物理"],
     experience: "5年補教經驗，曾任職補習班講師",
     school: "台灣大學",
@@ -27,7 +27,7 @@ export const tutors: Tutor[] = [
   {
     id: 2,
     name: "李小華",
-    phoneNumber: "0923-456-789",
+    phoneNumber: "0923456789",
     subjects: ["英文", "其他外語"],
     experience: "多年英語教學經驗，具備TESOL證照",
     school: "政治大學",

@@ -1,26 +1,36 @@
 'use client'
 
-import { useState } from 'react'
-import { TutorCase, tutorCases } from '@/app/data/cases'
-import { verifyTutor } from '@/app/actions/verify-tutor'
+import { useState, useEffect } from 'react'
+import { TutorCase } from '@/server/types/index'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import Link from 'next/link'
+import { collection, query, where, getDocs } from 'firebase/firestore'
+import { db } from '@/server/config/firebase'
 
 export default function TutorCasesPage() {
-  const [selectedCase, setSelectedCase] = useState<number | null>(null)
-  const [tutorCode, setTutorCode] = useState('') // 暫存輸入的家教編號，之後接資料庫會替換掉
-  const [error, setError] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [selectedCase, setSelectedCase] = useState<string | null>(null) 
+  const [approvedCases, setApprovedCases] = useState<TutorCase[]>([])
   const [verificationSuccess, setVerificationSuccess] = useState(false)
-  const [currentCase, setCurrentCase] = useState<TutorCase | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10 // 每頁顯示的案件數量
+
+  // 獲取 approved 狀態的案件資料
+  useEffect(() => {
+    const fetchApprovedCases = async () => {
+      const q = query(collection(db, 'cases'), where("pending", "==", "approved"))
+      const querySnapshot = await getDocs(q)
+      const casesList: TutorCase[] = querySnapshot.docs.map(doc => ({
+        ...(doc.data() as TutorCase) // 確保資料符合 TutorCase 類型
+      }))
+      setApprovedCases(casesList)
+    }
+
+    fetchApprovedCases()
+  }, [])
   
   const canApply = (tutorCase: TutorCase) => {
     if (tutorCase.status === '已徵到' || tutorCase.status === '有人接洽') return false;
@@ -28,7 +38,7 @@ export default function TutorCasesPage() {
   };
 
   // 在 return 語句之前加入排序邏輯
-  const sortedTutorCases = [...tutorCases].sort((a, b) => {
+  const sortedTutorCases = [...approvedCases].sort((a, b) => {
     // 定義狀態優先順序
     const statusOrder = {
       '急徵': 0,
@@ -63,7 +73,7 @@ export default function TutorCasesPage() {
           <CardTitle>所有家教需求</CardTitle>
         </CardHeader>
         <CardContent>
-          {tutorCases.length > 0 ? (
+          {approvedCases.length > 0 ? (
             <>
               <Table>
                 <TableHeader>
@@ -105,9 +115,6 @@ export default function TutorCasesPage() {
                         <Dialog open={selectedCase === tutorCase.id} onOpenChange={(open: boolean) => {
                           if (!open) {
                             setSelectedCase(null)
-                            // 重置輸入的家教編號
-                            setTutorCode('')
-                            setError('')
                             setVerificationSuccess(false)
                           }
                         }}>

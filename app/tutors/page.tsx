@@ -15,12 +15,35 @@ export default function TutorsPage() {
   // 獲取 approved 狀態的老師資料
   useEffect(() => {
     const fetchApprovedTutors = async () => {
+      // 先檢查 sessionStorage 中是否有資料
+      const cachedData = sessionStorage.getItem('approvedTutors')
+      const cachedTimestamp = sessionStorage.getItem('approvedTutorsTimestamp')
+      
+      // 如果有快取資料且未超過 10 分鐘，直接使用快取資料
+      if (cachedData && cachedTimestamp) {
+        const now = new Date().getTime()
+        const cacheTime = parseInt(cachedTimestamp)
+        const tenMinutes = 10 * 60 * 1000
+        
+        if (now - cacheTime < tenMinutes) {
+          setApprovedTutors(JSON.parse(cachedData))
+          return
+        }
+      }
+
+      // 如果沒有快取或快取已過期，從資料庫獲取資料
       const q = query(collection(db, 'tutors'), where("status", "==", "approved"))
       const querySnapshot = await getDocs(q)
       const tutorsList: Tutor[] = querySnapshot.docs.map(doc => ({
         ...(doc.data() as Tutor)
       }))
+      
+      // 更新 state
       setApprovedTutors(tutorsList)
+      
+      // 更新 sessionStorage
+      sessionStorage.setItem('approvedTutors', JSON.stringify(tutorsList))
+      sessionStorage.setItem('approvedTutorsTimestamp', new Date().getTime().toString())
     }
 
     fetchApprovedTutors()

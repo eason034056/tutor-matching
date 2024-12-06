@@ -31,7 +31,7 @@ export default function Home() {
       
       <p className="text-xl text-[#0F1035] text-bold mb-8 pt-8">由清華、交大畢業生創建的專業家教平台，專注新竹地區家教媒合<br/>幫助您輕鬆找到最適合的家教老師！</p>
       <div className="hidden md:flex justify-center items-end gap-4 mt-8">
-        <div className="h-56 w-1/5 bg-[#B9D7EA] rounded-3xl">
+        <div className="h-56 w-1/5 bg-[#D6E6F2] rounded-3xl">
           <p className="text-left pl-4 py-6 pb-2 text-4xl font-semibold">80%</p>
           <p className="text-left px-4 text-sm">以上的家長認為，個性化的家教能有效提高孩子的學習成績</p>
         </div>
@@ -43,7 +43,7 @@ export default function Home() {
           <p className="text-left pl-4 py-6 pb-2 text-4xl font-semibold">83%</p>
           <p className="text-left px-4 pb-4 text-sm">在家教輔導後，對學業的自信心顯著增強的學生比例</p>
         </div>
-        <div className="h-48 w-1/5 bg-[#769FCD] rounded-3xl">
+        <div className="h-48 w-1/5 bg-[#DFEFF0] rounded-3xl">
           <p className="text-left pl-4 py-6 pb-2 text-4xl font-semibold">2X</p>
           <p className="text-left px-4 pb-4 text-sm">專業家教能將學生的學習動機提升至原本的2倍以上</p>
         </div>

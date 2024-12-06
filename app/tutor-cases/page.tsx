@@ -21,12 +21,35 @@ export default function TutorCasesPage() {
   // 獲取 approved 狀態的案件資料
   useEffect(() => {
     const fetchApprovedCases = async () => {
+      // 先檢查 sessionStorage 中是否有資料
+      const cachedData = sessionStorage.getItem('approvedCases')
+      const cachedTimestamp = sessionStorage.getItem('approvedCasesTimestamp')
+      
+      // 如果有快取資料且未超過 10 分鐘，直接使用快取資料
+      if (cachedData && cachedTimestamp) {
+        const now = new Date().getTime()
+        const cacheTime = parseInt(cachedTimestamp)
+        const tenMinutes = 10 * 60 * 1000
+        
+        if (now - cacheTime < tenMinutes) {
+          setApprovedCases(JSON.parse(cachedData))
+          return
+        }
+      }
+
+      // 如果沒有快取或快取已過期，從資料庫獲取資料
       const q = query(collection(db, 'cases'), where("pending", "==", "approved"))
       const querySnapshot = await getDocs(q)
       const casesList: TutorCase[] = querySnapshot.docs.map(doc => ({
-        ...(doc.data() as TutorCase) // 確保資料符合 TutorCase 類型
+        ...(doc.data() as TutorCase)
       }))
+      
+      // 更新 state
       setApprovedCases(casesList)
+      
+      // 更新 sessionStorage
+      sessionStorage.setItem('approvedCases', JSON.stringify(casesList))
+      sessionStorage.setItem('approvedCasesTimestamp', new Date().getTime().toString())
     }
 
     fetchApprovedCases()
@@ -219,4 +242,3 @@ export default function TutorCasesPage() {
     </div>
   )
 }
-

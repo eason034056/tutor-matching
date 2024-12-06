@@ -7,7 +7,7 @@ export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   return (
-    <header className="bg-white text-primary-foreground p-4">
+    <header className="bg-white text-primary-foreground p-4 mt-4">
       <div className="container mx-auto flex flex-wrap justify-between items-center">
         <Link href="/" className="text-2xl text-[#0F1035] font-bold min-w-[140px]">新竹家教網</Link>
         
@@ -34,9 +34,9 @@ export default function Header() {
         <nav className={`${isMenuOpen ? 'block' : 'hidden'} w-full md:block md:w-auto`}>
           <ul className="flex flex-col md:flex-row px-4 md:px-0 md:space-x-4 font-bold space-y-4 md:space-y-0 mt-4 md:mt-0">
             <li><Link href="/case-upload" className="hover:underline block text-right md:text-left text-[#00A1B4]">找家教</Link></li>
+            <li><Link href="/tutor-registration" className="hover:underline block text-right md:text-left text-[#0F1035]">教師登錄</Link></li>
             <li><Link href="/tutors" className="hover:underline block text-right md:text-left text-[#0F1035]">家教老師</Link></li>
             <li><Link href="/tutor-cases" className="hover:underline block text-right md:text-left text-[#0F1035]">家教案件</Link></li>
-            <li><Link href="/tutor-registration" className="hover:underline block text-right md:text-left text-[#0F1035]">教師登錄</Link></li>
             <li className="group relative">
               <span className="hover:underline cursor-pointer block text-right md:text-left text-[#0F1035]">教師須知</span>
               <div className="absolute right-0 top-full hidden group-hover:block bg-[#415F9D] text-white rounded-md shadow-lg p-2 z-50 min-w-[120px] whitespace-nowrap">

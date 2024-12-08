@@ -3,13 +3,15 @@
 import { useState, useEffect } from 'react'
 import { onAuthStateChanged, User, signOut } from 'firebase/auth'
 import LoginForm from '@/components/auth/LoginForm'
-import { auth, db } from '@/server/config/firebase'
+import { auth, db, storage } from '@/server/config/firebase'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { Tutor, TutorCase } from '@/server/types'
 import { collection, query, where, getDocs, doc, updateDoc, deleteDoc, addDoc, getDoc } from 'firebase/firestore'
+import { ref } from 'firebase/storage'
+import { deleteObject } from 'firebase/storage'
 
 export default function AdminPage() {
   const [user, setUser] = useState<User | null>(null)
@@ -190,6 +192,29 @@ export default function AdminPage() {
         throw new Error('找不到該教師')
       }
       const tutorRef = querySnapshot.docs[0].ref
+
+      // Delete ID card images from storage
+      const tutorData = querySnapshot.docs[0].data();
+      
+      // Delete ID card photo if exists
+      if (tutorData.idCardUrl) {
+        try {
+          const idCardRef = ref(storage, tutorData.idCardUrl);
+          await deleteObject(idCardRef);
+        } catch (error) {
+          console.error('Error deleting ID card:', error);
+        }
+      }
+
+      // Delete student ID photo if exists  
+      if (tutorData.studentIdCardUrl) {
+        try {
+          const studentIdRef = ref(storage, tutorData.studentIdCardUrl);
+          await deleteObject(studentIdRef);
+        } catch (error) {
+          console.error('Error deleting student ID:', error);
+        }
+      }
       await deleteDoc(tutorRef)
       
       toast.success('已拒絕申請')
@@ -248,6 +273,17 @@ export default function AdminPage() {
   const handleCaseReject = async (id: string) => {
     try {
       const caseRef = doc(db, 'cases', id);
+
+      // 刪除 storage 中的照片
+      if (caseRef) {
+        const caseSnapshot = await getDoc(caseRef);
+        const caseData = caseSnapshot.data();
+        if (caseData?.idCardUrl) {
+          const imageRef = ref(storage, caseData.idCardUrl);
+          await deleteObject(imageRef);
+        }
+      }
+
       await deleteDoc(caseRef);
       
       toast.success('已拒絕案件')

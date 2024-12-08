@@ -14,6 +14,17 @@ export interface Tutor {
     idCardUrl: string;
 }
 
+export interface ApprovedTutor {
+    tutorId: string;
+    experience: string;
+    subjects: string[];
+    expertise: string;
+    major: string;
+    name: string;
+    school: string;
+    approvedAt: string;
+}
+
 export interface TutorCase {
     id: string;
     caseNumber: string;
@@ -37,4 +48,18 @@ export interface TutorCase {
     createdAt: string;
     pending: 'pending' | 'approved' | 'rejected';
     idCardUrl: string;
+}
+
+export interface ApprovedCase {
+    caseId: string;
+    caseNumber: string;
+    subject: string;
+    grade: string;
+    location: string;
+    availableTime: string;
+    studentDescription: string;
+    teacherRequirements: string;
+    hourlyFee: number;
+    status: '急徵' | '已徵到' | '有人接洽';
+    approvedAt: string;
 }

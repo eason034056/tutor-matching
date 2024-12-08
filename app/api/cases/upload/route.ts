@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { casesCollection } from '@/server/config/firebase'
 import { addDoc } from 'firebase/firestore'
+import { v4 as uuidv4 } from 'uuid'
 
 export async function POST(request: Request) {
   try {
@@ -8,16 +9,20 @@ export async function POST(request: Request) {
     const data = await request.json()
     console.log('Received case data:', data)
 
+    // 產生唯一ID
+    const uniqueId = uuidv4() as string & { readonly brand: unique symbol }
+
     // 新增到 Firebase
     const docRef = await addDoc(casesCollection, {
       ...data,
-      pending: 'pending',
+      id: uniqueId,
+      pending: 'pending', 
       createdAt: new Date().toISOString(),
     })
     
     const response = {
       success: true,
-      id: docRef.id,
+      id: uniqueId,
       ...data
     }
     console.log('Case created:', response)

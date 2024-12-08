@@ -1,32 +1,33 @@
 import { NextResponse } from 'next/server'
-import { doc, deleteDoc, getDoc } from 'firebase/firestore'
+import { where, query, getDocs, deleteDoc, getDoc } from 'firebase/firestore'
 import { ref, deleteObject } from 'firebase/storage'
-import { db, storage } from '@/server/config/firebase'
+import { storage, tutorsCollection } from '@/server/config/firebase'
 
 export async function POST(
   request: Request,
   { params }: { params: { id: string } }
 ) {
   try {
-    // 1. 先獲取文檔資料，以取得圖片 URL
-    const tutorRef = doc(db, 'tutors', params.id)
+    console.log('Received tutor rejection request for ID:', params.id)
+    const q = query(tutorsCollection, where('id', '==', params.id))
+    console.log('Query:', q)
+    const querySnapshot = await getDocs(q)
+    if (querySnapshot.empty) {
+      return NextResponse.json({ error: '找不到該教師' }, { status: 404 })
+    }
+
+    const tutorRef = querySnapshot.docs[0].ref
     const tutorSnap = await getDoc(tutorRef)
     
     if (!tutorSnap.exists()) {
-      return new NextResponse(JSON.stringify({ error: '找不到該申請' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' },
-      })
+      return NextResponse.json({ error: '找不到該申請' }, { status: 404 })
     }
 
     const tutorData = tutorSnap.data()
 
-    // 2. 刪除 Storage 中的圖片
     try {
-      // 從 gs:// URL 中提取檔案路徑
       const getStoragePath = (gsUrl: string) => {
         try {
-          // 移除 "gs://bucket-name/" 部分
           const path = gsUrl.replace(/^gs:\/\/[^\/]+\//, '')
           return path
         } catch (error) {
@@ -56,10 +57,9 @@ export async function POST(
       }
     } catch (error) {
       console.error('Error deleting images:', error)
-      // 繼續執行，即使圖片刪除失敗
     }
 
-    // 3. 刪除 Firestore 文檔
+    // 從資料庫中刪除文檔
     await deleteDoc(tutorRef)
     
     return new NextResponse(JSON.stringify({ 

@@ -1,67 +1,201 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { onAuthStateChanged, User, signOut } from 'firebase/auth'
+import LoginForm from '@/components/auth/LoginForm'
+import { auth, db } from '@/server/config/firebase'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { Tutor, TutorCase } from '@/server/types'
+import { collection, query, where, getDocs, doc, updateDoc, deleteDoc, addDoc, getDoc } from 'firebase/firestore'
 
 export default function AdminPage() {
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
   const [pendingTutors, setPendingTutors] = useState<Tutor[]>([])
   const [pendingCases, setPendingCases] = useState<TutorCase[]>([])
-  
-  // 載入待審核資料
-  useEffect(() => {
-    fetchPendingData()
-  }, [])
+  const [lastActivity, setLastActivity] = useState(Date.now())
+  const [inactiveTime, setInactiveTime] = useState(0)
 
   const fetchPendingData = async () => {
     try {
-      const [tutorsRes, casesRes] = await Promise.all([
-        fetch('/api/admin/tutors/pending'),
-        fetch('/api/admin/cases/pending')
-      ])
+      // 確保用戶已登入
+      const currentUser = auth.currentUser
+      if (!currentUser) {
+        console.error('請先登入');
+        return;
+      }
 
-      if (!tutorsRes.ok || !casesRes.ok) throw new Error('Failed to fetch')
+      // 使用 Firestore 查詢
+      const tutorsQuery = query(collection(db, 'tutors'), where('status', '==', 'pending'));
+      const casesQuery = query(collection(db, 'cases'), where('pending', '==', 'pending'));
       
-      const tutors = await tutorsRes.json()
-      const cases = await casesRes.json()
-      
-      setPendingTutors(tutors)
-      setPendingCases(cases)
+      const [tutorsSnapshot, casesSnapshot] = await Promise.all([
+        getDocs(tutorsQuery),
+        getDocs(casesQuery)
+      ]);
+
+      const tutors = tutorsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Tutor[];
+
+      const cases = casesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as TutorCase[];
+
+      setPendingTutors(tutors);
+      setPendingCases(cases);
     } catch (error) {
-      toast.error('載入失敗')
+      console.error('Fetch error:', error);
+      toast.error('載入失敗');
+    }
+  };
+
+  // 監聽使用者登入狀態
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user)
+      setLoading(false)
+      if (user) {
+        fetchPendingData()
+      }
+    })
+
+    return () => unsubscribe()
+  }, [])
+
+  // 自動登出計時器
+  useEffect(() => {
+    const currentUser = auth.currentUser
+    if (!currentUser) return
+
+    const updateLastActivity = () => {
+      setLastActivity(Date.now())
+    }
+
+    // 監聽使用者活動
+    window.addEventListener('mousemove', updateLastActivity)
+    window.addEventListener('keydown', updateLastActivity)
+    window.addEventListener('click', updateLastActivity)
+
+    // 每秒更新閒置時間
+    const updateInterval = setInterval(() => {
+      const now = Date.now()
+      const inactive = now - lastActivity
+      setInactiveTime(inactive)
+      
+      if (inactive > 10 * 60 * 1000) { // 10分鐘
+        handleLogout()
+        toast.info('因閒置過久，系統已自動登出')
+      }
+    }, 1000)
+
+    return () => {
+      window.removeEventListener('mousemove', updateLastActivity)
+      window.removeEventListener('keydown', updateLastActivity)
+      window.removeEventListener('click', updateLastActivity)
+      clearInterval(updateInterval)
+    }
+  }, [user, lastActivity])
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth)
+      toast.success('已登出')
+    } catch (error) {
+      toast.error('登出失敗')
     }
   }
 
-  // 處理教審核
+  if (loading) {
+    return (
+      <div className="container mx-auto py-8 flex justify-center items-center min-h-screen">
+        <p>載入中...</p>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <div className="container mx-auto py-8">
+        <div className="max-w-md mx-auto">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-2xl text-center">管理員登入</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <LoginForm />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
+  // 處理教師審核
   const handleTutorApprove = async (id: string) => {
     try {
-      const response = await fetch(`/api/admin/tutors/${id}/approve`, {
-        method: 'POST'
-      })
-      if (!response.ok) throw new Error('審核失敗')
+      const q = query(collection(db, 'tutors'), where('id', '==', id));
+      const querySnapshot = await getDocs(q)
+      if (querySnapshot.empty) {
+        throw new Error('找不到該教師')
+      }
+      const tutorRef = querySnapshot.docs[0].ref
+      const tutorData = querySnapshot.docs[0].data();
+
+      // Validate required fields
+      const requiredFields = ['experience', 'expertise', 'major', 'name', 'school', 'subjects'];
+      const missingFields = requiredFields.filter(field => !tutorData[field]);
+      
+      if (missingFields.length > 0) {
+        throw new Error(`教師資料不完整，缺少: ${missingFields.join(', ')}`);
+      }
+
+      await updateDoc(tutorRef, {
+        status: 'approved',
+        isActive: true,
+        approvedAt: new Date().toISOString()
+      });
+
+      // Store approved tutor info in approvedTutors collection
+      await addDoc(collection(db, 'approvedTutors'), {
+        tutorId: id,
+        experience: tutorData.experience,
+        subjects: tutorData.subjects,
+        expertise: tutorData.expertise,
+        major: tutorData.major,
+        name: tutorData.name,
+        school: tutorData.school,
+        approvedAt: new Date().toISOString()
+      });
       
       toast.success('審核通過')
       fetchPendingData()
     } catch (error) {
-      toast.error('審核失敗')
+      console.error('Error approving tutor:', error);
+      toast.error(error instanceof Error ? error.message : '審核失敗')
     }
   }
 
   // 處理家教拒絕
   const handleTutorReject = async (id: string) => {
     try {
-      const response = await fetch(`/api/admin/tutors/${id}/reject`, {
-        method: 'POST'
-      })
-      if (!response.ok) throw new Error('拒絕失敗')
+      const q = query(collection(db, 'tutors'), where('id', '==', id));
+      const querySnapshot = await getDocs(q)
+      if (querySnapshot.empty) {
+        throw new Error('找不到該教師')
+      }
+      const tutorRef = querySnapshot.docs[0].ref
+      await deleteDoc(tutorRef)
       
       toast.success('已拒絕申請')
       fetchPendingData()
     } catch (error) {
-      toast.error('操作失敗')
+      console.error('操作失敗: ', error)
     }
   }
 
@@ -73,14 +207,35 @@ export default function AdminPage() {
         toast.error('案件ID無效')
         return
       }
+      console.log(id)
 
-      console.log('Sending approval request for case:', id)
-      const response = await fetch(`/api/admin/cases/${id}/approve`, {
-        method: 'POST'
-      })
+      const caseRef = doc(db, 'cases', id);
+      const caseSnapshot = await getDoc(caseRef);
+      const caseData = caseSnapshot.data();
 
-      if (!response.ok) throw new Error('審核失敗')
+      if (!caseData) {
+        throw new Error('找不到該案件')
+      }
+
+      await updateDoc(caseRef, {
+        pending: 'approved'
+      });
+
+      // Add approved case to approvedCases collection
+      await addDoc(collection(db, 'approvedCases'), {
+        caseNumber: caseData.caseNumber,
+        subject: caseData.subject,
+        grade: caseData.grade,
+        location: caseData.location,
+        availableTime: caseData.availableTime,
+        teacherRequirements: caseData.teacherRequirements,
+        studentDescription: caseData.studentDescription,
+        hourlyFee: caseData.hourlyFee,
+        status: caseData.status,
+        approvedAt: new Date().toISOString()
+      });
       
+
       toast.success('案件已通過審核')
       fetchPendingData()
     } catch (error) {
@@ -92,10 +247,8 @@ export default function AdminPage() {
   // 處理案件拒絕
   const handleCaseReject = async (id: string) => {
     try {
-      const response = await fetch(`/api/admin/cases/${id}/reject`, {
-        method: 'POST'
-      })
-      if (!response.ok) throw new Error('拒絕失敗')
+      const caseRef = doc(db, 'cases', id);
+      await deleteDoc(caseRef);
       
       toast.success('已拒絕案件')
       fetchPendingData()
@@ -106,7 +259,19 @@ export default function AdminPage() {
 
   return (
     <div className="container mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-6">管理員後台</h1>
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-3xl font-bold">管理員後台</h1>
+        </div>
+        <div className="flex flex-row items-center gap-2">
+          <p className="text-sm text-gray-500">
+            閒置時間: {Math.floor(inactiveTime / 1000)} 秒
+          </p>
+        <Button variant="outline" onClick={handleLogout}>
+            登出
+          </Button>
+        </div>
+      </div>
       
       <Tabs defaultValue="tutors">
         <TabsList>

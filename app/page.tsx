@@ -10,7 +10,7 @@ export default function Home() {
             <div className="w-fit md:ml-12">
               <h1 className="text-3xl text-center md:text-left text-[#0F1035] font-bold mt-8 w-fit">歡迎來到新竹家教網</h1>
               <div className="flex flex-row my-4 text-center md:text-left w-full">
-                <Link href="/tutor-registration" className="flex-1 pr-2">
+                <Link href="/tutor-cases" className="flex-1 pr-2">
                   <Button size="lg" className="bg-[#415F9D] text-white hover:bg-[#415F9D]/80 rounded-3xl w-full">接家教</Button>
                 </Link>
                 <Link href="/case-upload" className="flex-1 pl-2">
@@ -44,7 +44,7 @@ export default function Home() {
           <p className="text-left px-4 pb-4 text-sm">在家教輔導後，對學業的自信心顯著增強的學生比例</p>
         </div>
         <div className="h-48 w-1/5 bg-[#DFEFF0] rounded-3xl">
-          <p className="text-left pl-4 py-6 pb-2 text-4xl font-semibold">2X</p>
+          <p className="text-left pl-4 py-6 pb-2 text-4xl font-semibold">2x</p>
           <p className="text-left px-4 pb-4 text-sm">專業家教能將學生的學習動機提升至原本的2倍以上</p>
         </div>
         <div className="h-56 w-1/5 bg-[#D6E6F2] rounded-3xl">

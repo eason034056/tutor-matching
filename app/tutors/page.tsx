@@ -5,11 +5,11 @@ import { Button } from "@/components/ui/button"
 import { useEffect, useState } from 'react'
 import { collection, query, where, getDocs } from "firebase/firestore"
 import { db } from "@/server/config/firebase"
-import { Tutor } from '@/server/types/index'
+import { ApprovedTutor } from '@/server/types/index'
 
 export default function TutorsPage() {
   const [currentPage, setCurrentPage] = useState(1)
-  const [approvedTutors, setApprovedTutors] = useState<Tutor[]>([])
+  const [approvedTutors, setApprovedTutors] = useState<ApprovedTutor[]>([])
   const itemsPerPage = 9 // 每頁顯示 9 位老師 (3x3 網格)
 
   // 獲取 approved 狀態的老師資料
@@ -32,11 +32,12 @@ export default function TutorsPage() {
       }
 
       // 如果沒有快取或快取已過期，從資料庫獲取資料
-      const q = query(collection(db, 'tutors'), where("status", "==", "approved"))
+      const q = query(collection(db, 'approvedTutors'))
       const querySnapshot = await getDocs(q)
-      const tutorsList: Tutor[] = querySnapshot.docs.map(doc => ({
-        ...(doc.data() as Tutor)
+      const tutorsList: ApprovedTutor[] = querySnapshot.docs.map(doc => ({
+        ...(doc.data() as ApprovedTutor)
       }))
+      console.log(tutorsList)
       
       // 更新 state
       setApprovedTutors(tutorsList)
@@ -69,7 +70,7 @@ export default function TutorsPage() {
       <h1 className="text-4xl font-bold mb-8 text-center">尋找合適的家教老師</h1>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {getCurrentPageItems().map((tutor) => (
-          <Card key={tutor.id} className="hover:shadow-lg transition-shadow">
+          <Card key={tutor.tutorId} className="hover:shadow-lg transition-shadow">
             <CardHeader className="bg-gray-50">
               <CardTitle className="text-2xl">{tutor.name.charAt(0)}老師</CardTitle>
             </CardHeader>

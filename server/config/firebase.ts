@@ -13,24 +13,27 @@ import {
   DocumentSnapshot
 } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
-
+import { getAuth } from "firebase/auth";
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: process.env.FIREBASE_API_KEY,
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: "tutor-matching-5c608.firebaseapp.com",
   projectId: "tutor-matching-5c608",
   storageBucket: "tutor-matching-5c608.firebasestorage.app",
   messagingSenderId: "645473434432",
-  appId: process.env.FIREBASE_APP_ID
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+export const auth = getAuth(app);
 
 // 初始化 Storage
 export const storage = getStorage(app);
 
 export const tutorsCollection = collection(db, 'tutors');
 export const casesCollection = collection(db, 'cases');
+export const approvedTutorsCollection = collection(db, 'approvedTutors');
+export const approvedCasesCollection = collection(db, 'approvedCases');
 export default app;

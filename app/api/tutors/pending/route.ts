@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { tutorsCollection } from '@/server/config/firebase'
 import { addDoc } from 'firebase/firestore'
 import { Tutor } from '@/server/types'
+import { v4 as uuidv4 } from 'uuid'
 
 export async function POST(request: Request) {
   try {
@@ -9,9 +10,13 @@ export async function POST(request: Request) {
     const data = await request.json()
     console.log('Received tutor data:', data)
 
+    // 產生唯一ID
+    const uniqueId = uuidv4() as string & { readonly brand: unique symbol }
+
     // 新增到 Firebase
     const docRef = await addDoc(tutorsCollection, {
       ...data,
+      id: uniqueId,
       status: 'pending',
       isActive: false,
       createdAt: new Date().toISOString(),
@@ -19,7 +24,7 @@ export async function POST(request: Request) {
     
     const response = {
       success: true,
-      id: docRef.id,
+      id: uniqueId,
       ...data
     }
     console.log('Tutor registration created:', response)

@@ -1,25 +1,24 @@
 import { NextResponse } from 'next/server'
-import { doc, deleteDoc, getDoc } from 'firebase/firestore'
+import { deleteDoc, getDocs, query, where } from 'firebase/firestore'
 import { ref, deleteObject } from 'firebase/storage'
-import { db, storage } from '@/server/config/firebase'
+import { casesCollection, storage } from '@/server/config/firebase'
 
 export async function POST(
   request: Request,
   { params }: { params: { id: string } }
 ) {
   try {
-    // 1. 先獲取案件資料，以取得圖片 URL
-    const caseRef = doc(db, 'cases', params.id)
-    const caseSnap = await getDoc(caseRef)
-    
-    if (!caseSnap.exists()) {
-      return new NextResponse(JSON.stringify({ error: '找不到該案件' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' },
-      })
+    console.log('Received tutor approval request for ID:', params.id)
+    const q = query(casesCollection, where('id', '==', params.id))
+    console.log('Query:', q)
+    const querySnapshot = await getDocs(q)
+    if (querySnapshot.empty) {
+      return NextResponse.json({ error: '找不到該案件' }, { status: 404 })
     }
-
-    const caseData = caseSnap.data()
+    
+    const caseDoc = querySnapshot.docs[0]
+    const caseData = caseDoc.data()
+    const caseRef = caseDoc.ref
 
     // 2. 刪除 Storage 中的身分證照片
     try {

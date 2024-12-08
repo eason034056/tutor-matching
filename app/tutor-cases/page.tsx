@@ -1,19 +1,19 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { TutorCase } from '@/server/types/index'
+import { ApprovedCase } from '@/server/types/index'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import Link from 'next/link'
-import { collection, query, where, getDocs } from 'firebase/firestore'
-import { db } from '@/server/config/firebase'
+import { query, getDocs } from 'firebase/firestore'
+import { approvedCasesCollection } from '@/server/config/firebase'
 
 export default function TutorCasesPage() {
   const [selectedCase, setSelectedCase] = useState<string | null>(null) 
-  const [approvedCases, setApprovedCases] = useState<TutorCase[]>([])
+  const [approvedCases, setApprovedCases] = useState<ApprovedCase[]>([])
   const [verificationSuccess, setVerificationSuccess] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10 // 每頁顯示的案件數量
@@ -38,10 +38,10 @@ export default function TutorCasesPage() {
       }
 
       // 如果沒有快取或快取已過期，從資料庫獲取資料
-      const q = query(collection(db, 'cases'), where("pending", "==", "approved"))
+      const q = query(approvedCasesCollection)
       const querySnapshot = await getDocs(q)
-      const casesList: TutorCase[] = querySnapshot.docs.map(doc => ({
-        ...(doc.data() as TutorCase)
+      const casesList: ApprovedCase[] = querySnapshot.docs.map(doc => ({
+        ...(doc.data() as ApprovedCase)
       }))
       
       // 更新 state
@@ -55,7 +55,7 @@ export default function TutorCasesPage() {
     fetchApprovedCases()
   }, [])
   
-  const canApply = (tutorCase: TutorCase) => {
+  const canApply = (tutorCase: ApprovedCase) => {
     if (tutorCase.status === '已徵到' || tutorCase.status === '有人接洽') return false;
     return tutorCase.status === '急徵';
   };
@@ -115,7 +115,7 @@ export default function TutorCasesPage() {
                 </TableHeader>
                 <TableBody>
                   {getCurrentPageItems().map((tutorCase) => (
-                    <TableRow key={tutorCase.id}>
+                    <TableRow key={tutorCase.caseId}>
                       <TableCell className="font-medium">{tutorCase.caseNumber}</TableCell>
                       <TableCell>{tutorCase.subject}</TableCell>
                       <TableCell className="w-20">{tutorCase.grade}</TableCell>
@@ -135,7 +135,7 @@ export default function TutorCasesPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Dialog open={selectedCase === tutorCase.id} onOpenChange={(open: boolean) => {
+                        <Dialog open={selectedCase === tutorCase.caseId} onOpenChange={(open: boolean) => {
                           if (!open) {
                             setSelectedCase(null)
                             setVerificationSuccess(false)
@@ -144,7 +144,7 @@ export default function TutorCasesPage() {
                           <DialogTrigger asChild>
                             <Button 
                               variant="outline"
-                              onClick={() => setSelectedCase(tutorCase.id)}
+                              onClick={() => setSelectedCase(tutorCase.caseId)}
                               disabled={!canApply(tutorCase)}
                             >應徵</Button>
                           </DialogTrigger>

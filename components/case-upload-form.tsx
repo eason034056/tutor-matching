@@ -8,9 +8,10 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "@/server/config/firebase";
+import { db, storage } from "@/server/config/firebase";
 import { addWatermark } from "@/lib/imageUtils";
 import { toast } from "sonner"
+import { collection, addDoc} from 'firebase/firestore'
 
 export default function CaseUploadForm() {
   const router = useRouter()
@@ -81,28 +82,21 @@ export default function CaseUploadForm() {
 
       const caseNumber = 'C' + Math.random().toString(36).substring(2, 8).toUpperCase()
       
-      const response = await fetch('/api/cases/upload', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...formData,
-          idCardUrl,  // 添加身分證 URL
-          caseNumber,
-          status: '急徵',
-          pending: 'pending',  // 添加審核狀態
-          createdAt: new Date().toISOString(),
-          hourlyFee: parseInt(formData.hourlyFee)
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error('提交失敗')
+      // 使用 Firestore SDK 新增案件資料
+      const { idCard, ...formDataWithoutIdCard } = formData
+      const caseData = {
+        ...formDataWithoutIdCard,
+        idCardUrl,
+        caseNumber,
+        status: '急徵',
+        pending: 'pending',
+        createdAt: new Date().toISOString(),
+        hourlyFee: parseInt(formData.hourlyFee)
       }
 
-      const data = await response.json()
-      console.log('Response:', data)
+      const casesRef = collection(db, 'cases')
+      const docRef = await addDoc(casesRef, caseData)
+      console.log('Case uploaded with ID:', docRef.id)
 
       // 清空表單資料
       setFormData({

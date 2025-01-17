@@ -10,7 +10,7 @@ import { ApprovedTutor } from '@/server/types/index'
 export default function TutorsPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [approvedTutors, setApprovedTutors] = useState<ApprovedTutor[]>([])
-  const itemsPerPage = 9 // 每頁顯示 9 位老師 (3x3 網格)
+  const itemsPerPage = 6 // 每頁顯示 6 位老師 (2x3 網格)
 
   // 獲取 approved 狀態的老師資料
   useEffect(() => {

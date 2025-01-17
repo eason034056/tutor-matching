@@ -9,7 +9,7 @@ export default function Header() {
   return (
     <header className="bg-white text-primary-foreground p-4 mt-4">
       <div className="container mx-auto flex flex-wrap justify-between items-center">
-        <Link href="/" className="text-2xl text-[#0F1035] font-bold min-w-[140px]">新竹家教網</Link>
+        <Link href="/" className="text-2xl text-[#0F1035] font-bold min-w-[140px]">優學家教媒合</Link>
         
         {/* 漢堡選單按鈕 - 只在小螢幕顯示 */}
         <button 
@@ -33,7 +33,7 @@ export default function Header() {
 
         <nav className={`${isMenuOpen ? 'block' : 'hidden'} w-full md:block md:w-auto`}>
           <ul className="flex flex-col md:flex-row px-4 md:px-0 md:space-x-4 font-bold space-y-4 md:space-y-0 mt-4 md:mt-0">
-            <li><Link href="/case-upload" className="hover:underline block text-right md:text-left text-[#00A1B4]">找家教</Link></li>
+            
             <li><Link href="/tutor-registration" className="hover:underline block text-right md:text-left text-[#0F1035]">教師登錄</Link></li>
             <li><Link href="/tutors" className="hover:underline block text-right md:text-left text-[#0F1035]">家教老師</Link></li>
             <li><Link href="/tutor-cases" className="hover:underline block text-right md:text-left text-[#0F1035]">家教案件</Link></li>
@@ -54,14 +54,15 @@ export default function Header() {
                 <Link href="/comparison" className="block px-4 py-2 hover:bg-white hover:text-[#0F1035] rounded-sm text-right md:text-left">
                   與補習班之比較
                 </Link>
-                <Link href="/license" className="block px-4 py-2 hover:bg-white hover:text-[#0F1035] rounded-sm text-right md:text-left">
+                {/* <Link href="/license" className="block px-4 py-2 hover:bg-white hover:text-[#0F1035] rounded-sm text-right md:text-left">
                   政府立案
-                </Link>
+                </Link> */}
                 <Link href="/pricing" className="block px-4 py-2 hover:bg-white hover:text-[#0F1035] rounded-sm text-right md:text-left">
                   家教費用參考
                 </Link>
               </div>
             </li>
+            <li><Link href="/case-upload" className="hover:underline block text-right md:text-left bg-[#00A1B4] px-4 text-white rounded-3xl">找家教</Link></li>
           </ul>
         </nav>
       </div>

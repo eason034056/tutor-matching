@@ -340,6 +340,10 @@ export default function AdminPage() {
                   <h3 className="font-bold">{tutor.name}</h3>
                   <p>電話：{tutor.phoneNumber}</p>
                   <p>科目：{tutor.subjects.join(', ')}</p>
+                  <p>經驗：{tutor.experience}</p>
+                  <p>學校：{tutor.school}</p>
+                  <p>專長：{tutor.expertise}</p>
+                  <p>學位：{tutor.major}</p>
                   <div className="grid grid-cols-2 gap-4 mt-4">
                     <div>
                       <h4 className="font-semibold mb-2">學生證</h4>

@@ -93,7 +93,7 @@ export default function TutorCasesPage() {
       <h1 className="text-3xl font-bold mb-6">家教案件列表</h1>
       <Card>
         <CardHeader>
-          <CardTitle>所有家教需求</CardTitle>
+          <CardTitle>所有家教案件</CardTitle>
         </CardHeader>
         <CardContent>
           {approvedCases.length > 0 ? (

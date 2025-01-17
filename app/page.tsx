@@ -3,12 +3,12 @@ import { Button } from "@/components/ui/button"
 
 export default function Home() {
   return (
-    <div className="container mx-auto text-center min-h-screen flex flex-col">
+    <div className="container mx-auto text-center flex flex-col">
       <div className="container bg-[#B9D7EA] mx-auto mb-8 rounded-3xl">
         <div className="flex flex-col md:flex-row items-center justify-between">
           <div className="md:w-1/2 mb-8 md:mb-0">
             <div className="w-fit md:ml-12">
-              <h1 className="text-3xl text-center md:text-left text-[#0F1035] font-bold mt-8 w-fit">歡迎來到新竹家教網</h1>
+              <h1 className="text-3xl text-center md:text-left text-[#0F1035] font-bold mt-8 w-fit">歡迎來到優學家教媒合</h1>
               <div className="flex flex-row my-4 text-center md:text-left w-full">
                 <Link href="/tutor-cases" className="flex-1 pr-2">
                   <Button size="lg" className="bg-[#415F9D] text-white hover:bg-[#415F9D]/80 rounded-3xl w-full">接家教</Button>
@@ -29,7 +29,7 @@ export default function Home() {
         </div>
       </div>
       
-      <p className="text-xl text-[#0F1035] text-bold mb-8 pt-8">由清華、交大畢業生創建的專業家教平台，專注新竹地區家教媒合<br/>幫助您輕鬆找到最適合的家教老師！</p>
+      <p className="text-xl text-[#0F1035] text-bold mb-8 pt-8">由清華、交大畢業生創建的免費家教媒合平台，專注新竹台北地區家教媒合<br/>幫助家教老師以及家長輕鬆媒合，無須支付任何費用！</p>
       <div className="hidden md:flex justify-center items-end gap-4 mt-8">
         <div className="h-56 w-1/5 bg-[#D6E6F2] rounded-3xl">
           <p className="text-left pl-4 py-6 pb-2 text-4xl font-semibold">80%</p>

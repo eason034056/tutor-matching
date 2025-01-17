@@ -8,6 +8,7 @@ export default function CaseUploadPage() {
         <CardHeader>
           <CardTitle>家長登錄</CardTitle>
           <CardDescription>請填寫以下表單來提交您的家教需求，我們將盡快為您安排合適的家教老師。</CardDescription>
+          <CardDescription>或是直接私訊我們，LINE ID：@home-tutor-tw</CardDescription>
         </CardHeader>
         <CardContent>
           <CaseUploadForm />

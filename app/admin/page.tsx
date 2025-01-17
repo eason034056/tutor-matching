@@ -259,6 +259,7 @@ export default function AdminPage() {
         studentDescription: caseData.studentDescription,
         hourlyFee: caseData.hourlyFee,
         status: caseData.status,
+        region: caseData.region,
         approvedAt: new Date().toISOString()
       });
       

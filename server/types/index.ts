@@ -48,6 +48,7 @@ export interface TutorCase {
     createdAt: string;
     pending: 'pending' | 'approved' | 'rejected';
     idCardUrl: string;
+    region: string;
 }
 
 export interface ApprovedCase {
@@ -62,4 +63,5 @@ export interface ApprovedCase {
     hourlyFee: number;
     status: '急徵' | '已徵到' | '有人接洽';
     approvedAt: string;
+    region: string;
 }

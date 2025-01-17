@@ -30,6 +30,7 @@ export default function CaseUploadForm() {
     studentDescription: '',
     subject: '',
     location: '',
+    region: '',
     availableTime: '',
     teacherRequirements: '',
     hourlyFee: '',
@@ -95,6 +96,7 @@ export default function CaseUploadForm() {
         studentDescription: formData.studentDescription,
         subject: formData.subject,
         location: formData.location,
+        region: formData.region,
         availableTime: formData.availableTime,
         teacherRequirements: formData.teacherRequirements,
         hourlyFee: parseInt(formData.hourlyFee),
@@ -124,6 +126,7 @@ export default function CaseUploadForm() {
         studentDescription: '',
         subject: '',
         location: '',
+        region: '',
         availableTime: '',
         teacherRequirements: '',
         hourlyFee: '',
@@ -286,6 +289,21 @@ export default function CaseUploadForm() {
       <div className="space-y-4">
         <h2 className="text-lg font-semibold">家教需求</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label>地區</Label>
+            <Select 
+              onValueChange={(value) => handleSelectChange('region', value)}
+              required
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="請選擇地區" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="台北">台北</SelectItem>
+                <SelectItem value="新竹">新竹</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div>
             <Label htmlFor="subject">需求科目</Label>
             <Input

@@ -45,6 +45,7 @@ export async function POST(
         teacherRequirements: caseData.teacherRequirements,
         hourlyFee: caseData.hourlyFee,
         status: caseData.status,
+        region: caseData.region,
         approvedAt: new Date().toISOString()
       })
     } catch (error) {

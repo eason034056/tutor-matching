@@ -10,12 +10,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import Link from 'next/link'
 import { query, getDocs } from 'firebase/firestore'
 import { approvedCasesCollection } from '@/server/config/firebase'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 
 export default function TutorCasesPage() {
   const [selectedCase, setSelectedCase] = useState<string | null>(null) 
   const [approvedCases, setApprovedCases] = useState<ApprovedCase[]>([])
   const [verificationSuccess, setVerificationSuccess] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
+  const [selectedRegion, setSelectedRegion] = useState<string>('all')
   const itemsPerPage = 10 // 每頁顯示的案件數量
 
   // 獲取 approved 狀態的案件資料
@@ -60,27 +62,29 @@ export default function TutorCasesPage() {
     return tutorCase.status === '急徵';
   };
 
-  // 在 return 語句之前加入排序邏輯
-  const sortedTutorCases = [...approvedCases].sort((a, b) => {
-    // 定義狀態優先順序
-    const statusOrder = {
-      '急徵': 0,
-      '有人接洽': 1, 
-      '已徵到': 2
-    };
-    
-    // 根據狀態優先順序進行排序
-    return statusOrder[a.status] - statusOrder[b.status];
-  });
+  // 新增篩選邏輯
+  const filteredAndSortedCases = [...approvedCases]
+    .filter(tutorCase => {
+      if (selectedRegion === 'all') return true;
+      return tutorCase.region === selectedRegion;
+    })
+    .sort((a, b) => {
+      const statusOrder = {
+        '急徵': 0,
+        '有人接洽': 1,
+        '已徵到': 2
+      };
+      return statusOrder[a.status] - statusOrder[b.status];
+    });
 
-  // 計算總頁數
-  const totalPages = Math.ceil(sortedTutorCases.length / itemsPerPage)
-  
-  // 取得當前頁面要顯示的案件
+  // 更新分頁計算
+  const totalPages = Math.ceil(filteredAndSortedCases.length / itemsPerPage)
+
+  // 更新當前頁面項目獲取邏輯
   const getCurrentPageItems = () => {
     const startIndex = (currentPage - 1) * itemsPerPage
     const endIndex = startIndex + itemsPerPage
-    return sortedTutorCases.slice(startIndex, endIndex)
+    return filteredAndSortedCases.slice(startIndex, endIndex)
   }
 
   // 分頁按鈕處理函數
@@ -88,15 +92,37 @@ export default function TutorCasesPage() {
     setCurrentPage(pageNumber)
   }
 
+  const handleRegionChange = (value: string) => {
+    setSelectedRegion(value)
+    setCurrentPage(1)
+  }
+
   return (
     <div className="container mx-auto py-8">
       <h1 className="text-3xl font-bold mb-6">家教案件列表</h1>
       <Card>
         <CardHeader>
-          <CardTitle>所有家教案件</CardTitle>
+          <div className="flex justify-between items-center">
+            <CardTitle>所有家教案件</CardTitle>
+            <div className="w-48">
+              <Select
+                value={selectedRegion}
+                onValueChange={handleRegionChange}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="選擇地區" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">所有地區</SelectItem>
+                  <SelectItem value="台北">台北</SelectItem>
+                  <SelectItem value="新竹">新竹</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-          {approvedCases.length > 0 ? (
+          {filteredAndSortedCases.length > 0 ? (
             <>
               <Table>
                 <TableHeader>
@@ -235,7 +261,7 @@ export default function TutorCasesPage() {
               </div>
             </>
           ) : (
-            <p>目前沒有家教案件</p>
+            <p>目前沒有符合條件的家教案件</p>
           )}
         </CardContent>
       </Card>

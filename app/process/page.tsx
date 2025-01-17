@@ -6,31 +6,69 @@ export default function ProcessPage() {
       {/* 接案流程 */}
       <div className="bg-white p-6 rounded-lg shadow-md mb-8 space-y-4">
         <h2 className="text-xl font-bold mb-4">接家教流程</h2>
-        {[
-          <span>填寫<a href="/tutor-registration" className="text-blue-600 hover:underline">家教註冊表單</a></span>,
-          "等待身份審核，審核完畢後會收到email傳送教師編號(請記得您的教師編號)",
-          "在案件專區找尋想接的案件",
-          "點擊「應徵」按鈕後寄信給家教中心取得合約書以及同意書",
-          "聯繫家長並預約試教時間",
-          "取得家長聯絡資訊之後三天內要用email回報試教時間，否則案件會被重新開放應徵",
-          "試教完後記得利用email進行案件回報，回報需包含以下資訊：\n" +
-          "    1. case編號\n" +
-          "    2. 姓名\n" +
-          "    3. 一星期上幾天\n" +
-          "    4. 幾月幾日開課\n" +
-          "    5. 星期幾上課\n" +
-          "    6. 每次幾小時\n" +
-          "    7. 時薪多少\n" +
-          "    8. 有無特殊狀況",
-          "一個家教老師一次只能應徵一個案件，等一個案件回報完成後才能再接下一個"
-        ].map((text, index) => (
-          <div key={index} className="flex gap-4">
-            <span className="font-bold">{index + 1}.</span>
-            <p className="text-gray-700 leading-relaxed whitespace-pre-line">
-              {typeof text === 'string' ? text : text}
-            </p>
-          </div>
-        ))}
+        <div className="flex gap-4">
+          <span className="font-bold">1.</span>
+          <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+            <span>填寫<a href="/tutor-registration" className="text-blue-600 hover:underline">家教註冊表單</a></span>
+          </p>
+        </div>
+
+        <div className="flex gap-4">
+          <span className="font-bold">2.</span>
+          <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+            等待身份審核，審核完畢後會收到email傳送教師編號(請記得您的教師編號)
+          </p>
+        </div>
+
+        <div className="flex gap-4">
+          <span className="font-bold">3.</span>
+          <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+            在案件專區找尋想接的案件
+          </p>
+        </div>
+
+        <div className="flex gap-4">
+          <span className="font-bold">4.</span>
+          <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+            點擊「應徵」按鈕後寄信給家教中心取得合約書以及同意書
+          </p>
+        </div>
+
+        <div className="flex gap-4">
+          <span className="font-bold">5.</span>
+          <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+            聯繫家長並預約試教時間
+          </p>
+        </div>
+
+        <div className="flex gap-4">
+          <span className="font-bold">6.</span>
+          <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+            取得家長聯絡資訊之後三天內要用email回報試教時間，否則案件會被重新開放應徵
+          </p>
+        </div>
+
+        <div className="flex gap-4">
+          <span className="font-bold">7.</span>
+          <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+            試教完後記得利用email進行案件回報，回報需包含以下資訊：
+            1. case編號
+            2. 姓名
+            3. 一星期上幾天
+            4. 幾月幾日開課
+            5. 星期幾上課
+            6. 每次幾小時
+            7. 時薪多少
+            8. 有無特殊狀況
+          </p>
+        </div>
+
+        <div className="flex gap-4">
+          <span className="font-bold">8.</span>
+          <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+            一個家教老師一次只能應徵一個案件，等一個案件回報完成後才能再接下一個
+          </p>
+        </div>
       </div>
 
       {/* 面談指南 */}

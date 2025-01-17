@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Button } from "@/components/ui/button"
-
+import Image from 'next/image'
 export default function Home() {
   return (
     <div className="container mx-auto text-center flex flex-col">
@@ -20,9 +20,11 @@ export default function Home() {
             </div>
           </div>
           <div className="md:w-1/2 flex items-end">
-            <img 
+            <Image
               src="/cover.png" 
               alt="家教老師與學生" 
+              width={600}
+              height={300}
               className="max-w-[600px] w-full"
             />
           </div>

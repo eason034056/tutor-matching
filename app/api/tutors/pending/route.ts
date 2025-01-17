@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { tutorsCollection } from '@/server/config/firebase'
 import { addDoc } from 'firebase/firestore'
-import { Tutor } from '@/server/types'
 import { v4 as uuidv4 } from 'uuid'
 
 export async function POST(request: Request) {
@@ -21,6 +20,8 @@ export async function POST(request: Request) {
       isActive: false,
       createdAt: new Date().toISOString(),
     })
+    
+    console.log('Tutor registration created:', docRef)
     
     const response = {
       success: true,

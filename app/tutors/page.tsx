@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useEffect, useState } from 'react'
-import { collection, query, where, getDocs } from "firebase/firestore"
+import { collection, query, getDocs } from "firebase/firestore"
 import { db } from "@/server/config/firebase"
 import { ApprovedTutor } from '@/server/types/index'
 

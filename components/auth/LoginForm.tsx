@@ -5,7 +5,6 @@ import { signInWithEmailAndPassword } from 'firebase/auth'
 import { auth } from '@/server/config/firebase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 
 export default function LoginForm() {
@@ -21,6 +20,7 @@ export default function LoginForm() {
             await signInWithEmailAndPassword(auth, email, password)
             toast.success('登入成功')
         } catch (error) {
+            console.error('登入失敗: ', error)
             toast.error('登入失敗')
         } finally {
             setLoading(false)

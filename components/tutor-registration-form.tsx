@@ -11,7 +11,7 @@ import { toast } from "sonner"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "@/server/config/firebase";
 import { addWatermark } from "@/lib/imageUtils";
-
+import Image from 'next/image'
 // 定義表單驗證規則
 const formSchema = z.object({
   name: z.string().min(2, { message: "姓名至少需要2個字" }),
@@ -21,10 +21,10 @@ const formSchema = z.object({
   school: z.string().min(1, { message: "請輸入就讀學校" }),
   major: z.string().min(1, { message: "請輸入主修科系" }),
   expertise: z.string().min(1, { message: "請輸入專長" }),
-  studentIdCard: z.instanceof(FileList)
-    .refine((files) => files.length > 0, "請上傳學生證照片"),
-  idCard: z.instanceof(FileList)
-    .refine((files) => files.length > 0, "請上傳身分證照片"),
+  studentIdCard: z.any()
+    .refine((files) => !files || files instanceof FileList, "請上傳學生證照片"),
+  idCard: z.any()
+    .refine((files) => !files || files instanceof FileList, "請上傳身分證照片"),
 })
 
 export default function TutorRegistrationForm() {
@@ -247,7 +247,8 @@ export default function TutorRegistrationForm() {
           <FormField
             control={form.control}
             name="studentIdCard"
-            render={({ field: { onChange, value, ...field } }) => (
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            render={({ field: { value: _value, onChange, ...field } }) => (
               <FormItem>
                 <FormLabel>學生證照片</FormLabel>
                 <FormControl>
@@ -266,9 +267,11 @@ export default function TutorRegistrationForm() {
                 </FormControl>
                 {previews.studentIdCard && (
                   <div className="mt-2">
-                    <img 
+                    <Image
                       src={previews.studentIdCard} 
                       alt="學生證預覽" 
+                      width={500}
+                      height={300}
                       className="w-full rounded-lg shadow-md"
                     />
                   </div>
@@ -281,7 +284,8 @@ export default function TutorRegistrationForm() {
           <FormField
             control={form.control}
             name="idCard"
-            render={({ field: { onChange, value, ...field } }) => (
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            render={({ field: { value: _value, onChange, ...field } }) => (
               <FormItem>
                 <FormLabel>身分證照片</FormLabel>
                 <FormControl>
@@ -300,9 +304,11 @@ export default function TutorRegistrationForm() {
                 </FormControl>
                 {previews.idCard && (
                   <div className="mt-2">
-                    <img 
+                    <Image
                       src={previews.idCard} 
                       alt="身分證預覽" 
+                      width={500}
+                      height={300}
                       className="w-full rounded-lg shadow-md"
                     />
                   </div>

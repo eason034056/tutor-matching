@@ -19,6 +19,8 @@ export async function POST(request: Request) {
       pending: 'pending', 
       createdAt: new Date().toISOString(),
     })
+
+    console.log('Case created:', docRef)
     
     const response = {
       success: true,

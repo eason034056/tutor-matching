@@ -32,7 +32,7 @@ export async function POST(
             const path = gsUrl.replace(/^gs:\/\/[^\/]+\//, '')
             return path
           } catch (error) {
-            console.error('Invalid URL:', gsUrl)
+            console.error('Invalid URL:', gsUrl + ' ' + error)
             return null
           }
         }

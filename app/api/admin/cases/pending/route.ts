@@ -7,14 +7,16 @@ export async function GET() {
   try {
     console.log('Fetching pending cases...')
     
-    // 查詢 pending 狀態為 'pending' 的案件
     const q = query(casesCollection, where("pending", "==", "pending"))
     const snapshot = await getDocs(q)
     
-    const pendingCases = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...(doc.data() as TutorCase)
-    }))
+    const pendingCases = snapshot.docs.map(doc => {
+      const data = doc.data() as TutorCase
+      return {
+        ...data,
+        id: doc.id
+      }
+    })
     
     console.log(`Found ${pendingCases.length} pending cases`)
     

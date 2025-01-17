@@ -12,7 +12,7 @@ import { db, storage } from "@/server/config/firebase";
 import { addWatermark } from "@/lib/imageUtils";
 import { toast } from "sonner"
 import { collection, addDoc} from 'firebase/firestore'
-
+import Image from 'next/image'
 export default function CaseUploadForm() {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -82,16 +82,28 @@ export default function CaseUploadForm() {
 
       const caseNumber = 'C' + Math.random().toString(36).substring(2, 8).toUpperCase()
       
-      // 使用 Firestore SDK 新增案件資料
-      const { idCard, ...formDataWithoutIdCard } = formData
       const caseData = {
-        ...formDataWithoutIdCard,
+        parentName: formData.parentName,
+        parentPhone: formData.parentPhone,
+        parentEmail: formData.parentEmail,
+        address: formData.address,
+        idNumber: formData.idNumber,
+        studentGender: formData.studentGender,
+        lineId: formData.lineId,
+        department: formData.department,
+        grade: formData.grade,
+        studentDescription: formData.studentDescription,
+        subject: formData.subject,
+        location: formData.location,
+        availableTime: formData.availableTime,
+        teacherRequirements: formData.teacherRequirements,
+        hourlyFee: parseInt(formData.hourlyFee),
+        message: formData.message,
         idCardUrl,
         caseNumber,
         status: '急徵',
         pending: 'pending',
         createdAt: new Date().toISOString(),
-        hourlyFee: parseInt(formData.hourlyFee)
       }
 
       const casesRef = collection(db, 'cases')
@@ -355,9 +367,11 @@ export default function CaseUploadForm() {
           />
           {preview && (
             <div className="mt-2">
-              <img 
+              <Image
                 src={preview} 
                 alt="身分證預覽" 
+                width={500}
+                height={300}
                 className="w-full rounded-lg shadow-md"
               />
             </div>

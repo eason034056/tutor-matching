@@ -12,6 +12,7 @@ import { Tutor, TutorCase } from '@/server/types'
 import { collection, query, where, getDocs, doc, updateDoc, deleteDoc, addDoc, getDoc } from 'firebase/firestore'
 import { ref } from 'firebase/storage'
 import { deleteObject } from 'firebase/storage'
+import Image from 'next/image'
 
 export default function AdminPage() {
   const [user, setUser] = useState<User | null>(null)
@@ -109,6 +110,7 @@ export default function AdminPage() {
       await signOut(auth)
       toast.success('已登出')
     } catch (error) {
+      console.error('登出失敗: ', error)
       toast.error('登出失敗')
     }
   }
@@ -289,6 +291,7 @@ export default function AdminPage() {
       toast.success('已拒絕案件')
       fetchPendingData()
     } catch (error) {
+      console.error('操作失敗: ', error)
       toast.error('操作失敗')
     }
   }
@@ -347,17 +350,21 @@ export default function AdminPage() {
                   <div className="grid grid-cols-2 gap-4 mt-4">
                     <div>
                       <h4 className="font-semibold mb-2">學生證</h4>
-                      <img 
+                      <Image
                         src={tutor.studentIdCardUrl} 
                         alt="學生證" 
+                        width={500}
+                        height={300}
                         className="w-full rounded-lg shadow-md"
                       />
                     </div>
                     <div>
                       <h4 className="font-semibold mb-2">身分證</h4>
-                      <img 
+                      <Image
                         src={tutor.idCardUrl} 
                         alt="身分證" 
+                        width={500}
+                        height={300}
                         className="w-full rounded-lg shadow-md"
                       />
                     </div>
@@ -401,9 +408,11 @@ export default function AdminPage() {
                   {case_.idCardUrl && (
                     <div className="mt-4">
                       <h4 className="font-semibold mb-2">身分證照片</h4>
-                      <img 
+                      <Image
                         src={case_.idCardUrl} 
                         alt="身分證" 
+                        width={500}
+                        height={300}
                         className="w-full rounded-lg shadow-md"
                       />
                     </div>

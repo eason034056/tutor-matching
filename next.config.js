@@ -29,6 +29,19 @@ const nextConfig = {
       }
     ]
   },
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Host',
+            value: 'tutor-matching.tw'
+          }
+        ],
+      },
+    ]
+  }
 }
 
 module.exports = nextConfig 

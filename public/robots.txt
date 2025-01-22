@@ -3,4 +3,4 @@ Allow: /
 Disallow: /admin/
 Disallow: /api/
 
-Sitemap: https://tutor-matching.vercel.app/sitemap.xml 
+Sitemap: https://tutor-matching.tw/sitemap.xml 

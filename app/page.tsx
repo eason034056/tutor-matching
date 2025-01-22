@@ -11,10 +11,10 @@ export default function Home() {
               <h1 className="text-3xl text-center md:text-left text-[#0F1035] font-bold mt-8 w-fit">歡迎來到優學家教媒合</h1>
               <div className="flex flex-row my-4 text-center md:text-left w-full">
                 <Link href="/tutor-cases" className="flex-1 pr-2">
-                  <Button size="lg" className="bg-[#415F9D] text-white hover:bg-[#415F9D]/80 rounded-3xl w-full">接家教</Button>
+                  <Button size="lg" className="bg-[#415F9D] text-white hover:bg-[#415F9D]/80 rounded-3xl w-full">案件專區</Button>
                 </Link>
                 <Link href="/case-upload" className="flex-1 pl-2">
-                  <Button size="lg" className="bg-[#415F9D] text-white hover:bg-[#415F9D]/80 rounded-3xl w-full">案件專區</Button>
+                  <Button size="lg" className="bg-[#415F9D] text-white hover:bg-[#415F9D]/80 rounded-3xl w-full">找家教</Button>
                 </Link>
               </div>
             </div>

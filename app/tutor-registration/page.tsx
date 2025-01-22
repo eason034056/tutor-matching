@@ -1,11 +1,13 @@
+
+
+import TutorRegistrationForm from '@/components/tutor-registration-form'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+
 export const metadata = {
   title: '家教老師註冊立即接案 | 優學家教媒合平台 | 最專業最快速的家教媒合平台',
   description: '歡迎優秀的家教老師加入我們的平台。提供彈性的教學時間，合理的薪資待遇，讓您在課餘時間創造額外收入。',
   keywords: ['家教註冊', '家教兼職', '家教工作', '教師註冊', '新竹家教', '新竹找家教', '台北家教', '台北找家教', '家教媒合', '家教怎麼找', '新竹找家教推薦', '台北找家教推薦']
 }
-
-import TutorRegistrationForm from '@/components/tutor-registration-form'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function TutorRegistrationPage() {
   return (

@@ -25,11 +25,6 @@ export default function SchemaOrg() {
       price: '0',
       priceCurrency: 'TWD'
     },
-    aggregateRating: {
-      '@type': 'AggregateRating',
-      ratingValue: '4.8',
-      reviewCount: '150'
-    }
   }
 
   return (

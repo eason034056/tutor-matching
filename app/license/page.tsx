@@ -1,3 +1,9 @@
+export const metadata = {
+  title: '使用條款 | 優學家教媒合平台',
+  description: '優學家教媒合平台使用條款與服務條件。請詳閱我們的使用規範，以保障您的權益。',
+  keywords: ['家教使用條款', '家教服務條款', '家教平台規範', '家教媒合條款', '家教平台使用規則']
+}
+
 export default function LicensePage() {
   return (
     <div className="container mx-auto py-8 px-4 max-w-3xl">

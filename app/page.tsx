@@ -14,7 +14,7 @@ export default function Home() {
                   <Button size="lg" className="bg-[#415F9D] text-white hover:bg-[#415F9D]/80 rounded-3xl w-full">接家教</Button>
                 </Link>
                 <Link href="/case-upload" className="flex-1 pl-2">
-                  <Button size="lg" className="bg-[#415F9D] text-white hover:bg-[#415F9D]/80 rounded-3xl w-full">找家教</Button>
+                  <Button size="lg" className="bg-[#415F9D] text-white hover:bg-[#415F9D]/80 rounded-3xl w-full">案件專區</Button>
                 </Link>
               </div>
             </div>

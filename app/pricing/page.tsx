@@ -1,3 +1,9 @@
+export const metadata = {
+  title: '家教費用參考表 | 優學家教媒合平台 | 最專業最快速的家教媒合平台',
+  description: '家教費用因教學地區及家教老師的教學經驗而有所不同薪資差距，以下為大致的薪資表格：本平台專營新竹、台北地區，提供最專業最快速的家教媒合服務，讓您輕鬆找到理想的家教。',
+  keywords: ['家教收費', '家教費用', '家教價格', '家教薪資', '家教媒合費用', '新竹家教', '新竹找家教', '台北家教', '台北找家教', '家教媒合', '家教怎麼找', '新竹找家教推薦', '台北找家教推薦']
+}
+
 export default function PricingPage() {
   return (
     <div className="container mx-auto py-8 px-4 max-w-5xl">

@@ -1,3 +1,9 @@
+export const metadata = {
+  title: '家教與補習班之比較 | 優學家教媒合平台 | 最專業最快速的家教媒合平台',
+  description: '了解優學家教媒合平台與其他家教平台的差異。我們提供最優質、最透明的家教媒合服務，讓您做出最佳選擇。',
+  keywords: ['家教平台比較', '家教媒合平台', '家教平台推薦', '家教平台評價', '家教平台選擇', '新竹家教', '新竹找家教', '台北家教', '台北找家教', '家教媒合', '家教怎麼找', '新竹找家教推薦', '台北找家教推薦']
+}
+
 export default function ComparisonPage() {
   return (
     <div className="container mx-auto py-8 px-4 max-w-4xl">

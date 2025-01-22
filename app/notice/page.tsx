@@ -1,3 +1,9 @@
+export const metadata = {
+  title: '注意事項 | 優學家教媒合平台',
+  description: '使用優學家教媒合平台前請詳閱注意事項。我們提供完整的平台使用說明，確保您的權益受到保障。',
+  keywords: ['家教注意事項', '家教媒合須知', '家教服務說明', '家教平台規範', '家教媒合規則']
+}
+
 export default function NoticePage() {
   return (
     <div className="container mx-auto py-8 px-4 max-w-3xl">

@@ -1,3 +1,9 @@
+export const metadata = {
+  title: '家教老師接案流程 | 優學家教媒合平台 | 最專業最快速的家教媒合平台',
+  description: '了解優學家教媒合平台的完整媒合流程。從刊登需求到成功媒合，我們提供專業、透明的家教媒合服務。',
+  keywords: ['家教媒合流程', '家教媒合方式', '家教媒合說明', '家教媒合步驟', '家教媒合服務', '新竹家教', '新竹找家教', '台北家教', '台北找家教', '家教媒合', '家教怎麼找', '新竹找家教推薦', '台北找家教推薦']
+}
+
 export default function ProcessPage() {
   return (
     <div className="container mx-auto py-8 px-4 max-w-3xl">

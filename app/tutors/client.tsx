@@ -67,7 +67,7 @@ export default function TutorsClient() {
 
   return (
     <div className="container mx-auto py-8">
-      <h1 className="text-4xl font-bold mb-8 text-center">新竹台北優質家教老師推薦 | 專業師資認證</h1>
+      <h1 className="text-2xl font-bold mb-8 text-center">新竹台北優質家教老師推薦 | 專業師資認證</h1>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {getCurrentPageItems().map((tutor) => (
           <Card key={tutor.tutorId} className="hover:shadow-lg transition-shadow">

@@ -8,7 +8,7 @@ export default function Home() {
         <div className="flex flex-col md:flex-row items-center justify-between">
           <div className="md:w-1/2 mb-8 md:mb-0">
             <div className="w-fit md:ml-12">
-              <h1 className="text-4xl font-bold text-center mb-8">台灣最專業的家教媒合平台 | 客製化一對一教學服務</h1>
+              <h1 className="text-2xl font-bold text-center mb-8 md:pt-0 pt-8">台灣最專業的家教媒合平台 | 客製化一對一教學服務</h1>
               <div className="flex flex-row my-4 text-center md:text-left w-full">
                 <Link href="/tutor-cases" className="flex-1 pr-2">
                   <Button size="lg" className="bg-[#415F9D] text-white hover:bg-[#415F9D]/80 rounded-3xl w-full">案件專區</Button>

@@ -7,7 +7,7 @@ export const metadata = {
 export default function ComparisonPage() {
   return (
     <div className="container mx-auto py-8 px-4 max-w-4xl">
-      <h1 className="text-3xl font-bold mb-8">與補習班比較</h1>
+      <h1 className="text-2xl font-bold mb-8">與補習班比較</h1>
       
       {/* 比較表格 */}
       <div className="mb-12 overflow-x-auto">

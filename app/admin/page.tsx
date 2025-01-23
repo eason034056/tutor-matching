@@ -301,7 +301,7 @@ export default function AdminPage() {
     <div className="container mx-auto py-8">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold">管理員後台</h1>
+          <h1 className="text-2xl font-bold">管理員後台</h1>
         </div>
         <div className="flex flex-row items-center gap-2">
           <p className="text-sm text-gray-500">

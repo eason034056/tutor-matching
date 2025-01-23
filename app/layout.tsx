@@ -14,16 +14,20 @@ export const metadata = {
     '國小家教', '國中家教', '高中家教', '數學家教', '英文家教', '理化家教'],
   authors: [{ name: '優學家教媒合' }],
   icons: {
-    icon: '/logo.jpg',
-    shortcut: '/logo.jpg',
-    apple: '/logo.jpg',
-    other: [
+    icon: [
       {
-        rel: 'icon',
-        type: 'image/jpeg',
-        url: '/logo.jpg',
+        url: '/web-app-manifest-192x192.png',
+        sizes: '192x192',
+        type: 'image/png'
+      },
+      {
+        url: '/web-app-manifest-512x512.png',
+        sizes: '512x512',
+        type: 'image/png'
       }
-    ]
+    ],
+    shortcut: '/web-app-manifest-192x192.png',
+    apple: '/web-app-manifest-192x192.png',
   },
   openGraph: {
     title: '優學家教媒合 | 新竹台北免費家教媒合平台 | 清大交大台大等國立大學家教',
@@ -32,9 +36,9 @@ export const metadata = {
     siteName: '優學家教媒合',
     images: [
       {
-        url: 'https://tutor-matching.tw/logo.jpg',
-        width: 600,
-        height: 300,
+        url: 'https://tutor-matching.tw/web-app-manifest-512x512.png',
+        width: 512,
+        height: 512,
         alt: '優學家教媒合平台 - 新竹台北地區免費家教媒合服務',
       },
     ],
@@ -45,7 +49,7 @@ export const metadata = {
     card: 'summary_large_image',
     title: '優學家教媒合 | 新竹台北免費家教媒合平台',
     description: '由清華、交大畢業生創建的免費家教媒合平台，專注新竹台北地區家教媒合。提供一對一客製化教學，免費媒合優質家教老師。',
-    images: ['https://tutor-matching.tw/cover.png'],
+    images: ['https://tutor-matching.tw/web-app-manifest-512x512.png'],
   },
   robots: {
     index: true,
@@ -74,9 +78,10 @@ export default function RootLayout({
   return (
     <html lang="zh-TW">
       <head>
-        <link rel="icon" type="image/jpeg" href="/logo.jpg" />
-        <link rel="shortcut icon" type="image/jpeg" href="/logo.jpg" />
-        <link rel="apple-touch-icon" href="/logo.jpg" />
+        <link rel="icon" type="image/png" sizes="192x192" href="/web-app-manifest-192x192.png" />
+        <link rel="icon" type="image/png" sizes="512x512" href="/web-app-manifest-512x512.png" />
+        <link rel="shortcut icon" type="image/png" href="/web-app-manifest-192x192.png" />
+        <link rel="apple-touch-icon" href="/web-app-manifest-192x192.png" />
       </head>
       <body className={inter.className}>
         <SchemaOrg />

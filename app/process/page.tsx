@@ -1,5 +1,3 @@
-
-
 export const metadata = {
   title: '家教老師接案流程 | 優學家教媒合平台 | 最專業最快速的家教媒合平台',
   description: '了解優學家教媒合平台的完整媒合流程。從刊登需求到成功媒合，我們提供專業、透明的家教媒合服務。',
@@ -9,7 +7,7 @@ export const metadata = {
 export default function ProcessPage() {
   return (
     <div className="container mx-auto py-8 px-4 max-w-3xl">
-      <h1 className="text-3xl font-bold mb-8">接案流程</h1>
+      <h1 className="text-4xl font-bold text-center mb-8">家教媒合流程說明 | 快速安心的媒合服務</h1>
       
       {/* 接案流程 */}
       <div className="bg-white p-6 rounded-lg shadow-md mb-8 space-y-4">

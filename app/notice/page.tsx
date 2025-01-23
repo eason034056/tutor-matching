@@ -7,7 +7,7 @@ export const metadata = {
 export default function NoticePage() {
   return (
     <div className="container mx-auto py-8 px-4 max-w-3xl">
-      <h1 className="text-3xl font-bold mb-8">注意事項</h1>
+      <h1 className="text-4xl font-bold text-center mb-8">家教服務注意事項 | 權益保障與服務說明</h1>
       
       <div className="space-y-4 bg-white p-6 rounded-lg shadow-md">
         {[

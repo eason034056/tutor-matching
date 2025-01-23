@@ -10,5 +10,10 @@ export const generateMetadata = async (): Promise<Metadata> => {
 }
 
 export default function TutorCasesPage() {
-  return <TutorCasesClient />
+  return (
+    <>
+      <h1 className="text-4xl font-bold text-center mb-8">新竹台北家教案件媒合 | 即時家教需求配對</h1>
+      <TutorCasesClient />
+    </>
+  )
 }

@@ -7,7 +7,7 @@ export const metadata = {
 export default function LicensePage() {
   return (
     <div className="container mx-auto py-8 px-4 max-w-3xl">
-      <h1 className="text-3xl font-bold mb-8">政府立案證明</h1>
+      <h1 className="text-4xl font-bold text-center mb-8">使用條款 | 家教平台使用規範</h1>
       
       <div className="space-y-8">
         <div className="bg-white p-6 rounded-lg shadow-md">

@@ -13,6 +13,18 @@ export const metadata = {
     '清華大學家教', '交通大學家教', '台灣大學家教', '台師大家教', '新竹補習', '台北補習', 
     '國小家教', '國中家教', '高中家教', '數學家教', '英文家教', '理化家教'],
   authors: [{ name: '優學家教媒合' }],
+  icons: {
+    icon: '/logo.jpg',
+    shortcut: '/logo.jpg',
+    apple: '/logo.jpg',
+    other: [
+      {
+        rel: 'icon',
+        type: 'image/jpeg',
+        url: '/logo.jpg',
+      }
+    ]
+  },
   openGraph: {
     title: '優學家教媒合 | 新竹台北免費家教媒合平台 | 清大交大台大等國立大學家教',
     description: '由清華、交大畢業生創建的免費家教媒合平台，專注新竹台北地區家教媒合。提供一對一客製化教學，免費媒合優質家教老師。快速配對、免仲介費、有保障、專業師資。',
@@ -20,7 +32,7 @@ export const metadata = {
     siteName: '優學家教媒合',
     images: [
       {
-        url: 'https://tutor-matching.tw/cover.png',
+        url: 'https://tutor-matching.tw/logo.jpg',
         width: 600,
         height: 300,
         alt: '優學家教媒合平台 - 新竹台北地區免費家教媒合服務',
@@ -61,6 +73,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="zh-TW">
+      <head>
+        <link rel="icon" type="image/jpeg" href="/logo.jpg" />
+        <link rel="shortcut icon" type="image/jpeg" href="/logo.jpg" />
+        <link rel="apple-touch-icon" href="/logo.jpg" />
+      </head>
       <body className={inter.className}>
         <SchemaOrg />
         <Header />

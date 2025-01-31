@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { Button } from "@/components/ui/button"
 import Image from 'next/image'
+import TutorCasesClient from './tutor-cases/client'
+
 export default function Home() {
   return (
     <div className="container mx-auto text-center flex flex-col">
@@ -8,7 +10,7 @@ export default function Home() {
         <div className="flex flex-col md:flex-row items-center justify-between">
           <div className="md:w-1/2 mb-8 md:mb-0">
             <div className="w-fit md:ml-12">
-              <h1 className="text-2xl font-bold text-center mb-8 md:pt-0 pt-8">專營新竹台北家教媒合</h1>
+              <h1 className="text-xl font-bold text-center md:text-4xl mb-8 md:pt-4 md:text-left pt-8">頂尖國立大學師資<br/>為孩子找到最適合的導師！</h1>
               <div className="flex flex-row my-4 text-center md:text-left w-full">
                 <Link href="/tutor-cases" className="flex-1 pr-2">
                   <Button size="lg" className="bg-[#415F9D] text-white hover:bg-[#415F9D]/80 rounded-3xl w-full">案件專區</Button>
@@ -54,6 +56,7 @@ export default function Home() {
           <p className="text-left px-4 pb-4 text-sm">學生認為，相比於補習班，家教老師的個性化教學能幫助他們更快速掌握難點</p>
         </div>
       </div>
+        <TutorCasesClient />
     </div>
   )
 }

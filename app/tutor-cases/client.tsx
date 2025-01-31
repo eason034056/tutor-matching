@@ -99,7 +99,6 @@ export default function TutorCasesClient() {
 
   return (
     <div className="container mx-auto py-8">
-      <h1 className="text-2xl font-bold mb-6">家教案件列表</h1>
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">

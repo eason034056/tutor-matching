@@ -8,8 +8,8 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata = {
   title: '優學家教媒合 | 新竹台北免費家教媒合平台 | 清大交大台大等國立大學家教',
   description: '由清華、交大畢業生創建的免費家教媒合平台，專注新竹台北地區家教媒合。提供一對一客製化教學，免費媒合優質家教老師。快速配對、免仲介費、有保障、專業師資。',
-  keywords: ['家教', '家教媒合', '新竹家教', '新竹找家教', '台北找家教', '台北家教', '一對一教學', '免費家教', 
-    '清華大學家教', '交通大學家教', '台灣大學家教', '台師大家教', '新竹補習', '台北補習', 
+  keywords: ['新竹家教', '新竹找家教', '台北找家教', '台北家教', '一對一教學', '免費家教', 
+    '清華大學家教', '交通大學家教', '台灣大學家教', '台師大家教', '新竹補習', '台北補習', '家教', '家教媒合', 
     '國小家教', '國中家教', '高中家教', '數學家教', '英文家教', '理化家教'],
   authors: [{ name: '優學家教媒合' }],
   icons: {
@@ -65,7 +65,7 @@ export const metadata = {
     google: '3XmDJwGHzAbasi6GpzAS4CnVNfeiQYgkzsqOOLX27oc',
   },
   alternates: {
-    canonical: 'https://tutor-matching.tw',
+    canonical: 'https://tutor-matching.tw/',
   },
 }
 

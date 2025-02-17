@@ -13,7 +13,7 @@ import { approvedCasesCollection } from '@/server/config/firebase'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 
 export default function TutorCasesClient() {
-  const [selectedCase, setSelectedCase] = useState<string | null>(null) 
+  const [selectedCase, setSelectedCase] = useState<ApprovedCase | null>(null) 
   const [approvedCases, setApprovedCases] = useState<ApprovedCase[]>([])
   const [verificationSuccess, setVerificationSuccess] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
@@ -98,7 +98,7 @@ export default function TutorCasesClient() {
   }
 
   return (
-    <div className="container mx-auto py-8">
+    <div className="container mx-auto py-8 px-0">
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
@@ -113,8 +113,24 @@ export default function TutorCasesClient() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">所有地區</SelectItem>
+                  <SelectItem value="線上">線上</SelectItem>
                   <SelectItem value="台北">台北</SelectItem>
+                  <SelectItem value="基隆">基隆</SelectItem>
+                  <SelectItem value="新北">新北</SelectItem>
+                  <SelectItem value="桃園">桃園</SelectItem>
                   <SelectItem value="新竹">新竹</SelectItem>
+                  <SelectItem value="苗栗">苗栗</SelectItem>
+                  <SelectItem value="台中">台中</SelectItem>
+                  <SelectItem value="彰化">彰化</SelectItem>
+                  <SelectItem value="南投">南投</SelectItem>
+                  <SelectItem value="雲林">雲林</SelectItem>
+                  <SelectItem value="嘉義">嘉義</SelectItem>
+                  <SelectItem value="台南">台南</SelectItem>
+                  <SelectItem value="高雄">高雄</SelectItem>
+                  <SelectItem value="屏東">屏東</SelectItem>
+                  <SelectItem value="宜蘭">宜蘭</SelectItem>
+                  <SelectItem value="花蓮">花蓮</SelectItem>
+                  <SelectItem value="台東">台東</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -126,31 +142,33 @@ export default function TutorCasesClient() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="min-w-20">案件編號</TableHead>
-                    <TableHead className="min-w-20">科目</TableHead>
-                    <TableHead className="min-w-20">年級</TableHead>
-                    <TableHead className="min-w-20">上課地點</TableHead>
-                    <TableHead className="min-w-24">可上課時段</TableHead>
-                    <TableHead className="min-w-20">教師條件</TableHead>
-                    <TableHead className="min-w-24">學生狀況</TableHead>
-                    <TableHead className="min-w-20">時薪</TableHead>
-                    <TableHead className="min-w-20">狀態</TableHead>
-                    <TableHead className="min-w-20">操作</TableHead>
+                    <TableHead className="min-w-20 text-left">案件編號</TableHead>
+                    <TableHead className="min-w-20 text-left">科目</TableHead>
+                    <TableHead className="min-w-20 text-left">年級</TableHead>
+                    <TableHead className="min-w-20 text-left">時薪</TableHead>
+                    <TableHead className="min-w-20 text-left">上課地點</TableHead>
+                    <TableHead className="min-w-24 text-left">可上課時段</TableHead>
+                    <TableHead className="min-w-20 text-left">教師條件</TableHead>
+                    <TableHead className="min-w-24 text-left">學生狀況</TableHead>
+                    <TableHead className="min-w-20 text-left">地區</TableHead>
+                    <TableHead className="min-w-20 text-left">狀態</TableHead>
+                    <TableHead className="min-w-20 text-left">操作</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {getCurrentPageItems().map((tutorCase) => (
                     <TableRow key={tutorCase.caseId}>
-                      <TableCell className="font-medium">{tutorCase.caseNumber}</TableCell>
-                      <TableCell>{tutorCase.subject}</TableCell>
-                      <TableCell className="w-20">{tutorCase.grade}</TableCell>
-                      <TableCell className="w-20">{tutorCase.location}</TableCell>
-                      <TableCell>{tutorCase.availableTime}</TableCell>
-                      <TableCell>{tutorCase.teacherRequirements}</TableCell>
-                      <TableCell>{tutorCase.studentDescription}</TableCell>
-                      <TableCell>${tutorCase.hourlyFee}</TableCell>
-                      <TableCell className="w-24">
-                        <div className="flex justify-center">
+                      <TableCell className="font-medium text-left">{tutorCase.caseNumber}</TableCell>
+                      <TableCell className="text-left">{tutorCase.subject}</TableCell>
+                      <TableCell className="w-20 text-left">{tutorCase.grade}</TableCell>
+                      <TableCell className="text-left">${tutorCase.hourlyFee}</TableCell>
+                      <TableCell className="w-20 text-left">{tutorCase.location}</TableCell>
+                      <TableCell className="text-left">{tutorCase.availableTime}</TableCell>
+                      <TableCell className="text-left">{tutorCase.teacherRequirements}</TableCell>
+                      <TableCell className="text-left">{tutorCase.studentDescription}</TableCell>
+                      <TableCell className="w-20 text-left">{tutorCase.region}</TableCell>
+                      <TableCell className="w-24 text-left">
+                        <div className="flex justify-start">
                           <Badge 
                             variant={tutorCase.status === '急徵' ? 'destructive' : 'secondary'}
                             className="w-16 text-center whitespace-nowrap flex items-center justify-center"
@@ -159,8 +177,8 @@ export default function TutorCasesClient() {
                           </Badge>
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <Dialog open={selectedCase === tutorCase.caseId} onOpenChange={(open: boolean) => {
+                      <TableCell className="text-left">
+                        <Dialog open={selectedCase === tutorCase} onOpenChange={(open: boolean) => {
                           if (!open) {
                             setSelectedCase(null)
                             setVerificationSuccess(false)
@@ -169,7 +187,7 @@ export default function TutorCasesClient() {
                           <DialogTrigger asChild>
                             <Button 
                               variant="outline"
-                              onClick={() => setSelectedCase(tutorCase.caseId)}
+                              onClick={() => setSelectedCase(tutorCase)}
                               disabled={!canApply(tutorCase)}
                             >應徵</Button>
                           </DialogTrigger>
@@ -196,7 +214,7 @@ export default function TutorCasesClient() {
 
                                   <div>
                                     <h3 className="font-medium mb-1">家教中心 Email</h3>
-                                    <p className="text-blue-600">tutoring.center@example.com</p>
+                                    <p className="text-blue-600">contact@tutor-matching.tw</p>
                                   </div>
                                 </div>
 

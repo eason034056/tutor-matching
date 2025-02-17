@@ -16,7 +16,7 @@ export async function addWatermark(file: File): Promise<Blob> {
       if (ctx) {
         // 設定浮水印樣式
         ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
-        ctx.font = '100px Arial';
+        ctx.font = '40px Arial';
         ctx.textAlign = 'center';    // 文字水平置中
         ctx.textBaseline = 'middle'; // 文字垂直置中
 
@@ -32,8 +32,8 @@ export async function addWatermark(file: File): Promise<Blob> {
         ctx.rotate(-Math.PI / 12); // 旋轉 -15 度
         
         // 繪製浮水印文字
-        ctx.fillText('僅供家教網使用', 0, 0);
-        ctx.font = '50px Arial';  // 較小的字體顯示時間
+        ctx.fillText('僅供優學家教網使用', 0, 0);
+        ctx.font = '20px Arial';  // 較小的字體顯示時間
         ctx.fillText(new Date().toISOString(), 0, 80);
         
         // 恢復原始狀態

@@ -5,7 +5,7 @@ import TutorCasesClient from './tutor-cases/client'
 
 export default function Home() {
   return (
-    <div className="container mx-auto text-center flex flex-col">
+    <div className="container px-0 mx-auto text-center flex flex-col max-w-7xl">
       <div className="container bg-[#B9D7EA] mx-auto mb-8 rounded-3xl">
         <div className="flex flex-col md:flex-row items-center justify-between">
           <div className="md:w-1/2 mb-8 md:mb-0">
@@ -33,7 +33,7 @@ export default function Home() {
         </div>
       </div>
       
-      <p className="text-xl text-[#0F1035] text-bold mb-8 pt-8">由清華、交大畢業生創建的免費家教媒合平台，專注新竹台北地區家教媒合<br/>幫助家教老師以及家長輕鬆媒合，無須支付任何費用！</p>
+      <p className="text-xl text-[#0F1035] text-bold mb-8 pt-8 hidden md:block">由清華、交大畢業生創建的免費家教媒合平台<br/>幫助家教老師以及家長輕鬆媒合，無須支付任何費用！</p>
       <div className="hidden md:flex justify-center items-end gap-4 mt-8">
         <div className="h-56 w-1/5 bg-[#D6E6F2] rounded-3xl">
           <p className="text-left pl-4 py-6 pb-2 text-4xl font-semibold">80%</p>

@@ -299,8 +299,24 @@ export default function CaseUploadForm() {
                 <SelectValue placeholder="請選擇地區" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="線上">線上</SelectItem>
+                <SelectItem value="基隆">基隆</SelectItem>
                 <SelectItem value="台北">台北</SelectItem>
+                <SelectItem value="新北">新北</SelectItem>
+                <SelectItem value="桃園">桃園</SelectItem>
                 <SelectItem value="新竹">新竹</SelectItem>
+                <SelectItem value="苗栗">苗栗</SelectItem>
+                  <SelectItem value="台中">台中</SelectItem>
+                  <SelectItem value="彰化">彰化</SelectItem>
+                  <SelectItem value="南投">南投</SelectItem>
+                  <SelectItem value="雲林">雲林</SelectItem>
+                  <SelectItem value="嘉義">嘉義</SelectItem>
+                  <SelectItem value="台南">台南</SelectItem>
+                  <SelectItem value="高雄">高雄</SelectItem>
+                  <SelectItem value="屏東">屏東</SelectItem>
+                  <SelectItem value="宜蘭">宜蘭</SelectItem>
+                  <SelectItem value="花蓮">花蓮</SelectItem>
+                  <SelectItem value="台東">台東</SelectItem>
               </SelectContent>
             </Select>
           </div>

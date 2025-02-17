@@ -7,8 +7,8 @@ export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   return (
-    <header className="bg-white text-primary-foreground p-4 mt-4">
-      <div className="container mx-auto flex flex-wrap justify-between items-center">
+    <header className="bg-white text-primary-foreground p-4 mt-4 ">
+      <div className="container px-0 mx-auto flex flex-wrap justify-between items-center max-w-7xl">
         <Link href="/" className="text-2xl text-[#0F1035] font-bold min-w-[140px]">優學家教媒合</Link>
         
         {/* 漢堡選單按鈕 - 只在小螢幕顯示 */}

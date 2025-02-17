@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 export const metadata = {
   title: '刊登家教需求 | 優學家教媒合平台 | 最專業最快速的家教媒合平台',
   description: '免費刊登家教需求，平台根據家長需求，快速找到合適的家教老師。提供便捷的家教媒合服務，讓您輕鬆找到理想的家教。',
-  keywords: ['刊登家教', '找家教', '家教需求', '家教媒合', '新竹家教', '新竹找家教', '台北家教', '台北找家教', '家教媒合', '家教怎麼找', '新竹找家教推薦', '台北找家教推薦']
+  keywords: ['刊登家教', '找家教', '家教需求', '家教媒合', '家教', '找家教', '家教媒合', '家教怎麼找']
 }
 
 export default function CaseUploadPage() {

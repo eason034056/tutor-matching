@@ -64,7 +64,7 @@ export default function Home() {
         </div>
         <div className="h-[20rem] w-[20%] bg-[#E8EAE6] rounded-3xl flex flex-col justify-end">
           <div className="pb-8">
-            <p className="text-left pl-4 py-6 pb-2 text-2xl font-semibold">免費讀書計畫</p>
+            <p className="text-left pl-4 py-6 pb-2 text-2xl font-semibold">免費安排讀書計畫</p>
             <p className="text-left px-4 text-sm">青椒家教中心提供免費的會考以及學測之讀書計畫，根據學生程度需求安排讀書計劃，幫助學生更有效地學習</p>
           </div>
         </div>

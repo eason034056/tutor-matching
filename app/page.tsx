@@ -1,7 +1,6 @@
 'use client'
 import Link from 'next/link'
 import { Button } from "@/components/ui/button"
-import Image from 'next/image'
 import TutorCasesClient from './tutor-cases/client'
 import InfiniteCarousel from '@/components/infinite-carousel'
 

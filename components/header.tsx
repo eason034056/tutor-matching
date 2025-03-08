@@ -8,8 +8,8 @@ export default function Header() {
 
   return (
     <header className="bg-white text-primary-foreground p-4 mt-4 ">
-      <div className="container px-0 mx-auto flex flex-wrap justify-between items-center max-w-7xl">
-        <Link href="/" className="text-2xl text-[#0F1035] font-bold min-w-[140px]">優學家教媒合</Link>
+      <div className="container px-4 mx-auto flex flex-wrap justify-between items-center max-w-7xl">
+        <Link href="/" className="text-2xl text-[#0F1035] font-bold min-w-[140px]">青椒家教中心</Link>
         
         {/* 漢堡選單按鈕 - 只在小螢幕顯示 */}
         <button 
@@ -39,7 +39,7 @@ export default function Header() {
             <li><Link href="/tutor-cases" onClick={() => setIsMenuOpen(false)} className="hover:underline block text-right md:text-left text-[#0F1035]">家教案件</Link></li>
             <li className="group relative">
               <span className="hover:underline cursor-pointer block text-right md:text-left text-[#0F1035]">教師須知</span>
-              <div className="md:bg-[#415F9D] md:absolute md:right-0 md:top-full hidden group-hover:block text-black md:text-white rounded-md md:shadow-lg md:p-2 md:z-50 md:min-w-[140px] md:whitespace-nowrap">
+              <div className="md:bg-[#427A5B] md:absolute md:right-0 md:top-full hidden group-hover:block text-black md:text-white rounded-md md:shadow-lg md:p-2 md:z-50 md:min-w-[140px] md:whitespace-nowrap">
                 <Link href="/process" onClick={() => setIsMenuOpen(false)} className="block px-4 py-2 hover:bg-white hover:text-[#0F1035] rounded-sm text-right md:text-left">
                   接案流程
                 </Link>
@@ -47,7 +47,7 @@ export default function Header() {
             </li>
             <li className="group relative">
               <span className="hover:underline cursor-pointer block text-right md:text-left text-[#0F1035]">家長須知</span>
-              <div className="md:bg-[#415F9D] md:absolute md:right-0 md:top-full hidden group-hover:block text-black md:text-white rounded-md md:shadow-lg md:p-2 md:z-50 md:min-w-[140px] md:whitespace-nowrap">
+              <div className="md:bg-[#427A5B] md:absolute md:right-0 md:top-full hidden group-hover:block text-black md:text-white rounded-md md:shadow-lg md:p-2 md:z-50 md:min-w-[140px] md:whitespace-nowrap">
                 <Link href="/notice" onClick={() => setIsMenuOpen(false)} className="block px-4 py-2 hover:bg-white hover:text-[#0F1035] rounded-sm text-right md:text-left">
                   注意事項
                 </Link>
@@ -62,9 +62,10 @@ export default function Header() {
                 </Link>
               </div>
             </li>
-            <li className="text-right"><Link href="/case-upload" onClick={() => setIsMenuOpen(false)} className="hover:underline inline-block text-right md:text-left bg-[#00A1B4] px-4 text-white rounded-3xl">找家教</Link></li>
           </ul>
+          
         </nav>
+        <Link href="/case-upload" onClick={() => setIsMenuOpen(false)} className="hidden md:block hover:bg-[#B4CD93] inline-block text-right md:text-left bg-[#427A5B] px-4 text-white rounded-3xl">找家教</Link>
       </div>
     </header>
   )

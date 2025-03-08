@@ -65,7 +65,7 @@ export default function Header() {
           </ul>
           
         </nav>
-        <Link href="/case-upload" onClick={() => setIsMenuOpen(false)} className="hidden md:block hover:bg-[#B4CD93] inline-block text-right md:text-left bg-[#427A5B] px-4 text-white rounded-3xl">找家教</Link>
+        <Link href="/case-upload" onClick={() => setIsMenuOpen(false)} className="hidden md:block hover:bg-[#B4CD93] inline-block text-right md:ml-[50px] md:text-left bg-[#427A5B] px-4 text-white rounded-3xl">找家教</Link>
       </div>
     </header>
   )

@@ -19,7 +19,7 @@ const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: "tutor-matching-5c608.firebaseapp.com",
   projectId: "tutor-matching-5c608",
-  storageBucket: "tutor-matching-5c608.firebasestorage.app",
+  storageBucket: "tutor-matching-5c608.appspot.com",
   messagingSenderId: "645473434432",
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };

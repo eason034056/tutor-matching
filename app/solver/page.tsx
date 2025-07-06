@@ -117,8 +117,8 @@ export default function SolverPage() {
         console.log('載入到的訊息數量:', data.messages?.length || 0);
         
         // 將 ChatMessage 轉換為 Message
-        const convertedMessages: Message[] = (data.messages || []).map((msg: any) => ({
-          role: msg.role,
+        const convertedMessages: Message[] = (data.messages || []).map((msg: { role: string; content: string; imageUrl?: string }) => ({
+          role: msg.role as 'user' | 'assistant',
           content: msg.content,
           imageUrl: msg.imageUrl
         }));

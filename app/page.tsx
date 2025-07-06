@@ -18,7 +18,7 @@ const logos = [
 
 export default function Home() {
   return (
-    <div className="container px-0 mx-auto text-center flex flex-col max-w-7xl">
+    <div className="container px-4 mx-auto text-center flex flex-col max-w-7xl">
       <div className="w-full">
         <h1 className="text-3xl font-bold text-center md:text-6xl mb-4 md:pt-4 pt-8">
           頂尖國立大學師資<br/>為孩子找到最適合的導師！
@@ -48,11 +48,14 @@ export default function Home() {
             <Link href="/tutor-cases">
               <Button size="lg" className="bg-[#E8EAE6] text-black hover:bg-[#CDD0CB]/80 rounded-3xl w-[60%]">案件專區</Button>
             </Link>
+            <Link href="/solver">
+              <Button size="lg" className="bg-[#0F1035] text-white hover:bg-[#B4CD93]/80 rounded-3xl w-[60%]">AI解題機器人</Button>
+            </Link>
           </div>
             
           <div className="w-full bg-[#E8EAE6]/80 rounded-3xl">
             <p className="text-center pl-4 py-6 pb-2 text-2xl font-semibold">最適化配對</p>
-            <p className="text-center px-4 pb-8 text-sm">青椒家教中心提供最適化配對，根據學生需求以及家教老師的專長，為學生找到最適合的家教老師</p>
+            <p className="text-center px-4 pb-8 text-sm">青椒老師家教中心提供最適化配對，根據學生需求以及家教老師的專長，為學生找到最適合的家教老師</p>
           </div>
         </div>
         
@@ -65,7 +68,7 @@ export default function Home() {
         <div className="h-[20rem] w-[20%] bg-[#E8EAE6] rounded-3xl flex flex-col justify-end">
           <div className="pb-8">
             <p className="text-left pl-4 py-6 pb-2 text-2xl font-semibold">免費安排讀書計畫</p>
-            <p className="text-left px-4 text-sm">青椒家教中心提供免費的會考以及學測之讀書計畫，根據學生程度需求安排讀書計劃，幫助學生更有效地學習</p>
+            <p className="text-left px-4 text-sm">青椒老師家教中心提供免費的會考以及學測之讀書計畫，根據學生程度需求安排讀書計劃，幫助學生更有效地學習</p>
           </div>
         </div>
       </div>
@@ -76,6 +79,9 @@ export default function Home() {
         </Link>
         <Link href="/tutor-cases">
           <Button size="lg" className="bg-[#E8EAE6] text-black hover:bg-[#CDD0CB]/80 rounded-3xl w-[60%]">案件專區</Button>
+        </Link>
+        <Link href="/solver">
+          <Button size="lg" className="bg-[#0F1035] text-white hover:bg-[#B4CD93]/80 rounded-3xl w-[60%]">AI解題機器人</Button>
         </Link>
       </div>
       <div className="flex flex-col md:hidden gap-4">
@@ -88,13 +94,13 @@ export default function Home() {
       <div className="w-[100%] bg-[#E8EAE6]/80 rounded-3xl flex-col justify-end">
         <div className="pb-8">
           <p className="text-left pl-4 py-6 pb-2 text-2xl font-semibold">最適化配對</p>
-          <p className="text-left px-4 text-sm">青椒家教中心提供最適化配對，根據學生需求以及家教老師的專長，為學生找到最適合的家教老師</p>
+          <p className="text-left px-4 text-sm">青椒老師家教中心提供最適化配對，根據學生需求以及家教老師的專長，為學生找到最適合的家教老師</p>
         </div>
       </div>
       <div className="w-[100%] bg-[#E8EAE6] rounded-3xl flex-col justify-end">
         <div className="pb-8">
           <p className="text-left pl-4 py-6 pb-2 text-2xl font-semibold">免費讀書計畫</p>
-          <p className="text-left px-4 text-sm">青椒家教中心提供免費的會考以及學測之讀書計畫，根據學生程度需求安排讀書計劃，幫助學生更有效地學習</p>
+          <p className="text-left px-4 text-sm">青椒老師家教中心提供免費的會考以及學測之讀書計畫，根據學生程度需求安排讀書計劃，幫助學生更有效地學習</p>
         </div>
       </div>
       </div>

@@ -9,7 +9,7 @@ export default function Header() {
   return (
     <header className="bg-white text-primary-foreground p-4 mt-4 ">
       <div className="container px-4 mx-auto flex flex-wrap justify-between items-center max-w-7xl">
-        <Link href="/" className="text-2xl text-[#0F1035] font-bold min-w-[140px]">青椒家教中心</Link>
+        <Link href="/" className="text-2xl text-[#0F1035] font-bold min-w-[140px]">青椒老師家教中心</Link>
         
         {/* 漢堡選單按鈕 - 只在小螢幕顯示 */}
         <button 

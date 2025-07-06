@@ -43,7 +43,8 @@ export default function TutorCasesClient() {
       const q = query(approvedCasesCollection)
       const querySnapshot = await getDocs(q)
       const casesList: ApprovedCase[] = querySnapshot.docs.map(doc => ({
-        ...(doc.data() as ApprovedCase)
+        ...(doc.data() as ApprovedCase),
+        caseId: doc.id,
       }))
       
       // 更新 state

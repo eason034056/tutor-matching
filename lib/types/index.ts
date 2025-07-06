@@ -68,16 +68,21 @@ export interface ApprovedCase {
 
 export interface Message {
   role: 'user' | 'assistant';
-  content: string;
+  content?: string;
+  imageUrl?: string;
 }
 
 export interface SolverRequest {
   message: string;
   userId: string;
+  threadId?: string;
+  isNewThread?: boolean;
 }
 
 export interface SolverResponse {
   message: string;
+  threadId: string;
+  isNewThread: boolean;
   error?: string;
 }
 
@@ -85,13 +90,45 @@ export interface UserProfile {
   uid: string;
   email: string;
   displayName?: string;
-  createdAt: any; // Firestore Timestamp 或 Date
+  createdAt: number | Date; // Firestore Timestamp 或 Date
   // ...其他欄位
 }
 
 export interface ChatHistory {
   userId: string;
-  question: string;
-  answer: string;
-  timestamp: any; // Firestore Timestamp 或 Date
+  question?: string;
+  answer?: string;
+  questionImageUrl?: string;
+  answerImageUrl?: string;
+  timestamp: number | Date; // Firestore Timestamp 或 Date
 }
+
+// 新增的 Thread 相關類型
+export interface ChatThread {
+  id: string;
+  userId: string;
+  title: string;
+  hasImage: boolean;
+  createdAt: number | Date; // Firestore Timestamp 或 Date
+  lastUpdated: number | Date; // Firestore Timestamp 或 Date
+}
+
+export interface ChatMessage {
+  id: string;
+  threadId: string;
+  userId: string;
+  role: 'user' | 'assistant';
+  content: string;
+  imageUrl?: string;
+  timestamp: number | Date; // Firestore Timestamp 或 Date
+}
+
+export interface ThreadListResponse {
+  threads: ChatThread[];
+  error?: string;
+}
+
+export interface ThreadMessagesResponse {
+  messages: ChatMessage[];
+  error?: string;
+} 

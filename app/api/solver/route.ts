@@ -131,7 +131,9 @@ export async function POST(request: NextRequest) {
     }));
 
     // buildUserMessage 型別明確
-    function buildUserMessage(message: string, imageUrl?: string): { role: 'user'; content: string | Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }> } {
+    type UserMessageContent = string | Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }>;
+    
+    function buildUserMessage(message: string, imageUrl?: string): { role: 'user'; content: UserMessageContent } {
       if (imageUrl) {
         return {
           role: 'user',

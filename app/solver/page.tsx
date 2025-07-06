@@ -115,8 +115,6 @@ export default function SolverPage() {
     }
   };
 
-
-
   // 處理拍照
   const handleCameraClick = () => {
     cameraInputRef.current?.click();
@@ -289,8 +287,6 @@ export default function SolverPage() {
       setLoading(false);
     }
   };
-
-
 
   // 回到首頁
   const goToHome = () => {

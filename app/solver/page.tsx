@@ -62,13 +62,22 @@ export default function SolverPage() {
     if (!user) return;
     
     try {
+      console.log('載入 threads 列表');
       const response = await fetch(`/api/solver/threads?userId=${user.uid}`);
+      console.log('Threads API 回應狀態:', response.status);
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('載入到的 threads 數量:', data.threads?.length || 0);
         setThreads(data.threads || []);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Threads API 錯誤:', response.status, errorData);
+        alert('載入對話列表失敗：' + (errorData.error || '未知錯誤'));
       }
     } catch (error) {
       console.error('Failed to load threads:', error);
+      alert('載入對話列表失敗，請稍後再試');
     }
   }, [user]);
 
@@ -99,19 +108,36 @@ export default function SolverPage() {
     if (!user) return;
     
     try {
+      console.log('載入 thread 訊息:', threadId);
       const response = await fetch(`/api/solver/threads/${threadId}/messages?userId=${user.uid}`);
+      console.log('API 回應狀態:', response.status);
+      
       if (response.ok) {
         const data = await response.json();
-        setMessages(data.messages || []);
+        console.log('載入到的訊息數量:', data.messages?.length || 0);
+        
+        // 將 ChatMessage 轉換為 Message
+        const convertedMessages: Message[] = (data.messages || []).map((msg: any) => ({
+          role: msg.role,
+          content: msg.content,
+          imageUrl: msg.imageUrl
+        }));
+        
+        setMessages(convertedMessages);
         setCurrentThreadId(threadId);
         setPageState('chat');
         // 手機自動收起側邊欄
         if (typeof window !== 'undefined' && window.innerWidth < 768) {
           setShowThreadList(false);
         }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('API 錯誤:', response.status, errorData);
+        alert('載入聊天記錄失敗：' + (errorData.error || '未知錯誤'));
       }
     } catch (error) {
       console.error('Failed to load thread messages:', error);
+      alert('載入聊天記錄失敗，請稍後再試');
     }
   };
 

@@ -12,6 +12,24 @@ export async function GET(request: NextRequest, context: { params: Promise<{ thr
       return NextResponse.json({ error: 'threadId is required' }, { status: 400 });
     }
 
+    // 從網址 query 取得 userId
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('userId');
+    if (!userId) {
+      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+    }
+
+    // 先檢查 thread 是否屬於該用戶
+    const threadDoc = await adminDb.collection('chat_threads').doc(threadId).get();
+    if (!threadDoc.exists) {
+      return NextResponse.json({ error: 'Thread not found' }, { status: 404 });
+    }
+    
+    const threadData = threadDoc.data();
+    if (threadData?.userId !== userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    }
+
     // 查詢 firebase，找出這個 thread 的所有訊息，依照時間排序
     const messagesQuery = adminDb
       .collection('chat_messages')
@@ -34,6 +52,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ thr
     // 回傳訊息陣列
     return NextResponse.json({ messages });
   } catch (error) {
+    console.error('[ERROR] Failed to get messages:', error);
     return NextResponse.json({ error: 'Failed to get messages', detail: String(error) }, { status: 500 });
   }
 } 

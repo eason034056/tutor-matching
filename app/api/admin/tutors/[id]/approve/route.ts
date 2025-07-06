@@ -4,11 +4,12 @@ import { tutorsCollection, approvedTutorsCollection } from '@/server/config/fire
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    console.log('Received tutor approval request for ID:', params.id)
-    const q = query(tutorsCollection, where('id', '==', params.id))
+    const resolvedParams = await params;
+    console.log('Received tutor approval request for ID:', resolvedParams.id)
+    const q = query(tutorsCollection, where('id', '==', resolvedParams.id))
     console.log('Query:', q)
     const querySnapshot = await getDocs(q)
     if (querySnapshot.empty) {
@@ -39,7 +40,7 @@ export async function POST(
     try {
       // Store approved tutor info in approvedTutorsCollection
       await addDoc(approvedTutorsCollection, {
-        tutorId: params.id,
+        tutorId: resolvedParams.id,
         experience: tutorData.experience,
         expertise: tutorData.expertise,
         major: tutorData.major,

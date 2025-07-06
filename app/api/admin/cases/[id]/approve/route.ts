@@ -4,18 +4,19 @@ import { casesCollection, approvedCasesCollection } from '@/server/config/fireba
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    if (!params.id) {
+    const resolvedParams = await params;
+    if (!resolvedParams.id) {
       console.error('No case ID provided')
       return NextResponse.json(
         { error: '缺少案件ID' },
         { status: 400 }
       )
     }
-    console.log('Received tutor approval request for ID:', params.id)
-    const q = query(casesCollection, where('id', '==', params.id))
+    console.log('Received tutor approval request for ID:', resolvedParams.id)
+    const q = query(casesCollection, where('id', '==', resolvedParams.id))
     console.log('Query:', q)
     const querySnapshot = await getDocs(q)
     if (querySnapshot.empty) {
@@ -26,7 +27,7 @@ export async function POST(
     const caseData = caseDoc.data()
     const caseRef = caseDoc.ref
 
-    console.log('Approving case with id:', params.id)
+    console.log('Approving case with id:', resolvedParams.id)
     await updateDoc(caseRef, {
       pending: 'approved',
       approvedAt: new Date().toISOString()
@@ -35,7 +36,7 @@ export async function POST(
     try {
       // Store approved case info in approvedCasesCollection
       await addDoc(approvedCasesCollection, {
-        caseId: params.id,
+        caseId: resolvedParams.id,
         caseNumber: caseData.caseNumber,
         subject: caseData.subject,
         grade: caseData.grade,

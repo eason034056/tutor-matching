@@ -60,6 +60,7 @@ export default function CropperPage({ image, onCancel, onCropComplete }: Cropper
             aspect={undefined}
             className="bg-white p-4 rounded shadow-lg"
           >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               ref={imgRef}
               src={image}

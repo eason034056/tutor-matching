@@ -5,11 +5,12 @@ import { casesCollection, storage } from '@/server/config/firebase'
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    console.log('Received tutor approval request for ID:', params.id)
-    const q = query(casesCollection, where('id', '==', params.id))
+    const resolvedParams = await params;
+    console.log('Received tutor approval request for ID:', resolvedParams.id)
+    const q = query(casesCollection, where('id', '==', resolvedParams.id))
     console.log('Query:', q)
     const querySnapshot = await getDocs(q)
     if (querySnapshot.empty) {

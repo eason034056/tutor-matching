@@ -5,9 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function SolverTestPage() {
-  const [testResults, setTestResults] = useState<any>({});
+  const [testResults, setTestResults] = useState<Record<string, unknown>>({});
 
-  const testAPI = async (endpoint: string, method: string = 'GET', body?: any) => {
+  const testAPI = async (endpoint: string, method: string = 'GET', body?: unknown) => {
     try {
       const response = await fetch(endpoint, {
         method,
@@ -25,7 +25,7 @@ export default function SolverTestPage() {
   };
 
   const runTests = async () => {
-    const results: any = {};
+    const results: Record<string, unknown> = {};
 
     // 測試 Thread 列表 API
     console.log('Testing threads API...');
@@ -33,16 +33,17 @@ export default function SolverTestPage() {
 
     // 測試主要解題 API
     console.log('Testing solver API...');
-    results.solver = await testAPI('/api/solver', 'POST', {
+    const solverResult = await testAPI('/api/solver', 'POST', {
       message: '測試問題',
       userId: 'test-user',
       isNewThread: true
     });
+    results.solver = solverResult;
 
     // 如果有 threadId，測試訊息 API
-    if (results.solver.success && results.solver.data.threadId) {
+    if (solverResult && typeof solverResult === 'object' && 'success' in solverResult && solverResult.success && 'data' in solverResult && typeof solverResult.data === 'object' && solverResult.data && 'threadId' in solverResult.data) {
       console.log('Testing messages API...');
-      results.messages = await testAPI(`/api/solver/threads/${results.solver.data.threadId}/messages?userId=test-user`);
+      results.messages = await testAPI(`/api/solver/threads/${(solverResult.data as { threadId: string }).threadId}/messages?userId=test-user`);
     }
 
     setTestResults(results);
@@ -58,15 +59,15 @@ export default function SolverTestPage() {
         </Button>
 
         <div className="space-y-6">
-          {Object.entries(testResults).map(([testName, result]: [string, any]) => (
+          {Object.entries(testResults).map(([testName, result]: [string, unknown]) => (
             <Card key={testName}>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <span>{testName.toUpperCase()} API</span>
                   <span className={`text-sm px-2 py-1 rounded ${
-                    result.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    result && typeof result === 'object' && 'success' in result && result.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                   }`}>
-                    {result.success ? '成功' : '失敗'}
+                    {result && typeof result === 'object' && 'success' in result && result.success ? '成功' : '失敗'}
                   </span>
                 </CardTitle>
               </CardHeader>

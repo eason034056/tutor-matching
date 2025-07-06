@@ -3,10 +3,10 @@ import { adminDb } from '@/lib/firebase/firebase-admin';
 import type { ChatMessage } from '@/lib/types';
 
 // 處理 GET 請求，取得某個 thread 的所有訊息
-export async function GET(request: NextRequest, context: any) {
+export async function GET(request: NextRequest, context: { params: Promise<{ threadId: string }> }) {
   try {
     // Next.js 14 動態 API Route 取得 params 的正確方式
-    const { params } = await context;
+    const params = await context.params;
     const threadId = params.threadId;
     if (!threadId) {
       return NextResponse.json({ error: 'threadId is required' }, { status: 400 });

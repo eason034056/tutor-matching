@@ -207,6 +207,7 @@ export default function SolverChat({ messages, onSendMessage, loading }: SolverC
             {imagePreview && (
               <Card className="overflow-hidden">
                 <CardContent className="p-0">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img 
                     src={imagePreview} 
                     alt="題目圖片" 
@@ -308,6 +309,7 @@ export default function SolverChat({ messages, onSendMessage, loading }: SolverC
                 } p-4`}
               >
                 {message.imageUrl && (
+                  /* eslint-disable-next-line @next/next/no-img-element */
                   <img 
                     src={message.imageUrl} 
                     alt="題目圖片" 

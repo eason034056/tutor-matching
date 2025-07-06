@@ -12,9 +12,7 @@ import {
   Send, 
   ArrowLeft, 
   ChevronDown, 
-  ChevronUp, 
   RefreshCw, 
-  BarChart3,
   Plus,
   Image as ImageIcon,
   MessageSquare,
@@ -41,7 +39,7 @@ export default function SolverPage() {
   const [pageState, setPageState] = useState<PageState>('home');
   const [currentQuestion, setCurrentQuestion] = useState('');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [expandedAnswers, setExpandedAnswers] = useState<Set<number>>(new Set());
+
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -117,17 +115,7 @@ export default function SolverPage() {
     }
   };
 
-  // 處理圖片上傳
-  const handleImageUpload = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setImagePreview(ev.target?.result as string);
-      setPageState('question');
-      // 上傳新圖片時，創建新的 Thread
-      setCurrentThreadId(null);
-    };
-    reader.readAsDataURL(file);
-  };
+
 
   // 處理拍照
   const handleCameraClick = () => {
@@ -302,16 +290,7 @@ export default function SolverPage() {
     }
   };
 
-  // 切換答案展開/收合
-  const toggleAnswerExpansion = (index: number) => {
-    const newExpanded = new Set(expandedAnswers);
-    if (newExpanded.has(index)) {
-      newExpanded.delete(index);
-    } else {
-      newExpanded.add(index);
-    }
-    setExpandedAnswers(newExpanded);
-  };
+
 
   // 回到首頁
   const goToHome = () => {
@@ -560,6 +539,7 @@ export default function SolverPage() {
                 {imagePreview && (
                   <Card className="overflow-hidden">
                     <CardContent className="p-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img 
                         src={imagePreview} 
                         alt="題目圖片" 
@@ -668,6 +648,7 @@ export default function SolverPage() {
                         }
                       >
                         {message.imageUrl && (
+                          /* eslint-disable-next-line @next/next/no-img-element */
                           <img 
                             src={message.imageUrl} 
                             alt="題目圖片" 

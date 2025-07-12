@@ -1,3 +1,7 @@
 export default function SolverLayout({ children }: { children: React.ReactNode }) {
-  return <main className="min-h-screen">{children}</main>;
+  return (
+    <div className="fixed inset-0 bg-gray-50 z-50">
+      {children}
+    </div>
+  );
 } 

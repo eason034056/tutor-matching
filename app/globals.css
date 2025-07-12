@@ -144,4 +144,51 @@
     /* WebKit (Chrome, Safari) */
     display: none;
   }
+
+  /* Solver 頁面高度覆蓋 */
+  .solver-container {
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+  }
+
+  /* 確保側邊欄高度正確並可滾動 */
+  .solver-container .sidebar {
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+  }
+
+  /* 側邊欄內的滾動區域 */
+  .solver-container .sidebar .threads-list {
+    flex: 1 1 0% !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+
+  /* 聊天記錄區域的滾動 */
+  .solver-container .chat-messages {
+    flex: 1 1 0% !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    min-height: 0 !important;
+  }
+
+  /* 聊天頁面的主內容區域 */
+  .solver-container .chat-container {
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+  }
+
+  /* 防止 solver 頁面整體滾動 */
+  body.solver-no-scroll {
+    overflow: hidden !important;
+  }
+
+  /* 覆蓋根layout對solver頁面的影響 */
+  .solver-container,
+  .solver-container * {
+    box-sizing: border-box;
+  }
 }

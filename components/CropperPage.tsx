@@ -64,8 +64,8 @@ function getCroppedImg(image: HTMLImageElement, crop: Crop): string | null {
     cropHeightOnOriginal  // Canvas 上的高度（保持原始尺寸）
   );
   
-  // 使用 PNG 格式保持無損品質
-  return canvas.toDataURL('image/png');
+  // 使用 JPEG 格式並設定壓縮品質為 0.7
+  return canvas.toDataURL('image/jpeg', 0.7);
 }
 
 export default function CropperPage({ image, onCancel, onCropComplete }: CropperPageProps) {

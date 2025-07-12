@@ -986,11 +986,11 @@ export default function SolverPage() {
                       ))}
                     </div>
 
-                    {/* 提交按鈕 - 使用懸浮樣式確保始終可見 */}
-                    <div className="mobile-floating-button">
+                    {/* 提交按鈕 */}
+                    <div>
                       <Button 
                         type="submit" 
-                        className="w-full bg-green-500 hover:bg-green-600 text-white shadow-lg py-8"
+                        className="w-full bg-green-500 hover:bg-green-600 text-white shadow-lg py-4"
                         disabled={loading || !currentQuestion.trim()}
                       >
                         {loading ? (

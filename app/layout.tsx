@@ -15,18 +15,18 @@ export const metadata = {
   icons: {
     icon: [
       {
-        url: '/web-app-manifest-192x192.png',
+        url: '/teacher-icon-192x192.png',
         sizes: '192x192',
         type: 'image/png'
       },
       {
-        url: '/web-app-manifest-512x512.png',
+        url: '/teacher-icon-512x512.png',
         sizes: '512x512',
         type: 'image/png'
       }
     ],
-    shortcut: '/web-app-manifest-192x192.png',
-    apple: '/web-app-manifest-192x192.png',
+    shortcut: '/teacher-icon-192x192.png',
+    apple: '/teacher-icon-192x192.png',
   },
   openGraph: {
     title: '青椒老師家教中心 | 清大交大台大等國立大學家教',
@@ -35,7 +35,7 @@ export const metadata = {
     siteName: '青椒老師家教中心',
     images: [
       {
-        url: 'https://tutor-matching.tw/web-app-manifest-512x512.png',
+        url: 'https://tutor-matching.tw/teacher-icon-512x512.png',
         width: 512,
         height: 512,
         alt: '青椒老師家教中心 - 免費家教媒合服務',
@@ -48,7 +48,7 @@ export const metadata = {
     card: 'summary_large_image',
     title: '青椒老師家教中心',
     description: '由清華大學、交通大學畢業生創建的家教媒合平台。提供一對一客製化教學，免費媒合優質家教老師。',
-    images: ['https://tutor-matching.tw/web-app-manifest-512x512.png'],
+    images: ['https://tutor-matching.tw/teacher-icon-512x512.png'],
   },
   robots: {
     index: true,
@@ -77,10 +77,10 @@ export default function RootLayout({
   return (
     <html lang="zh-TW">
       <head>
-        <link rel="icon" type="image/png" sizes="192x192" href="/web-app-manifest-192x192.png" />
-        <link rel="icon" type="image/png" sizes="512x512" href="/web-app-manifest-512x512.png" />
-        <link rel="shortcut icon" type="image/png" href="/web-app-manifest-192x192.png" />
-        <link rel="apple-touch-icon" href="/web-app-manifest-192x192.png" />
+        <link rel="icon" type="image/png" sizes="192x192" href="/teacher-icon-192x192.png" />
+        <link rel="icon" type="image/png" sizes="512x512" href="/teacher-icon-512x512.png" />
+        <link rel="shortcut icon" type="image/png" href="/teacher-icon-192x192.png" />
+        <link rel="apple-touch-icon" href="/teacher-icon-192x192.png" />
       </head>
       <body className={inter.className }>
         <ConditionalHeader />

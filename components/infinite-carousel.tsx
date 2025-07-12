@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
 
 interface InfiniteCarouselProps {
   images: string[]
@@ -81,9 +82,11 @@ export default function InfiniteCarousel({
               height: `${imageHeight}px` // 確保容器有正確高度
             }}
           >
-            <img
+            <Image
               src={image}
               alt={`Carousel image ${index + 1}`}
+              width={imageWidth}
+              height={imageHeight}
               className="object-contain"
               style={{
                 width: `${imageWidth}px`,

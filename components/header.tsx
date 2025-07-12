@@ -1,6 +1,7 @@
 "use client"
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { useState, useEffect, useRef } from 'react'
 
 export default function Header() {
@@ -40,9 +41,11 @@ export default function Header() {
         {/* 統一排列 - 品牌名稱靠左，選單/按鈕靠右 */}
         <div className="flex justify-between items-center">
           <Link href="/" className="flex items-center space-x-3 text-xl font-semibold text-gray-900 flex-shrink-0">
-            <img 
+            <Image 
               src="/teacher-icon.png" 
               alt="青椒老師家教中心" 
+              width={32}
+              height={32}
               className="w-8 h-8"
             />
             <span>青椒老師家教中心</span>

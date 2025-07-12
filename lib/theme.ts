@@ -131,16 +131,19 @@ export const cssVariables = {
 }
 
 // 實用函數
-export const getColor = (colorPath: string) => {
+export const getColor = (colorPath: string): string | undefined => {
   const keys = colorPath.split('.')
-  let result: any = colors
+  let result: Record<string, unknown> = colors
   
   for (const key of keys) {
-    result = result[key]
-    if (!result) return undefined
+    if (result && typeof result === 'object' && key in result) {
+      result = result[key] as Record<string, unknown>
+    } else {
+      return undefined
+    }
   }
   
-  return result
+  return typeof result === 'string' ? result : undefined
 }
 
 // 預設主題配置

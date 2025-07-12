@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import ReactCrop, { Crop } from 'react-image-crop';
 import { Button } from './ui/button';
+import Image from 'next/image';
 import 'react-image-crop/dist/ReactCrop.css';
 
 // 定義 props 型別
@@ -60,13 +61,16 @@ export default function CropperPage({ image, onCancel, onCropComplete }: Cropper
             aspect={undefined}
             className="bg-white p-4 rounded shadow-lg"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            
+            <Image
               ref={imgRef}
               src={image}
               alt="裁切圖片"
+              width={500}
+              height={500}
               style={{objectFit: 'scale-down' }}
               onLoad={e => { imgRef.current = e.currentTarget; onImageLoad(); }}
+              unoptimized
             />
           </ReactCrop>
         </div>

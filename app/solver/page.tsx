@@ -3,20 +3,23 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import Image from 'next/image';
 import { 
   Camera, 
   Upload, 
   Send, 
   ArrowLeft, 
-  ChevronDown, 
   RefreshCw, 
   Plus,
   Image as ImageIcon,
   MessageSquare,
-  Clock
+  Clock,
+  Menu,
+  X,
+  User,
+  Home
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import rehypeKatex from 'rehype-katex';
@@ -47,7 +50,11 @@ export default function SolverPage() {
   // Thread 相關狀態
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
-  const [showThreadList, setShowThreadList] = useState(true);
+  const [showThreadList, setShowThreadList] = useState(false);
+  
+  // 新增：聊天記錄載入狀態管理
+  const [loadingThreadId, setLoadingThreadId] = useState<string | null>(null);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -105,7 +112,21 @@ export default function SolverPage() {
 
   // 載入特定 Thread 的訊息
   const loadThreadMessages = async (threadId: string) => {
-    if (!user) return;
+    if (!user || loadingThreadId === threadId || isLoadingMessages) return;
+    
+    // 設置載入狀態
+    setLoadingThreadId(threadId);
+    setIsLoadingMessages(true);
+    
+    // 立即切換到聊天頁面並顯示載入狀態
+    setPageState('chat');
+    setCurrentThreadId(threadId);
+    setMessages([]); // 清空當前消息以顯示載入狀態
+    
+    // 手機自動收起側邊欄
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setShowThreadList(false);
+    }
     
     try {
       console.log('載入 thread 訊息:', threadId);
@@ -123,21 +144,28 @@ export default function SolverPage() {
           imageUrl: msg.imageUrl
         }));
         
+        // 添加小延遲以確保用戶看到載入狀態
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
         setMessages(convertedMessages);
-        setCurrentThreadId(threadId);
-        setPageState('chat');
-        // 手機自動收起側邊欄
-        if (typeof window !== 'undefined' && window.innerWidth < 768) {
-          setShowThreadList(false);
-        }
       } else {
         const errorData = await response.json().catch(() => ({}));
         console.error('API 錯誤:', response.status, errorData);
         alert('載入聊天記錄失敗：' + (errorData.error || '未知錯誤'));
+        // 錯誤時返回原來的狀態
+        setPageState('home');
+        setCurrentThreadId(null);
       }
     } catch (error) {
       console.error('Failed to load thread messages:', error);
       alert('載入聊天記錄失敗，請稍後再試');
+      // 錯誤時返回原來的狀態
+      setPageState('home');
+      setCurrentThreadId(null);
+    } finally {
+      // 清除載入狀態
+      setLoadingThreadId(null);
+      setIsLoadingMessages(false);
     }
   };
 
@@ -377,6 +405,11 @@ export default function SolverPage() {
     setCurrentThreadId(null);
   };
 
+  // 返回主頁面
+  const goToMainPage = () => {
+    window.location.href = '/';
+  };
+
   // 格式化時間
   const formatTime = (timestamp: number) => {
     const date = new Date(timestamp);
@@ -393,9 +426,9 @@ export default function SolverPage() {
   // 如果認證還在載入中，顯示載入狀態
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-500" />
+          <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-green-600" />
           <p className="text-gray-600">檢查登入狀態...</p>
         </div>
       </div>
@@ -405,9 +438,9 @@ export default function SolverPage() {
   // 如果沒有登入，顯示載入中（會自動重定向）
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-500" />
+          <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-green-600" />
           <p className="text-gray-600">重定向到登入頁面...</p>
         </div>
       </div>
@@ -415,83 +448,145 @@ export default function SolverPage() {
   }
 
   return (
-    <div className="h-screen bg-gray-50 flex">
+    <div className="h-screen bg-gray-50 flex overflow-hidden">
       {/* 手機版遮罩 */}
       {showThreadList && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-40 z-40 md:hidden"
+          className="fixed inset-0 bg-black bg-opacity-30 z-40 md:hidden"
           onClick={() => setShowThreadList(false)}
         />
       )}
+      
+      {/* 側邊欄 */}
       <div
-        className={
-          `${showThreadList ? 'block' : 'hidden'}
-          md:fixed md:top-0 md:left-0 md:h-screen md:w-80 md:block
-          fixed top-0 left-0 w-full h-full z-50 bg-white border-r border-gray-200 flex flex-col
-          md:z-30`
-        }
-        style={{ maxWidth: '20rem' }}
+        className={`${showThreadList ? 'translate-x-0' : '-translate-x-full'}
+          md:translate-x-0 md:static fixed top-0 left-0 h-full w-80 z-50 
+          bg-white border-r border-gray-200 transition-transform duration-300 ease-in-out
+          flex flex-col`}
       >
-        {/* Header */}
+        {/* 側邊欄 Header */}
         <div className="p-4 border-b border-gray-200 flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <h1 className="text-xl font-bold text-gray-900">解題助手</h1>
-            <Button 
-              onClick={startNewThread}
-              size="sm"
-              className="bg-blue-500 hover:bg-blue-600 text-white"
-            >
-              <Plus className="w-4 h-4 mr-1" />
-              新對話
-            </Button>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden">
+                <Image 
+                  src="/teacher-icon-192x192.png" 
+                  alt="AI助手" 
+                  width={32}
+                  height={32}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <h1 className="text-lg font-semibold text-gray-900">解題助手</h1>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={goToMainPage}
+                className="text-gray-600 hover:text-green-600"
+                title="返回主頁面"
+              >
+                <Home className="w-4 h-4" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setShowThreadList(false)}
+                className="md:hidden text-gray-600"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
+          <Button 
+            onClick={startNewThread}
+            className="w-full bg-green-500 hover:bg-green-600 text-white"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            新對話
+          </Button>
         </div>
 
         {/* Thread 列表 */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto scrollbar-hide">
           {threads.length === 0 ? (
-            <div className="p-4 text-center text-gray-500">
-              <MessageSquare className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-              <p>還沒有對話記錄</p>
-              <p className="text-sm">開始你的第一個解題對話吧！</p>
+            <div className="p-6 text-center text-gray-500">
+              <MessageSquare className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+              <p className="text-sm">還沒有對話記錄</p>
             </div>
           ) : (
             <div className="p-2">
-              {threads.map((thread) => (
-                <div
-                  key={thread.id}
-                  onClick={() => loadThreadMessages(thread.id)}
-                  className={`p-3 rounded-lg cursor-pointer transition-colors ${
-                    currentThreadId === thread.id
-                      ? 'bg-blue-50 border border-blue-200'
-                      : 'hover:bg-gray-50'
-                  }`}
-                >
-                  <div className="flex items-start space-x-2">
-                    {thread.hasImage ? (
-                      <ImageIcon className="w-4 h-4 mt-1 text-blue-500 flex-shrink-0" />
-                    ) : (
-                      <MessageSquare className="w-4 h-4 mt-1 text-gray-400 flex-shrink-0" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {thread.title}
-                      </p>
-                      <div className="flex items-center text-xs text-gray-500 mt-1">
-                        <Clock className="w-3 h-3 mr-1" />
-                        {formatTime(thread.lastUpdated)}
+              {threads.map((thread) => {
+                const isLoading = loadingThreadId === thread.id;
+                const isCurrentThread = currentThreadId === thread.id;
+                const isDisabled = isLoadingMessages && !isLoading;
+                
+                return (
+                  <div
+                    key={thread.id}
+                    onClick={() => !isDisabled && loadThreadMessages(thread.id)}
+                    className={`p-3 rounded-lg transition-all duration-200 mb-2 relative ${
+                      isCurrentThread
+                        ? 'bg-green-50 border-l-4 border-green-500'
+                        : isDisabled
+                        ? 'opacity-50 cursor-not-allowed'
+                        : 'hover:bg-gray-50 cursor-pointer'
+                    } ${isLoading ? 'bg-green-100 shadow-sm' : ''}`}
+                  >
+                    {/* 載入覆蓋層 */}
+                    {isLoading && (
+                      <div className="absolute inset-0 bg-white bg-opacity-80 rounded-lg flex items-center justify-center z-10">
+                        <div className="flex items-center space-x-2">
+                          <RefreshCw className="w-4 h-4 text-green-600 animate-spin" />
+                          <span className="text-xs text-green-600 font-medium">載入中...</span>
+                        </div>
                       </div>
+                    )}
+                    
+                    <div className="flex items-start space-x-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
+                        thread.hasImage ? 'bg-green-100' : 'bg-gray-100'
+                      } ${isLoading ? 'bg-green-200' : ''}`}>
+                        {thread.hasImage ? (
+                          <ImageIcon className={`w-4 h-4 transition-colors ${
+                            isLoading ? 'text-green-700' : 'text-green-600'
+                          }`} />
+                        ) : (
+                          <MessageSquare className={`w-4 h-4 transition-colors ${
+                            isLoading ? 'text-gray-600' : 'text-gray-500'
+                          }`} />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-medium truncate transition-colors ${
+                          isLoading ? 'text-green-800' : 'text-gray-900'
+                        }`}>
+                          {thread.title}
+                        </p>
+                        <div className="flex items-center text-xs text-gray-500 mt-1">
+                          <Clock className="w-3 h-3 mr-1" />
+                          {formatTime(thread.lastUpdated)}
+                        </div>
+                      </div>
+                      
+                      {/* 載入指示器 */}
+                      {isLoading && (
+                        <div className="absolute top-2 right-2">
+                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                        </div>
+                      )}
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
       </div>
 
       {/* 主內容區域 */}
-      <div className="flex-1 flex flex-col h-screen max-h-screen bg-white md:ml-80">
+      <div className="flex-1 flex flex-col h-screen overflow-hidden bg-white">
         {/* 手機版 Header */}
         <div className="md:hidden bg-white border-b border-gray-200 px-4 py-3 flex-shrink-0">
           <div className="flex items-center justify-between">
@@ -500,38 +595,53 @@ export default function SolverPage() {
               onClick={() => setShowThreadList(!showThreadList)}
               className="mr-3"
             >
-              <ChevronDown className={`w-5 h-5 transition-transform ${showThreadList ? 'rotate-180' : ''}`} />
+              <Menu className="w-5 h-5" />
             </Button>
-            <h1 className="text-lg font-bold text-gray-900">解題助手</h1>
+            <h1 className="text-lg font-semibold text-gray-900">解題助手</h1>
             <Button 
-              onClick={startNewThread}
+              variant="ghost" 
               size="sm"
-              className="bg-blue-500 hover:bg-blue-600 text-white"
+              onClick={goToMainPage}
+              className="text-gray-600 hover:text-green-600"
             >
-              <Plus className="w-4 h-4" />
+              <Home className="w-4 h-4" />
             </Button>
           </div>
         </div>
 
         {/* 首頁 - 拍照/上傳選擇 */}
         {pageState === 'home' && (
-          <div className="flex-1 flex items-center justify-center p-4">
-            <div className="max-w-md w-full space-y-8">
+          <div className="flex-1 flex items-center justify-center p-6">
+            <div className="max-w-md w-full">
+              <div className="text-center mb-8">
+                <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 overflow-hidden">
+                  <Image 
+                    src="/teacher-icon-192x192.png" 
+                    alt="AI助手" 
+                    width={64}
+                    height={64}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">開始解題</h2>
+                <p className="text-gray-600">上傳題目圖片，青椒老師幫你解答</p>
+              </div>
+
               {/* 拍照/上傳按鈕 */}
-              <div className="flex gap-4">
+              <div className="grid grid-cols-2 gap-4 mb-8">
                 <Button 
                   onClick={handleCameraClick}
-                  className="flex-1 h-16 bg-blue-500 hover:bg-blue-600 text-white rounded-xl"
+                  className="h-20 bg-green-500 hover:bg-green-600 text-white rounded-xl flex-col space-y-2"
                 >
-                  <Camera className="w-6 h-6 mr-2" />
-                  拍照
+                  <Camera className="w-6 h-6" />
+                  <span>拍照</span>
                 </Button>
                 <Button 
                   onClick={handleUploadClick}
-                  className="flex-1 h-16 bg-green-500 hover:bg-green-600 text-white rounded-xl"
+                  className="h-20 bg-gray-500 hover:bg-gray-600 text-white rounded-xl flex-col space-y-2"
                 >
-                  <Upload className="w-6 h-6 mr-2" />
-                  上傳
+                  <Upload className="w-6 h-6" />
+                  <span>上傳</span>
                 </Button>
               </div>
 
@@ -552,26 +662,14 @@ export default function SolverPage() {
                 onChange={(e) => handleFileChange(e)}
               />
 
-              {/* 分隔線 */}
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300" />
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-gray-50 text-gray-500">使用範例</span>
-                </div>
-              </div>
-
-              {/* 使用範例 */}
-              <div className="space-y-3 text-sm text-gray-600">
-                <div className="flex items-start">
-                  <span className="text-blue-500 mr-2">▸</span>
-                  <span>拍下題目圖片 → 輸入「這題怎麼解？」</span>
-                </div>
-                <div className="flex items-start">
-                  <span className="text-blue-500 mr-2">▸</span>
-                  <span>選擇相簿圖片 → 輸入「請幫我找關鍵字」</span>
-                </div>
+              {/* 使用說明 */}
+              <div className="bg-gray-50 rounded-xl p-4">
+                <h3 className="font-semibold text-gray-900 mb-3">使用說明</h3>
+                <ul className="space-y-2 text-sm text-gray-600">
+                  <li>• 拍攝或上傳題目圖片</li>
+                  <li>• 輸入你的問題</li>
+                  <li>• 青椒老師會提供詳細解答</li>
+                </ul>
               </div>
             </div>
           </div>
@@ -579,9 +677,9 @@ export default function SolverPage() {
 
         {/* 提問頁 - 圖片預覽 + 問題輸入 */}
         {pageState === 'question' && (
-          <div className="flex-1 flex flex-col h-screen max-h-screen overflow-y-auto">
+          <div className="flex-1 flex flex-col overflow-hidden">
             {/* Header */}
-            <div className="sticky top-0 bg-white border-b px-4 py-3 z-10 flex-shrink-0">
+            <div className="bg-white border-b border-gray-200 px-4 py-3 flex-shrink-0">
               <div className="flex items-center">
                 <Button 
                   variant="ghost" 
@@ -590,52 +688,59 @@ export default function SolverPage() {
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </Button>
-                <h1 className="text-xl font-bold text-gray-900">輸入問題</h1>
+                <h1 className="text-lg font-semibold text-gray-900">輸入問題</h1>
               </div>
             </div>
 
             {/* 主要內容 */}
-            <div className="flex-1 p-4">
+            <div className="flex-1 overflow-y-auto p-4">
               <div className="max-w-2xl mx-auto space-y-6">
                 {/* 圖片預覽 */}
                 {imagePreview && (
-                  <Card className="overflow-hidden">
-                    <CardContent className="p-0">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img 
+                  <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                    <div className="p-4 border-b border-gray-200">
+                      <h3 className="font-semibold text-gray-900">題目圖片</h3>
+                    </div>
+                    <div className="p-4">
+                      <Image 
                         src={imagePreview} 
                         alt="題目圖片" 
-                        className="w-full h-auto max-h-96 object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                        width={600}
+                        height={400}
+                        className="w-full h-auto max-h-96 object-contain rounded-lg cursor-pointer hover:scale-105 transition-transform duration-200"
                         onClick={() => {
                           window.open(imagePreview, '_blank');
                         }}
                       />
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </div>
                 )}
 
                 {/* 問題輸入 */}
-                <form onSubmit={handleQuestionSubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      請輸入你對這張圖片的問題
-                    </label>
-                    <Textarea
-                      value={currentQuestion}
-                      onChange={(e) => setCurrentQuestion(e.target.value)}
-                      placeholder="例如：這題怎麼解？請幫我分析關鍵字..."
-                      className="min-h-[100px] resize-none"
-                      disabled={loading}
-                    />
-                    {/* 預設問題按鈕區塊 */}
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      {['這題怎麼解？', '請幫我分析關鍵字', '請用不同方法解釋', '請列出詳細步驟', '請解釋為什麼這樣算'].map((preset, idx) => (
+                <div className="bg-white rounded-xl border border-gray-200 p-4">
+                  <form onSubmit={handleQuestionSubmit} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-900 mb-2">
+                        請輸入你的問題
+                      </label>
+                      <Textarea
+                        value={currentQuestion}
+                        onChange={(e) => setCurrentQuestion(e.target.value)}
+                        placeholder="例如：這題怎麼解？請幫我分析關鍵字..."
+                        className="min-h-[120px] resize-none border-gray-300 focus:border-green-500 focus:ring-green-500"
+                        disabled={loading}
+                      />
+                    </div>
+
+                    {/* 預設問題按鈕 */}
+                    <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
+                      {['這題怎麼解？', '請幫我分析關鍵字', '請用不同方法解釋', '請列出詳細步驟', '請解釋這個概念', '有其他解法嗎？'].map((preset, idx) => (
                         <Button
                           key={idx}
                           type="button"
                           variant="outline"
                           size="sm"
-                          className="text-xs"
+                          className="text-xs whitespace-nowrap flex-shrink-0"
                           onClick={() => setCurrentQuestion(preset)}
                           disabled={loading}
                         >
@@ -643,25 +748,26 @@ export default function SolverPage() {
                         </Button>
                       ))}
                     </div>
-                  </div>
-                  <Button 
-                    type="submit" 
-                    className="w-full bg-blue-500 hover:bg-blue-600 text-white"
-                    disabled={loading || !currentQuestion.trim()}
-                  >
-                    {loading ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                        處理中...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="w-4 h-4 mr-2" />
-                        送出
-                      </>
-                    )}
-                  </Button>
-                </form>
+
+                    <Button 
+                      type="submit" 
+                      className="w-full bg-green-500 hover:bg-green-600 text-white"
+                      disabled={loading || !currentQuestion.trim()}
+                    >
+                      {loading ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                          分析中...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4 mr-2" />
+                          開始解題
+                        </>
+                      )}
+                    </Button>
+                  </form>
+                </div>
               </div>
             </div>
           </div>
@@ -669,70 +775,199 @@ export default function SolverPage() {
 
         {/* 聊天詳情頁 */}
         {pageState === 'chat' && (
-          <div className="flex-1 flex flex-col">
+          <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
             {/* Header */}
-            <div className="sticky top-0 bg-white border-b px-4 py-3 z-10 flex-shrink-0">
-              <div className="flex items-center">
-                <Button 
-                  variant="ghost" 
-                  onClick={goToQuestion}
-                  className="mr-3"
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                </Button>
-                <h1 className="text-xl font-bold text-gray-900">解題對話</h1>
+            <div className="bg-white border-b border-gray-200 px-6 py-4 flex-shrink-0 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <Button 
+                    variant="ghost" 
+                    onClick={goToQuestion}
+                    className="mr-3 p-2 hover:bg-gray-100 rounded-full"
+                  >
+                    <ArrowLeft className="w-5 h-5 text-gray-600" />
+                  </Button>
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-full overflow-hidden bg-green-100">
+                      <Image 
+                        src="/teacher-icon-192x192.png" 
+                        alt="青椒老師" 
+                        width={40}
+                        height={40}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div>
+                      <h1 className="text-lg font-semibold text-gray-900">青椒老師</h1>
+                      <p className="text-sm text-gray-500">AI 解題助手</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
             {/* 聊天記錄區域 */}
-            <div className="flex-1 min-h-0 overflow-y-auto p-4 pb-28">
-              <div className="max-w-4xl mx-auto space-y-4">
-                {messages.map((message, index) => (
-                  <div
-                    key={index}
-                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    {message.role === 'assistant' ? (
-                      <div className="bg-white rounded-2xl shadow-2xl border-2 border-gray-200 p-8 mb-6">
-                        <div className="prose prose-lg max-w-none katex-math-render space-y-4">
-                          <ReactMarkdown
-                            remarkPlugins={[remarkMath, remarkGfm]}
-                            rehypePlugins={[rehypeKatex]}
-                          >
-                            {fixLatexBlocks(message.content || "")}
-                          </ReactMarkdown>
+            <div className="flex-1 overflow-y-auto px-6 py-4" style={{ paddingBottom: '140px' }}>
+              <div className="max-w-4xl mx-auto space-y-6">
+                {/* 骨架屏載入效果 */}
+                {isLoadingMessages && messages.length === 0 ? (
+                  <div className="space-y-6">
+                    {/* 骨架屏 - 用戶消息 */}
+                    <div className="flex items-start space-x-3 flex-row-reverse space-x-reverse">
+                      <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse flex-shrink-0"></div>
+                      <div className="flex justify-end">
+                        <div className="max-w-md">
+                          <div className="flex justify-end mb-1">
+                            <div className="h-3 w-16 bg-gray-200 rounded animate-pulse"></div>
+                          </div>
+                          <div className="bg-gray-200 rounded-2xl p-4 animate-pulse">
+                            <div className="space-y-2">
+                              <div className="h-20 w-48 bg-gray-300 rounded-lg"></div>
+                              <div className="h-4 w-32 bg-gray-300 rounded"></div>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    ) : (
-                      <div
-                        className={
-                          `max-w-[80%] bg-blue-500 text-white rounded-2xl rounded-br-md p-4`
-                        }
-                      >
-                        {message.imageUrl && (
-                          /* eslint-disable-next-line @next/next/no-img-element */
-                          <img 
-                            src={message.imageUrl} 
-                            alt="題目圖片" 
-                            className="max-w-full h-auto max-h-48 rounded-lg mb-3 cursor-pointer hover:opacity-90 transition-opacity"
-                            onClick={() => window.open(message.imageUrl, '_blank')}
-                          />
-                        )}
-                        {message.content && (
-                          <div>{message.content}</div>
-                        )}
+                    </div>
+
+                    {/* 骨架屏 - AI 回覆 */}
+                    <div className="flex items-start space-x-3">
+                      <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse flex-shrink-0"></div>
+                      <div className="max-w-3xl">
+                        <div className="mb-2">
+                          <div className="h-4 w-20 bg-gray-200 rounded animate-pulse"></div>
+                        </div>
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
+                          <div className="space-y-3">
+                            <div className="h-4 w-full bg-gray-200 rounded animate-pulse"></div>
+                            <div className="h-4 w-4/5 bg-gray-200 rounded animate-pulse"></div>
+                            <div className="h-4 w-3/4 bg-gray-200 rounded animate-pulse"></div>
+                            <div className="h-4 w-5/6 bg-gray-200 rounded animate-pulse"></div>
+                            <div className="h-4 w-2/3 bg-gray-200 rounded animate-pulse"></div>
+                          </div>
+                        </div>
                       </div>
-                    )}
-                    
+                    </div>
+
+                    {/* 載入指示器 */}
+                    <div className="flex justify-center">
+                      <div className="flex items-center space-x-2 bg-green-50 px-4 py-2 rounded-full">
+                        <RefreshCw className="w-4 h-4 animate-spin text-green-600" />
+                        <span className="text-sm text-green-600 font-medium">載入聊天記錄中...</span>
+                      </div>
+                    </div>
                   </div>
-                ))}
+                ) : (
+                  <>
+                    {messages.map((message, index) => (
+                      <div
+                        key={index}
+                        className={`flex items-start space-x-3 ${message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}
+                      >
+                        {/* 頭像 */}
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
+                          {message.role === 'user' ? (
+                            <div className="w-full h-full bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center">
+                              <User className="w-4 h-4 text-white" />
+                            </div>
+                          ) : (
+                            <Image 
+                              src="/teacher-icon-192x192.png" 
+                              alt="青椒老師" 
+                              width={32}
+                              height={32}
+                              className="w-full h-full object-cover"
+                            />
+                          )}
+                        </div>
+
+                        {/* 訊息內容 */}
+                        <div className={`flex-1 ${message.role === 'user' ? 'flex justify-end' : ''}`}>
+                          {message.role === 'assistant' ? (
+                            <div className="max-w-3xl">
+                              <div className="mb-2">
+                                <span className="text-sm font-medium text-gray-900">青椒老師</span>
+                                <span className="text-xs text-gray-500 ml-2">剛剛</span>
+                              </div>
+                              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
+                                <div className="prose max-w-none">
+                                  <ReactMarkdown
+                                    remarkPlugins={[remarkMath, remarkGfm]}
+                                    rehypePlugins={[rehypeKatex]}
+                                    components={{
+                                      h1: ({...props}) => <h1 className="text-xl font-bold text-gray-900 mb-3" {...props} />,
+                                      h2: ({...props}) => <h2 className="text-lg font-semibold text-gray-900 mb-2" {...props} />,
+                                      h3: ({...props}) => <h3 className="text-md font-semibold text-gray-900 mb-2" {...props} />,
+                                      p: ({...props}) => <p className="text-gray-700 mb-2 leading-relaxed" {...props} />,
+                                      ul: ({...props}) => <ul className="list-disc list-inside text-gray-700 mb-2 space-y-1" {...props} />,
+                                      ol: ({...props}) => <ol className="list-decimal list-inside text-gray-700 mb-2 space-y-1" {...props} />,
+                                      code: ({inline, ...props}: React.JSX.IntrinsicElements['code'] & { inline?: boolean }) => 
+                                        inline ? (
+                                          <code className="bg-gray-100 px-2 py-1 rounded text-sm font-mono text-gray-800" {...props} />
+                                        ) : (
+                                          <code className="block bg-gray-100 p-3 rounded-lg text-sm font-mono text-gray-800 overflow-x-auto" {...props} />
+                                        ),
+                                      blockquote: ({...props}) => <blockquote className="border-l-4 border-green-500 pl-4 py-2 bg-green-50 text-gray-700 mb-2" {...props} />,
+                                    }}
+                                  >
+                                    {fixLatexBlocks(message.content || "")}
+                                  </ReactMarkdown>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="max-w-md">
+                              <div className="flex justify-end mb-1">
+                                <span className="text-xs text-gray-500">Me • 剛剛</span>
+                              </div>
+                              <div className="bg-green-500 text-white rounded-2xl p-4 shadow-sm">
+                                {message.imageUrl && (
+                                  <div className="mb-3">
+                                    <Image 
+                                      src={message.imageUrl} 
+                                      alt="題目圖片" 
+                                      width={300}
+                                      height={200}
+                                      className="max-w-full h-auto max-h-40 rounded-lg cursor-pointer"
+                                      onClick={() => window.open(message.imageUrl, '_blank')}
+                                      unoptimized
+                                    />
+                                  </div>
+                                )}
+                                {message.content && (
+                                  <div className="text-white">{message.content}</div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
+                
                 {/* 載入中狀態 */}
                 {loading && (
-                  <div className="flex justify-start">
-                    <div className="bg-white border rounded-2xl rounded-bl-md shadow-sm p-4">
-                      <div className="flex items-center space-x-2">
-                        <RefreshCw className="w-4 h-4 animate-spin text-blue-500" />
-                        <span className="text-gray-600">AI 正在分析...</span>
+                  <div className="flex items-start space-x-3">
+                    <div className="w-8 h-8 rounded-full overflow-hidden">
+                      <Image 
+                        src="/teacher-icon-192x192.png" 
+                        alt="青椒老師" 
+                        width={32}
+                        height={32}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="max-w-3xl">
+                      <div className="mb-2">
+                        <span className="text-sm font-medium text-gray-900">青椒老師</span>
+                        <span className="text-xs text-gray-500 ml-2">剛剛</span>
+                      </div>
+                      <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+                        <div className="flex items-center space-x-2">
+                          <RefreshCw className="w-4 h-4 animate-spin text-green-500" />
+                          <span className="text-gray-600">正在思考...</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -740,22 +975,24 @@ export default function SolverPage() {
                 <div ref={messagesEndRef} />
               </div>
             </div>
-            {/* 輸入區域固定在底部 */}
-            <div className="sticky bottom-0 bg-white border-t p-4 z-20">
+            
+            {/* 輸入區域 */}
+            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-30 md:left-80 shadow-lg">
               <div className="max-w-4xl mx-auto">
-                <form onSubmit={handleChatSubmit} className="flex space-x-3">
+                <form onSubmit={handleChatSubmit} className="flex items-center space-x-3 bg-gray-50 rounded-full p-2">
+                  
                   <Input
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder="繼續提問..."
-                    className="flex-1"
+                    placeholder="輸入訊息..."
+                    className="flex-1 border-0 bg-transparent focus:ring-0 focus:border-0 focus-visible:ring-0 focus-visible:outline-none placeholder-gray-500 shadow-none"
                     disabled={loading}
                   />
                   <Button
                     type="submit"
                     disabled={loading || !input.trim()}
-                    className="bg-blue-500 hover:bg-blue-600 text-white"
+                    className="bg-green-500 hover:bg-green-600 text-white rounded-full w-10 h-10 p-0"
                   >
                     {loading ? (
                       <RefreshCw className="w-4 h-4 animate-spin" />
@@ -764,21 +1001,24 @@ export default function SolverPage() {
                     )}
                   </Button>
                 </form>
-                {/* 預設問題按鈕區塊 */}
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {['這題怎麼解？', '請幫我分析關鍵字', '請用不同方法解釋', '請列出詳細步驟', '請解釋為什麼這樣算'].map((preset, idx) => (
-                    <Button
-                      key={idx}
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="text-xs"
-                      onClick={() => setInput(preset)}
-                      disabled={loading}
-                    >
-                      {preset}
-                    </Button>
-                  ))}
+                
+                {/* 預設問題按鈕 */}
+                <div className="mt-3">
+                  <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
+                    {['這題怎麼解？', '請幫我分析關鍵字', '請用不同方法解釋', '請列出詳細步驟', '請解釋這個概念', '有其他解法嗎？'].map((preset, idx) => (
+                      <Button
+                        key={idx}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="text-xs bg-white hover:bg-gray-50 border-gray-200 rounded-full whitespace-nowrap flex-shrink-0"
+                        onClick={() => setInput(preset)}
+                        disabled={loading}
+                      >
+                        {preset}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>

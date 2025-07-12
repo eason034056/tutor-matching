@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import Image from 'next/image';
 import { Camera, Upload, Send, ArrowLeft, ChevronDown, ChevronUp, RefreshCw, BarChart3 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import rehypeKatex from 'rehype-katex';
@@ -207,14 +208,16 @@ export default function SolverChat({ messages, onSendMessage, loading }: SolverC
             {imagePreview && (
               <Card className="overflow-hidden">
                 <CardContent className="p-0">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img 
+                  <Image 
                     src={imagePreview} 
                     alt="題目圖片" 
+                    width={600}
+                    height={400}
                     className="w-full h-auto max-h-96 object-contain cursor-pointer hover:opacity-90 transition-opacity"
                     onClick={() => {
                       window.open(imagePreview, '_blank');
                     }}
+                    unoptimized
                   />
                 </CardContent>
               </Card>
@@ -309,12 +312,14 @@ export default function SolverChat({ messages, onSendMessage, loading }: SolverC
                 } p-4`}
               >
                 {message.imageUrl && (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img 
+                  <Image 
                     src={message.imageUrl} 
                     alt="題目圖片" 
+                    width={300}
+                    height={200}
                     className="max-w-full h-auto max-h-48 rounded-lg mb-3 cursor-pointer hover:opacity-90 transition-opacity"
                     onClick={() => window.open(message.imageUrl, '_blank')}
+                    unoptimized
                   />
                 )}
                 
@@ -384,7 +389,7 @@ export default function SolverChat({ messages, onSendMessage, loading }: SolverC
               <div className="bg-white border rounded-2xl rounded-bl-md shadow-sm p-4">
                 <div className="flex items-center space-x-2">
                   <RefreshCw className="w-4 h-4 animate-spin text-blue-500" />
-                  <span className="text-gray-600">AI 正在分析...</span>
+                  <span className="text-gray-600">青椒老師解題中...</span>
                 </div>
               </div>
             </div>

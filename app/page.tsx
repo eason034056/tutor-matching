@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Button } from "@/components/ui/button"
 import TutorCasesClient from './tutor-cases/client'
 import InfiniteCarousel from '@/components/infinite-carousel'
@@ -42,9 +43,11 @@ export default function Home() {
             {/* Profile Image */}
             <div className="w-48 h-48 mx-auto mb-4 relative">
               <Link href="/solver" className="group">
-                <img 
+                <Image 
                   src="/teacher-icon.png" 
                   alt="青椒老師家教中心" 
+                  width={192}
+                  height={192}
                   className="w-full h-full object-cover rounded-full cursor-pointer transition-transform duration-300 group-hover:scale-105"
                 />
               </Link>
@@ -54,7 +57,7 @@ export default function Home() {
           {/* Main Title */}
           <h1 className="text-4xl md:text-6xl font-bold text-neutral-900 mb-6 leading-tight">
             為孩子找到<br />
-            最適合的<span className="text-brand-600">導師</span>
+            最適合的<span className="text-brand-600">家教老師</span>
           </h1>
           
           <p className="text-xl text-neutral-600 mb-12 max-w-2xl mx-auto">

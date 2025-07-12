@@ -32,6 +32,21 @@ import CropperPage from '@/components/CropperPage';
 // 定義頁面狀態類型
 type PageState = 'home' | 'question' | 'chat';
 
+// 定義請求資料類型
+interface RequestData {
+  message: string;
+  userId: string;
+  threadId?: string | null;
+  questionImageUrl?: string;
+  isNewThread?: boolean;
+}
+
+// 定義錯誤類型
+interface ApiError extends Error {
+  name: string;
+  message: string;
+}
+
 function fixLatexBlocks(text: string) {
   // 將 [ \begin{...} ... \end{...} ] 轉成 $$...$$
   return text.replace(/\[\s*(\\begin\{[a-zA-Z*]+\}[\s\S]*?\\end\{[a-zA-Z*]+\})\s*\]/g, (_, inner) => `$$${inner}$$`);
@@ -62,7 +77,7 @@ export default function SolverPage() {
   const [retryCount, setRetryCount] = useState(0);
   const [lastRequest, setLastRequest] = useState<{
     type: 'question' | 'chat';
-    data: any;
+    data: RequestData;
   } | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -396,13 +411,14 @@ export default function SolverPage() {
       } else {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error:', error);
       clearTimeouts();
-      if (error.name === 'AbortError') {
+      const apiError = error as ApiError;
+      if (apiError.name === 'AbortError') {
         setApiTimeout(true);
       } else {
-        alert('請求失敗：' + error.message);
+        alert('請求失敗：' + apiError.message);
       }
     } finally {
       setLoading(false);
@@ -506,13 +522,14 @@ export default function SolverPage() {
       } else {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error:', error);
       clearTimeouts();
-      if (error.name === 'AbortError') {
+      const apiError = error as ApiError;
+      if (apiError.name === 'AbortError') {
         setApiTimeout(true);
       } else {
-        alert('請求失敗：' + error.message);
+        alert('請求失敗：' + apiError.message);
       }
     } finally {
       setLoading(false);

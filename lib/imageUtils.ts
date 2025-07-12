@@ -40,11 +40,11 @@ export async function addWatermark(file: File): Promise<Blob> {
         ctx.restore();
       }
       
-      // 轉換為 blob
+      // 轉換為 blob（使用 PNG 格式保持原始品質）
       canvas.toBlob((blob) => {
         if (blob) resolve(blob);
         else reject(new Error('Failed to create blob'));
-      }, 'image/jpeg', 0.95);
+      }, 'image/png');
     };
     
     img.onerror = () => reject(new Error('Failed to load image'));

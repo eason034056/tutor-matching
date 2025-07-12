@@ -32,7 +32,7 @@ function calculateFileSize(width: number, height: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-// 裁切函數
+// 裁切函數（保持原始品質）
 function getCroppedImg(image: HTMLImageElement, crop: Crop): string | null {
   if (!crop.width || !crop.height) return null;
   const canvas = document.createElement('canvas');
@@ -54,7 +54,8 @@ function getCroppedImg(image: HTMLImageElement, crop: Crop): string | null {
     crop.width,
     crop.height
   );
-  return canvas.toDataURL('image/jpeg', 0.92);
+  // 使用 PNG 格式保持無損品質
+  return canvas.toDataURL('image/png');
 }
 
 export default function CropperPage({ image, onCancel, onCropComplete }: CropperPageProps) {

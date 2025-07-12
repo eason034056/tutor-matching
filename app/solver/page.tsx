@@ -1226,11 +1226,11 @@ export default function SolverPage() {
                               </div>
                             </div>
                           ) : (
-                            <div className="max-w-md w-full md:max-w-md">
-                              <div className="flex justify-end mb-1">
+                            <div className="flex flex-col items-end">
+                              <div className="mb-1">
                                 <span className="text-xs text-gray-500">Me • 剛剛</span>
                               </div>
-                              <div className="bg-green-500 text-white rounded-2xl p-4 shadow-sm overflow-hidden">
+                              <div className="bg-green-500 text-white rounded-2xl p-4 shadow-sm overflow-hidden max-w-sm sm:max-w-md md:max-w-lg">
                                 {message.imageUrl && (
                                   <div className="mb-3">
                                     <Image 
@@ -1238,7 +1238,7 @@ export default function SolverPage() {
                                       alt="題目圖片" 
                                       width={300}
                                       height={200}
-                                      className="max-w-full h-auto max-h-40 rounded-lg cursor-pointer"
+                                      className="max-w-full h-auto rounded-lg cursor-pointer"
                                       onClick={() => window.open(message.imageUrl, '_blank')}
                                       unoptimized
                                     />

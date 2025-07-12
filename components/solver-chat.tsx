@@ -305,10 +305,10 @@ export default function SolverChat({ messages, onSendMessage, loading }: SolverC
               }`}
             >
               <div
-                className={`max-w-[80%] ${
+                className={`${
                   message.role === 'user'
-                    ? 'bg-blue-500 text-white rounded-2xl rounded-br-md'
-                    : 'bg-white border rounded-2xl rounded-bl-md shadow-sm'
+                    ? 'max-w-[70%] sm:max-w-[80%] bg-blue-500 text-white rounded-2xl rounded-br-md'
+                    : 'max-w-[85%] sm:max-w-[80%] bg-white border rounded-2xl rounded-bl-md shadow-sm'
                 } p-4`}
               >
                 {message.imageUrl && (

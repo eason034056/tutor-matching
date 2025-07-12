@@ -92,6 +92,54 @@ export default function SolverPage() {
   const [cropImage, setCropImage] = useState<string | null>(null);
   const [showCropper, setShowCropper] = useState(false);
 
+  // 新增：移動端檢測和視窗高度管理
+  const [isMobile, setIsMobile] = useState(false);
+  const [viewportHeight, setViewportHeight] = useState(0);
+
+  // 新增：檢測移動端環境和視窗高度變化
+  useEffect(() => {
+    const detectMobile = () => {
+      const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const isSmallScreen = window.innerWidth < 768;
+      setIsMobile(isMobileDevice || isSmallScreen);
+    };
+
+    const handleResize = () => {
+      detectMobile();
+      setViewportHeight(window.innerHeight);
+    };
+
+    const handleVisualViewportChange = () => {
+      // 處理虛擬鍵盤彈出時的視窗變化
+      if (window.visualViewport) {
+        setViewportHeight(window.visualViewport.height);
+      }
+    };
+
+    // 初始化
+    handleResize();
+
+    // 監聽事件
+    window.addEventListener('resize', handleResize);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleVisualViewportChange);
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleVisualViewportChange);
+      }
+    };
+  }, []);
+
+  // 新增：動態設置視窗高度的 CSS 變數
+  useEffect(() => {
+    if (isMobile && viewportHeight > 0) {
+      document.documentElement.style.setProperty('--vh', `${viewportHeight * 0.01}px`);
+    }
+  }, [isMobile, viewportHeight]);
+
   // 新增：清除超時計時器的函數
   const clearTimeouts = () => {
     if (timeoutRef.current) {
@@ -788,8 +836,8 @@ export default function SolverPage() {
 
         {/* 首頁 - 拍照/上傳選擇 */}
         {pageState === 'home' && (
-          <div className="flex-1 flex items-center justify-center p-6 bg-gray-50 h-full">
-            <div className="max-w-md w-full">
+          <div className="flex-1 flex items-center justify-center p-6 bg-gray-50 h-full mobile-keyboard-adjust">
+            <div className="max-w-md w-full mobile-content-area">
               <div className="text-center mb-8">
                 <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 overflow-hidden">
                   <Image 
@@ -808,14 +856,14 @@ export default function SolverPage() {
               <div className="grid grid-cols-2 gap-4 mb-8">
                 <Button 
                   onClick={handleCameraClick}
-                  className="h-20 bg-green-500 hover:bg-green-600 text-white rounded-xl flex-col space-y-2"
+                  className="h-20 bg-green-500 hover:bg-green-600 text-white rounded-xl flex-col space-y-2 shadow-lg"
                 >
                   <Camera className="w-6 h-6" />
                   <span>拍照</span>
                 </Button>
                 <Button 
                   onClick={handleUploadClick}
-                  className="h-20 bg-gray-500 hover:bg-gray-600 text-white rounded-xl flex-col space-y-2"
+                  className="h-20 bg-gray-500 hover:bg-gray-600 text-white rounded-xl flex-col space-y-2 shadow-lg"
                 >
                   <Upload className="w-6 h-6" />
                   <span>上傳</span>
@@ -840,7 +888,7 @@ export default function SolverPage() {
               />
 
               {/* 使用說明 */}
-              <div className="bg-gray-50 rounded-xl p-4">
+              <div className="bg-gray-100 rounded-xl p-4 shadow-sm">
                 <h3 className="font-semibold text-gray-900 mb-3">使用說明</h3>
                 <ul className="space-y-2 text-sm text-gray-600">
                   <li>• 拍攝或上傳題目圖片</li>
@@ -848,13 +896,16 @@ export default function SolverPage() {
                   <li>• 青椒老師會提供詳細解答</li>
                 </ul>
               </div>
+
+              {/* 移動端底部安全區域 */}
+              <div className="mobile-safe-bottom"></div>
             </div>
           </div>
         )}
 
         {/* 提問頁 - 圖片預覽 + 問題輸入 */}
         {pageState === 'question' && (
-          <div className="flex-1 flex flex-col overflow-hidden bg-gray-50 h-full">
+          <div className="flex-1 flex flex-col overflow-hidden bg-gray-50 h-full mobile-keyboard-adjust">
             {/* Header */}
             <div className="bg-white border-b border-gray-200 px-4 py-3 flex-shrink-0">
               <div className="flex items-center">
@@ -870,8 +921,8 @@ export default function SolverPage() {
             </div>
 
             {/* 主要內容 */}
-            <div className="flex-1 overflow-y-auto p-4 scrollbar-hide">
-              <div className="max-w-2xl mx-auto space-y-6">
+            <div className="flex-1 overflow-y-auto p-4 scrollbar-hide mobile-scroll-container">
+              <div className="max-w-2xl mx-auto space-y-6 mobile-content-area">
                 {/* 圖片預覽 */}
                 {imagePreview && (
                   <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -906,6 +957,15 @@ export default function SolverPage() {
                         placeholder="例如：這題怎麼解？請幫我分析關鍵字..."
                         className="min-h-[120px] resize-none border-gray-300 focus:border-green-500 focus:ring-green-500"
                         disabled={loading}
+                        onFocus={() => {
+                          // 當輸入框聚焦時，滾動到底部確保按鈕可見
+                          setTimeout(() => {
+                            const submitButton = document.querySelector('[type="submit"]');
+                            if (submitButton) {
+                              submitButton.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                            }
+                          }, 300);
+                        }}
                       />
                     </div>
 
@@ -926,28 +986,31 @@ export default function SolverPage() {
                       ))}
                     </div>
 
-                    <Button 
-                      type="submit" 
-                      className="w-full bg-green-500 hover:bg-green-600 text-white"
-                      disabled={loading || !currentQuestion.trim()}
-                    >
-                      {loading ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                          分析中...
-                          {timeoutWarning && (
-                            <span className="text-green-200 ml-2">
-                              (處理時間較長...)
-                            </span>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          <Send className="w-4 h-4 mr-2" />
-                          開始解題
-                        </>
-                      )}
-                    </Button>
+                    {/* 提交按鈕 - 使用懸浮樣式確保始終可見 */}
+                    <div className="mobile-floating-button">
+                      <Button 
+                        type="submit" 
+                        className="w-full bg-green-500 hover:bg-green-600 text-white shadow-lg"
+                        disabled={loading || !currentQuestion.trim()}
+                      >
+                        {loading ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                            分析中...
+                            {timeoutWarning && (
+                              <span className="text-green-200 ml-2">
+                                (處理時間較長...)
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-4 h-4 mr-2" />
+                            開始解題
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </form>
                 </div>
 
@@ -1012,6 +1075,9 @@ export default function SolverPage() {
                     </div>
                   </div>
                 )}
+
+                {/* 額外的底部空間，確保所有內容都可以滾動到 */}
+                <div className="mobile-safe-bottom"></div>
               </div>
             </div>
           </div>
@@ -1128,13 +1194,13 @@ export default function SolverPage() {
                         {/* 訊息內容 */}
                         <div className={`flex-1 ${message.role === 'user' ? 'flex justify-end' : ''}`}>
                           {message.role === 'assistant' ? (
-                            <div className="max-w-3xl">
+                            <div className="max-w-3xl w-full md:max-w-3xl">
                               <div className="mb-2">
                                 <span className="text-sm font-medium text-gray-900">青椒老師</span>
                                 <span className="text-xs text-gray-500 ml-2">剛剛</span>
                               </div>
-                              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
-                                <div className="prose max-w-none">
+                              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 overflow-hidden">
+                                <div className="prose max-w-none w-full overflow-hidden">
                                   <ReactMarkdown
                                     remarkPlugins={[remarkMath, remarkGfm]}
                                     rehypePlugins={[rehypeKatex]}
@@ -1160,11 +1226,11 @@ export default function SolverPage() {
                               </div>
                             </div>
                           ) : (
-                            <div className="max-w-md">
+                            <div className="max-w-md w-full md:max-w-md">
                               <div className="flex justify-end mb-1">
                                 <span className="text-xs text-gray-500">Me • 剛剛</span>
                               </div>
-                              <div className="bg-green-500 text-white rounded-2xl p-4 shadow-sm">
+                              <div className="bg-green-500 text-white rounded-2xl p-4 shadow-sm overflow-hidden">
                                 {message.imageUrl && (
                                   <div className="mb-3">
                                     <Image 
@@ -1179,7 +1245,7 @@ export default function SolverPage() {
                                   </div>
                                 )}
                                 {message.content && (
-                                  <div className="text-white">{message.content}</div>
+                                  <div className="text-white break-words overflow-wrap-anywhere">{message.content}</div>
                                 )}
                               </div>
                             </div>

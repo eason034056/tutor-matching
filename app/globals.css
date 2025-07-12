@@ -72,63 +72,125 @@
 @layer components {
   .prose {
     @apply text-gray-900;
+    /* 防止內容溢出 */
+    max-width: 100% !important;
+    overflow-wrap: break-word !important;
+    word-wrap: break-word !important;
+    word-break: break-word !important;
   }
   
   .prose h1 {
     @apply text-2xl font-bold mb-4;
+    /* 響應式標題 */
+    font-size: clamp(1.5rem, 4vw, 2rem) !important;
   }
   
   .prose h2 {
     @apply text-xl font-semibold mb-3;
+    font-size: clamp(1.25rem, 3.5vw, 1.5rem) !important;
   }
   
   .prose h3 {
     @apply text-lg font-medium mb-2;
+    font-size: clamp(1.125rem, 3vw, 1.25rem) !important;
   }
   
   .prose p {
     @apply mb-3;
+    /* 確保段落文字自動換行 */
+    overflow-wrap: break-word !important;
+    word-wrap: break-word !important;
+    hyphens: auto !important;
   }
   
   .prose ul {
     @apply list-disc list-inside mb-3;
+    /* 列表項目自動換行 */
+    overflow-wrap: break-word !important;
   }
   
   .prose ol {
     @apply list-decimal list-inside mb-3;
+    overflow-wrap: break-word !important;
   }
   
   .prose li {
     @apply mb-1;
+    overflow-wrap: break-word !important;
+    word-wrap: break-word !important;
   }
   
   .prose code {
     @apply bg-gray-100 px-1 py-0.5 rounded text-sm font-mono;
+    /* 程式碼自動換行 */
+    white-space: pre-wrap !important;
+    overflow-wrap: break-word !important;
+    word-break: break-all !important;
+    max-width: 100% !important;
   }
   
   .prose pre {
     @apply bg-gray-100 p-3 rounded mb-3 overflow-x-auto;
+    /* 程式碼區塊響應式處理 */
+    max-width: 100% !important;
+    white-space: pre-wrap !important;
+    word-wrap: break-word !important;
   }
   
   .prose pre code {
     @apply bg-transparent p-0;
+    white-space: pre-wrap !important;
+    word-wrap: break-word !important;
   }
   
   .prose blockquote {
     @apply border-l-4 border-gray-300 pl-4 italic mb-3;
+    overflow-wrap: break-word !important;
   }
   
   .prose table {
     @apply w-full border-collapse border border-gray-300 mb-3;
+    /* 表格響應式處理 */
+    table-layout: fixed !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    display: block !important;
+    white-space: nowrap !important;
   }
   
   .prose th,
   .prose td {
     @apply border border-gray-300 px-3 py-2 text-left;
+    /* 表格內容自動換行 */
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    white-space: normal !important;
+    min-width: 0 !important;
   }
   
   .prose th {
     @apply bg-gray-100 font-semibold;
+  }
+
+  /* 數學公式響應式處理 */
+  .prose .katex-display {
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    max-width: 100% !important;
+    padding: 0.5rem 0 !important;
+  }
+
+  .prose .katex {
+    font-size: min(1em, 4vw) !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+  }
+
+  /* 行內數學公式 */
+  .prose .katex-inline {
+    white-space: nowrap !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
   }
 }
 
@@ -145,17 +207,22 @@
     display: none;
   }
 
-  /* Solver 頁面高度覆蓋 */
+  /* Solver 頁面高度覆蓋 - 修復移動端瀏覽器 UI 遮擋問題 */
   .solver-container {
+    /* 使用動態視窗高度，適應移動端瀏覽器 UI */
     height: 100vh !important;
+    height: 100dvh !important; /* 動態視窗高度 - 支援的瀏覽器會使用這個 */
     max-height: 100vh !important;
+    max-height: 100dvh !important;
     overflow: hidden !important;
   }
 
   /* 確保側邊欄高度正確並可滾動 */
   .solver-container .sidebar {
     height: 100vh !important;
+    height: 100dvh !important;
     max-height: 100vh !important;
+    max-height: 100dvh !important;
     overflow: hidden !important;
   }
 
@@ -177,7 +244,9 @@
   /* 聊天頁面的主內容區域 */
   .solver-container .chat-container {
     height: 100vh !important;
+    height: 100dvh !important;
     max-height: 100vh !important;
+    max-height: 100dvh !important;
     overflow: hidden !important;
   }
 
@@ -190,5 +259,115 @@
   .solver-container,
   .solver-container * {
     box-sizing: border-box;
+  }
+
+  /* 移動端優化：為底部按鈕添加安全區域 */
+  .mobile-safe-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom)) !important;
+  }
+
+  /* 移動端優化：確保滾動容器有足夠的底部空間 */
+  .mobile-scroll-container {
+    /* 為移動端瀏覽器 UI 預留空間 */
+    padding-bottom: max(2rem, calc(env(safe-area-inset-bottom) + 1rem)) !important;
+  }
+
+  /* 移動端優化：懸浮按鈕樣式 */
+  .mobile-floating-button {
+    position: sticky !important;
+    bottom: max(1rem, env(safe-area-inset-bottom)) !important;
+    z-index: 50 !important;
+    margin-top: auto !important;
+  }
+
+  /* 移動端優化：當虛擬鍵盤出現時的佈局調整 */
+  .mobile-keyboard-adjust {
+    /* 檢測虛擬鍵盤並調整佈局 */
+    height: 100vh !important;
+    height: 100dvh !important;
+    height: calc(var(--vh, 1vh) * 100) !important; /* 使用 JavaScript 動態計算的高度 */
+  }
+
+  /* 移動端優化：確保內容可以正確滾動到底部 */
+  .mobile-content-area {
+    /* 確保內容區域可以完全滾動，不被瀏覽器 UI 遮擋 */
+    min-height: calc(100vh - 4rem) !important;
+    min-height: calc(100dvh - 4rem) !important;
+    min-height: calc(calc(var(--vh, 1vh) * 100) - 4rem) !important; /* 使用動態高度 */
+  }
+
+  /* 移動端優化：智能檢測和調整 */
+  @media (max-width: 768px) {
+    .mobile-floating-button {
+      /* 在小螢幕上增加按鈕的可見度 */
+      box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    .mobile-scroll-container {
+      /* 移動端增加更多底部空間 */
+      padding-bottom: max(3rem, calc(env(safe-area-inset-bottom) + 2rem)) !important;
+    }
+
+    /* 當虛擬鍵盤出現時的特殊處理 */
+    .mobile-keyboard-adjust {
+      /* 使用更精確的高度計算 */
+      height: calc(var(--vh, 1vh) * 100) !important;
+      max-height: calc(var(--vh, 1vh) * 100) !important;
+    }
+
+    /* 聊天界面移動端優化 */
+    .chat-messages {
+      padding-left: 1rem !important;
+      padding-right: 1rem !important;
+    }
+
+    /* 聊天氣泡在移動端的寬度限制 */
+    .chat-messages .max-w-3xl {
+      max-width: calc(100vw - 4rem) !important;
+    }
+
+    .chat-messages .max-w-md {
+      max-width: calc(85vw - 2rem) !important;
+    }
+
+    /* 確保數學公式在移動端正確顯示 */
+    .prose .katex-display {
+      font-size: 0.9em !important;
+      margin: 0.5rem 0 !important;
+    }
+
+    .prose .katex {
+      font-size: 0.85em !important;
+    }
+
+    /* 移動端文字大小調整 */
+    .prose {
+      font-size: 14px !important;
+      line-height: 1.6 !important;
+    }
+
+    .prose h1 {
+      font-size: 1.4rem !important;
+    }
+
+    .prose h2 {
+      font-size: 1.2rem !important;
+    }
+
+    .prose h3 {
+      font-size: 1.1rem !important;
+    }
+
+    /* 移動端程式碼區塊優化 */
+    .prose code {
+      font-size: 12px !important;
+      padding: 2px 4px !important;
+    }
+
+    .prose pre {
+      font-size: 12px !important;
+      padding: 0.75rem !important;
+      margin: 0.5rem 0 !important;
+    }
   }
 }

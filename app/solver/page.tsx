@@ -156,8 +156,42 @@ export default function SolverPage() {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (ev) => {
-        setCropImage(ev.target?.result as string);
+      reader.onload = async (ev) => {
+        const originalDataUrl = ev.target?.result as string;
+        // 壓縮圖片
+        const compressImage = async (dataUrl: string, quality = 0.7, maxSize = 1000): Promise<string> => {
+          return new Promise((resolve) => {
+            const img = new window.Image();
+            img.onload = () => {
+              let { width, height } = img;
+              if (width > maxSize || height > maxSize) {
+                if (width > height) {
+                  height = Math.round((height * maxSize) / width);
+                  width = maxSize;
+                } else {
+                  width = Math.round((width * maxSize) / height);
+                  height = maxSize;
+                }
+              }
+              const canvas = document.createElement('canvas');
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              ctx?.drawImage(img, 0, 0, width, height);
+              const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+              resolve(compressedDataUrl);
+            };
+            img.src = dataUrl;
+          });
+        };
+        // log 壓縮前
+        console.log('[圖片壓縮] 原始 base64 長度:', originalDataUrl.length);
+        console.log('[圖片壓縮] 原始大約大小(KB):', Math.round((originalDataUrl.length * 3 / 4) / 1024));
+        const compressedDataUrl = await compressImage(originalDataUrl);
+        // log 壓縮後
+        console.log('[圖片壓縮] 壓縮後 base64 長度:', compressedDataUrl.length);
+        console.log('[圖片壓縮] 壓縮後大約大小(KB):', Math.round((compressedDataUrl.length * 3 / 4) / 1024));
+        setCropImage(compressedDataUrl);
         setShowCropper(true);
       };
       reader.readAsDataURL(file);
@@ -183,6 +217,7 @@ export default function SolverPage() {
       return;
     }
 
+    const startTime = Date.now(); // 記錄開始時間
     setLoading(true);
     setPageState('chat');
     // 手機自動收起側邊欄
@@ -220,6 +255,8 @@ export default function SolverPage() {
 
       if (response.ok) {
         const data = await response.json();
+        const endTime = Date.now(); // 記錄結束時間
+        console.log('[AI 回應時間] handleQuestionSubmit 花費秒數:', ((endTime - startTime) / 1000).toFixed(2), '秒');
         console.log('API 回傳:', data);
         if (data.error) {
           alert('API 錯誤：' + data.error);
@@ -258,6 +295,7 @@ export default function SolverPage() {
       return;
     }
 
+    const startTime = Date.now(); // 記錄開始時間
     const message = input.trim();
     setInput('');
     setLoading(true);
@@ -294,6 +332,8 @@ export default function SolverPage() {
 
       if (response.ok) {
         const data = await response.json();
+        const endTime = Date.now(); // 記錄結束時間
+        console.log('[AI 回應時間] handleChatSubmit 花費秒數:', ((endTime - startTime) / 1000).toFixed(2), '秒');
         console.log('API 回傳:', data);
         if (data.error) {
           alert('API 錯誤：' + data.error);

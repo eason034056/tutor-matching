@@ -10,7 +10,6 @@ export const metadata = {
 export default function TutorRegistrationPage() {
   return (
     <div className="container mx-auto py-8">
-      <h1 className="text-2xl font-bold text-center mb-8">家教老師註冊申請 | 加入我們的專業教師團隊</h1>
       <Card className="max-w-2xl mx-auto">
         <CardHeader>
           <CardTitle>教師登錄</CardTitle>

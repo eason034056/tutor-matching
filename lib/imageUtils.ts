@@ -32,7 +32,7 @@ export async function addWatermark(file: File): Promise<Blob> {
         ctx.rotate(-Math.PI / 12); // 旋轉 -15 度
         
         // 繪製浮水印文字
-        ctx.fillText('僅供優學家教網使用', 0, 0);
+        ctx.fillText('僅供青椒老師家教中心使用', 0, 0);
         ctx.font = '20px Arial';  // 較小的字體顯示時間
         ctx.fillText(new Date().toISOString(), 0, 80);
         

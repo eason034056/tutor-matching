@@ -1,6 +1,5 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
-import Image from 'next/image'
 
 interface InfiniteCarouselProps {
   images: string[]
@@ -8,6 +7,7 @@ interface InfiniteCarouselProps {
   imageWidth?: number
   imageHeight?: number
   className?: string
+  gap?: number
 }
 
 export default function InfiniteCarousel({
@@ -15,7 +15,8 @@ export default function InfiniteCarousel({
   speed = 0.1,
   imageWidth = 200,
   imageHeight = 100,
-  className = ""
+  className = "",
+  gap = 160
 }: InfiniteCarouselProps) {
   const [position, setPosition] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -61,8 +62,10 @@ export default function InfiniteCarousel({
       className={`relative w-full overflow-hidden ${className}`}
     >
       <div 
-        className="flex h-[100px] gap-16"
+        className="flex"
         style={{ 
+          height: `${imageHeight + 20}px`, // 圖片高度 + 20px 間距
+          gap: `${gap}px`, // 動態間距
           transform: `translateX(${position}%)`,
           transition: position <= -100 ? 'none' : 'transform 0.1s linear',
           width: `${300}%`, // 三倍寬度，因為有三組圖片
@@ -74,16 +77,20 @@ export default function InfiniteCarousel({
             className="flex-shrink-0 flex justify-center items-center"
             style={{ 
               width: `${100 / extendedImages.length}%`,
-              padding: '0 20px'
+              padding: '0 20px',
+              height: `${imageHeight}px` // 確保容器有正確高度
             }}
           >
-            <Image
+            <img
               src={image}
               alt={`Carousel image ${index + 1}`}
-              width={imageWidth}
-              height={imageHeight}
               className="object-contain"
-              priority={index < images.length} // 只對第一組圖片設置 priority
+              style={{
+                width: `${imageWidth}px`,
+                height: `${imageHeight}px`,
+                maxWidth: `${imageWidth}px`,
+                maxHeight: `${imageHeight}px`
+              }}
             />
           </div>
         ))}

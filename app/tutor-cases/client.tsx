@@ -99,7 +99,7 @@ export default function TutorCasesClient() {
   }
 
   return (
-    <div className="container mx-auto py-8 px-0">
+    <div className="container mx-auto py-8 px-0 max-w-6xl">
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">

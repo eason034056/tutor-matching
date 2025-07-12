@@ -79,21 +79,10 @@ export default function Footer() {
         </div>
         
         {/* Bottom */}
-        <div className="flex flex-col md:flex-row justify-between items-center pt-8 border-t border-neutral-200">
-          <p className="text-neutral-600 text-sm mb-4 md:mb-0">
-            © 2024 青椒老師家教中心. All rights reserved.
+        <div className="flex flex-col md:flex-row justify-center items-center pt-8 border-t border-neutral-200">
+          <p className="text-neutral-600 text-sm">
+            © 2025 青椒老師家教中心. All rights reserved.
           </p>
-          <div className="flex space-x-6">
-            <Link href="/license" className="text-neutral-600 hover:text-brand-700 text-sm transition-colors">
-              隱私權政策
-            </Link>
-            <Link href="/comparison" className="text-neutral-600 hover:text-brand-700 text-sm transition-colors">
-              服務條款
-            </Link>
-            <Link href="/notice" className="text-neutral-600 hover:text-brand-700 text-sm transition-colors">
-              聯絡我們
-            </Link>
-          </div>
         </div>
       </div>
     </footer>

@@ -42,7 +42,7 @@ export default function Header() {
         <div className="flex justify-between items-center">
           <Link href="/" className="flex items-center space-x-3 text-xl font-semibold text-gray-900 flex-shrink-0">
             <Image 
-              src="/public/teacher-icon.png" 
+              src="/teacher-icon-512x512.png" 
               alt="青椒老師家教中心" 
               width={32}
               height={32}

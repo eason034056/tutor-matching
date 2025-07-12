@@ -836,8 +836,8 @@ export default function SolverPage() {
 
         {/* 首頁 - 拍照/上傳選擇 */}
         {pageState === 'home' && (
-          <div className="flex-1 flex items-center justify-center p-6 bg-gray-50 h-full mobile-keyboard-adjust">
-            <div className="max-w-md w-full mobile-content-area">
+          <div className="flex-1 flex items-center justify-center p-6 bg-gray-50 h-full mobile-keyboard-adjust min-h-0">
+            <div className="max-w-md w-full mobile-content-area flex flex-col justify-center">
               <div className="text-center mb-8">
                 <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 overflow-hidden">
                   <Image 
@@ -990,7 +990,7 @@ export default function SolverPage() {
                     <div className="mobile-floating-button">
                       <Button 
                         type="submit" 
-                        className="w-full bg-green-500 hover:bg-green-600 text-white shadow-lg"
+                        className="w-full bg-green-500 hover:bg-green-600 text-white shadow-lg py-8"
                         disabled={loading || !currentQuestion.trim()}
                       >
                         {loading ? (

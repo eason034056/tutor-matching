@@ -332,40 +332,10 @@ export default function SolverPage() {
       const reader = new FileReader();
       reader.onload = async (ev) => {
         const originalDataUrl = ev.target?.result as string;
-        // 壓縮圖片（提高品質）
-        const compressImage = async (dataUrl: string, quality = 0.9, maxSize = 2000): Promise<string> => {
-          return new Promise((resolve) => {
-            const img = new window.Image();
-            img.onload = () => {
-              let { width, height } = img;
-              if (width > maxSize || height > maxSize) {
-                if (width > height) {
-                  height = Math.round((height * maxSize) / width);
-                  width = maxSize;
-                } else {
-                  width = Math.round((width * maxSize) / height);
-                  height = maxSize;
-                }
-              }
-              const canvas = document.createElement('canvas');
-              canvas.width = width;
-              canvas.height = height;
-              const ctx = canvas.getContext('2d');
-              ctx?.drawImage(img, 0, 0, width, height);
-              const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
-              resolve(compressedDataUrl);
-            };
-            img.src = dataUrl;
-          });
-        };
-        // log 壓縮前
-        console.log('[圖片壓縮] 原始 base64 長度:', originalDataUrl.length);
-        console.log('[圖片壓縮] 原始大約大小(KB):', Math.round((originalDataUrl.length * 3 / 4) / 1024));
-        const compressedDataUrl = await compressImage(originalDataUrl);
-        // log 壓縮後
-        console.log('[圖片壓縮] 壓縮後 base64 長度:', compressedDataUrl.length);
-        console.log('[圖片壓縮] 壓縮後大約大小(KB):', Math.round((compressedDataUrl.length * 3 / 4) / 1024));
-        setCropImage(compressedDataUrl);
+        // 保持原始畫質，不進行壓縮
+        console.log('[圖片處理] 原始 base64 長度:', originalDataUrl.length);
+        console.log('[圖片處理] 原始大約大小(KB):', Math.round((originalDataUrl.length * 3 / 4) / 1024));
+        setCropImage(originalDataUrl);
         setShowCropper(true);
       };
       reader.readAsDataURL(file);

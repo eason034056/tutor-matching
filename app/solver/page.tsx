@@ -332,8 +332,8 @@ export default function SolverPage() {
       const reader = new FileReader();
       reader.onload = async (ev) => {
         const originalDataUrl = ev.target?.result as string;
-        // 壓縮圖片
-        const compressImage = async (dataUrl: string, quality = 0.7, maxSize = 1000): Promise<string> => {
+        // 壓縮圖片（提高品質）
+        const compressImage = async (dataUrl: string, quality = 0.9, maxSize = 2000): Promise<string> => {
           return new Promise((resolve) => {
             const img = new window.Image();
             img.onload = () => {

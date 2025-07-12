@@ -208,6 +208,7 @@ export default function SolverPage() {
     setPageState('chat');
     setCurrentThreadId(threadId);
     setMessages([]); // 清空當前消息以顯示載入狀態
+    resetTimeoutState(); // 清理超時狀態
     
     // 手機自動收起側邊欄
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
@@ -544,11 +545,13 @@ export default function SolverPage() {
     setCurrentQuestion('');
     setMessages([]);
     setCurrentThreadId(null);
+    resetTimeoutState();
   };
 
   // 回到提問頁
   const goToQuestion = () => {
     setPageState('question');
+    resetTimeoutState();
   };
 
   // 開始新對話
@@ -558,6 +561,7 @@ export default function SolverPage() {
     setCurrentQuestion('');
     setMessages([]);
     setCurrentThreadId(null);
+    resetTimeoutState();
   };
 
   // 返回主頁面
@@ -973,7 +977,7 @@ export default function SolverPage() {
                           
                           <Button 
                             onClick={() => {
-                              setApiTimeout(false);
+                              resetTimeoutState();
                               setLastRequest(null);
                               setRetryCount(0);
                             }}
@@ -1264,7 +1268,7 @@ export default function SolverPage() {
                               
                               <Button 
                                 onClick={() => {
-                                  setApiTimeout(false);
+                                  resetTimeoutState();
                                   setLastRequest(null);
                                   setRetryCount(0);
                                 }}

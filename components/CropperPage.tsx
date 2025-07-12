@@ -32,28 +32,38 @@ function calculateFileSize(width: number, height: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-// 裁切函數（保持原始品質）
+// 裁切函數（保持原始解析度和品質）
 function getCroppedImg(image: HTMLImageElement, crop: Crop): string | null {
   if (!crop.width || !crop.height) return null;
   const canvas = document.createElement('canvas');
+  
+  // 計算縮放比例（顯示尺寸與原始尺寸的比例）
   const scaleX = image.naturalWidth / image.width;
   const scaleY = image.naturalHeight / image.height;
-  canvas.width = crop.width;
-  canvas.height = crop.height;
+  
+  // 重要：Canvas 尺寸要基於原始圖片尺寸，不是顯示尺寸
+  const cropWidthOnOriginal = crop.width * scaleX;
+  const cropHeightOnOriginal = crop.height * scaleY;
+  
+  canvas.width = cropWidthOnOriginal;
+  canvas.height = cropHeightOnOriginal;
+  
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
   
+  // 從原始圖片裁切，保持完整解析度
   ctx.drawImage(
     image,
-    crop.x * scaleX,
-    crop.y * scaleY,
-    crop.width * scaleX,
-    crop.height * scaleY,
-    0,
-    0,
-    crop.width,
-    crop.height
+    crop.x * scaleX,  // 原始圖片上的 X 位置
+    crop.y * scaleY,  // 原始圖片上的 Y 位置
+    cropWidthOnOriginal,  // 原始圖片上的裁切寬度
+    cropHeightOnOriginal, // 原始圖片上的裁切高度
+    0,  // Canvas 上的 X 位置
+    0,  // Canvas 上的 Y 位置
+    cropWidthOnOriginal,  // Canvas 上的寬度（保持原始尺寸）
+    cropHeightOnOriginal  // Canvas 上的高度（保持原始尺寸）
   );
+  
   // 使用 PNG 格式保持無損品質
   return canvas.toDataURL('image/png');
 }

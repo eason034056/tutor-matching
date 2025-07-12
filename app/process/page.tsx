@@ -7,7 +7,6 @@ export const metadata = {
 export default function ProcessPage() {
   return (
     <div className="container mx-auto py-8 px-4 max-w-3xl">
-      <h1 className="text-2xl font-bold text-center mb-8">家教媒合流程說明 | 快速安心的媒合服務</h1>
       
       {/* 接案流程 */}
       <div className="bg-white p-6 rounded-lg shadow-md mb-8 space-y-4">

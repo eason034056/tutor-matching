@@ -7,7 +7,6 @@ export const metadata = {
 export default function PricingPage() {
   return (
     <div className="container mx-auto py-8 px-4 max-w-5xl">
-      <h1 className="text-2xl font-bold text-center mb-8">新竹與台北地區家教收費標準參考 | 透明合理的價格制度</h1>
       
       <div className="bg-white p-6 rounded-lg shadow-md mb-8">
         <p className="text-gray-700 leading-relaxed">

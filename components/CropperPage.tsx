@@ -35,24 +35,24 @@ function calculateFileSize(width: number, height: number): string {
 // 裁切函數（保持原始解析度和品質）
 function getCroppedImg(image: HTMLImageElement, crop: Crop): string | null {
   if (!crop.width || !crop.height) return null;
-  const canvas = document.createElement('canvas');
   
   // 計算縮放比例（顯示尺寸與原始尺寸的比例）
   const scaleX = image.naturalWidth / image.width;
   const scaleY = image.naturalHeight / image.height;
   
-  // 重要：Canvas 尺寸要基於原始圖片尺寸，不是顯示尺寸
+  // 先用原始尺寸建立 canvas 進行裁切
+  const originalCanvas = document.createElement('canvas');
   const cropWidthOnOriginal = crop.width * scaleX;
   const cropHeightOnOriginal = crop.height * scaleY;
   
-  canvas.width = cropWidthOnOriginal;
-  canvas.height = cropHeightOnOriginal;
+  originalCanvas.width = cropWidthOnOriginal;
+  originalCanvas.height = cropHeightOnOriginal;
   
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
+  const originalCtx = originalCanvas.getContext('2d');
+  if (!originalCtx) return null;
   
   // 從原始圖片裁切，保持完整解析度
-  ctx.drawImage(
+  originalCtx.drawImage(
     image,
     crop.x * scaleX,  // 原始圖片上的 X 位置
     crop.y * scaleY,  // 原始圖片上的 Y 位置
@@ -60,12 +60,53 @@ function getCroppedImg(image: HTMLImageElement, crop: Crop): string | null {
     cropHeightOnOriginal, // 原始圖片上的裁切高度
     0,  // Canvas 上的 X 位置
     0,  // Canvas 上的 Y 位置
-    cropWidthOnOriginal,  // Canvas 上的寬度（保持原始尺寸）
-    cropHeightOnOriginal  // Canvas 上的高度（保持原始尺寸）
+    cropWidthOnOriginal,  // Canvas 上的寬度（原始尺寸）
+    cropHeightOnOriginal  // Canvas 上的高度（原始尺寸）
   );
-  
-  // 使用 JPEG 格式並設定壓縮品質為 0.5
-  return canvas.toDataURL('image/jpeg', 0.5);
+
+  // 檢查是否需要縮放（最長邊超過 1500px）
+  const MAX_SIZE = 1500;
+  let finalWidth = cropWidthOnOriginal;
+  let finalHeight = cropHeightOnOriginal;
+
+  if (cropWidthOnOriginal > MAX_SIZE || cropHeightOnOriginal > MAX_SIZE) {
+    if (cropWidthOnOriginal > cropHeightOnOriginal) {
+      // 寬度較長
+      finalWidth = MAX_SIZE;
+      finalHeight = (cropHeightOnOriginal * MAX_SIZE) / cropWidthOnOriginal;
+    } else {
+      // 高度較長
+      finalHeight = MAX_SIZE;
+      finalWidth = (cropWidthOnOriginal * MAX_SIZE) / cropHeightOnOriginal;
+    }
+
+    // 建立新的 canvas 進行縮放
+    const resizedCanvas = document.createElement('canvas');
+    resizedCanvas.width = finalWidth;
+    resizedCanvas.height = finalHeight;
+
+    const resizedCtx = resizedCanvas.getContext('2d');
+    if (!resizedCtx) return null;
+
+    // 使用 imageSmoothingQuality 提高縮放品質
+    resizedCtx.imageSmoothingEnabled = true;
+    resizedCtx.imageSmoothingQuality = 'high';
+
+    // 將原始裁切結果縮放到新尺寸
+    resizedCtx.drawImage(
+      originalCanvas,
+      0, 0,
+      cropWidthOnOriginal, cropHeightOnOriginal,
+      0, 0,
+      finalWidth, finalHeight
+    );
+
+    // 提高 JPEG 品質到 0.92 以保持文字清晰度
+    return resizedCanvas.toDataURL('image/jpeg', 0.92);
+  }
+
+  // 如果不需要縮放，直接返回原始裁切結果
+  return originalCanvas.toDataURL('image/jpeg', 0.92);
 }
 
 export default function CropperPage({ image, onCancel, onCropComplete }: CropperPageProps) {

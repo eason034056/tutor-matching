@@ -124,12 +124,23 @@ export default function SolverPage() {
     if (!lastRequest || !user) return;
 
     setRetryCount(prev => prev + 1);
-    setApiTimeout(false);
-    setTimeoutWarning(false);
+    resetTimeoutState();
 
     if (lastRequest.type === 'question') {
-      await handleQuestionSubmit(null, true);
+      // 如果是問題提交超時，回到上傳/拍照頁面重新開始
+      setPageState('home');
+      setMessages([]);
+      setCurrentThreadId(null);
+      // 清除之前的內容，讓用戶重新開始
+      setCurrentQuestion('');
+      setImagePreview(null);
+      setLastRequest(null);
+      // 手機自動收起側邊欄
+      if (typeof window !== 'undefined' && window.innerWidth < 768) {
+        setShowThreadList(false);
+      }
     } else {
+      // 如果是聊天超時，重新發送聊天請求
       await handleChatSubmit(null, true);
     }
   };
@@ -970,7 +981,7 @@ export default function SolverPage() {
                             ) : (
                               <>
                                 <RefreshCw className="w-4 h-4 mr-2" />
-                                重試 {retryCount > 0 && `(第${retryCount + 1}次)`}
+                                {lastRequest?.type === 'question' ? '重新上傳' : '重試'} {retryCount > 0 && `(第${retryCount + 1}次)`}
                               </>
                             )}
                           </Button>
@@ -1261,7 +1272,7 @@ export default function SolverPage() {
                                 ) : (
                                   <>
                                     <RefreshCw className="w-4 h-4 mr-2" />
-                                    重試 {retryCount > 0 && `(${retryCount})`}
+                                    {lastRequest?.type === 'question' ? '重新上傳' : '重試'} {retryCount > 0 && `(${retryCount})`}
                                   </>
                                 )}
                               </Button>

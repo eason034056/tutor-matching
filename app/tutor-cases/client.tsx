@@ -202,7 +202,7 @@ export default function TutorCasesClient() {
                                 <div className="bg-blue-50 p-4 rounded-lg mb-4">
                                   <p className="text-blue-800 font-medium mb-2">接案須知：</p>
                                   <p className="text-blue-700">
-                                    請寄信至家教中心信箱，並附上您的家教編號，家教中心會盡快與您聯絡。<br />
+                                    請加入家教中心Line帳號，並傳送您的家教編號，家教中心會盡快與您聯絡。<br />
                                     若還沒進行教師編號，請先至<Link href="/tutor-registration" className="text-blue-600 underline">教師登錄</Link>頁面進行登錄。填完資料後大約１～２天會收到教師編號。
                                   </p>
                                 </div>
@@ -214,14 +214,14 @@ export default function TutorCasesClient() {
                                   </div>
 
                                   <div>
-                                    <h3 className="font-medium mb-1">家教中心 Email</h3>
-                                    <p className="text-blue-600">contact@tutor-matching.tw</p>
+                                    <h3 className="font-medium mb-1">家教中心 Line ID</h3>
+                                    <p className="text-blue-600">home-tutor-tw</p>
                                   </div>
                                 </div>
 
                                 <div className="bg-yellow-50 p-4 rounded-lg">
                                   <p className="text-yellow-800">
-                                    提醒：請務必在收到家長聯絡資訊後三天內用email回報試教時間，以確保案件不會被重新開放。
+                                    提醒：請務必在收到家長聯絡資訊後三天內透過Line回報試教時間，以確保案件不會被重新開放。
                                   </p>
                                 </div>
                               </div>

@@ -28,6 +28,7 @@ import remarkGfm from 'remark-gfm';
 import 'katex/dist/katex.min.css';
 import type { ChatThread, Message } from '@/lib/types';
 import CropperPage from '@/components/CropperPage';
+import { MarkdownMessage } from '@/components/MarkdownMessage';
 
 // 定義頁面狀態類型
 type PageState = 'home' | 'question' | 'chat';
@@ -47,10 +48,13 @@ interface ApiError extends Error {
   message: string;
 }
 
-function fixLatexBlocks(text: string) {
-  // 將 [ \begin{...} ... \end{...} ] 轉成 $$...$$
-  return text.replace(/\[\s*(\\begin\{[a-zA-Z*]+\}[\s\S]*?\\end\{[a-zA-Z*]+\})\s*\]/g, (_, inner) => `$$${inner}$$`);
+// 擴展 Message 接口，添加時間戳
+interface MessageWithTime extends Message {
+  timestamp?: number;
+  responseTime?: number; // 回答時間（秒）
 }
+
+
 
 export default function SolverPage() {
   const { user, loading: authLoading } = useAuth();
@@ -60,7 +64,7 @@ export default function SolverPage() {
 
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<MessageWithTime[]>([]);
   
   // Thread 相關狀態
   const [threads, setThreads] = useState<ChatThread[]>([]);
@@ -71,22 +75,13 @@ export default function SolverPage() {
   const [loadingThreadId, setLoadingThreadId] = useState<string | null>(null);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   
-  // 新增：超時處理相關狀態
-  const [timeoutWarning, setTimeoutWarning] = useState(false);
-  const [apiTimeout, setApiTimeout] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const [lastRequest, setLastRequest] = useState<{
-    type: 'question' | 'chat';
-    data: RequestData;
-  } | null>(null);
+  // 新增：計時相關狀態
+  const [requestStartTime, setRequestStartTime] = useState<number | null>(null);
+  const [currentWaitTime, setCurrentWaitTime] = useState<number>(0);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
-  // 新增：超時控制的 ref
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // 在 SolverPage 組件內部 state 加入：
   const [cropImage, setCropImage] = useState<string | null>(null);
@@ -96,12 +91,28 @@ export default function SolverPage() {
   const [isMobile, setIsMobile] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(0);
 
-  // 新增：檢測移動端環境和視窗高度變化
+  // 新增：實時計時器效果
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    
+    if (loading && requestStartTime) {
+      interval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - requestStartTime) / 1000);
+        setCurrentWaitTime(elapsed);
+      }, 1000);
+    } else {
+      setCurrentWaitTime(0);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [loading, requestStartTime]);
+
+  // 新增：移動端檢測和視窗高度管理
   useEffect(() => {
     const detectMobile = () => {
-      const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      const isSmallScreen = window.innerWidth < 768;
-      setIsMobile(isMobileDevice || isSmallScreen);
+      setIsMobile(window.innerWidth < 768);
     };
 
     const handleResize = () => {
@@ -110,14 +121,14 @@ export default function SolverPage() {
     };
 
     const handleVisualViewportChange = () => {
-      // 處理虛擬鍵盤彈出時的視窗變化
       if (window.visualViewport) {
         setViewportHeight(window.visualViewport.height);
       }
     };
 
     // 初始化
-    handleResize();
+    detectMobile();
+    setViewportHeight(window.innerHeight);
 
     // 監聽事件
     window.addEventListener('resize', handleResize);
@@ -139,66 +150,6 @@ export default function SolverPage() {
       document.documentElement.style.setProperty('--vh', `${viewportHeight * 0.01}px`);
     }
   }, [isMobile, viewportHeight]);
-
-  // 新增：清除超時計時器的函數
-  const clearTimeouts = () => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-    if (warningTimeoutRef.current) {
-      clearTimeout(warningTimeoutRef.current);
-      warningTimeoutRef.current = null;
-    }
-  };
-
-  // 新增：設置超時計時器的函數
-  const setTimeoutHandlers = () => {
-    // 45秒後顯示警告
-    warningTimeoutRef.current = setTimeout(() => {
-      setTimeoutWarning(true);
-    }, 45000);
-
-    // 60秒後標記為超時
-    timeoutRef.current = setTimeout(() => {
-      setApiTimeout(true);
-      setLoading(false);
-      setTimeoutWarning(false);
-    }, 60000);
-  };
-
-  // 新增：重試 API 請求的函數
-  const retryRequest = async () => {
-    if (!lastRequest || !user) return;
-
-    setRetryCount(prev => prev + 1);
-    resetTimeoutState();
-
-    if (lastRequest.type === 'question') {
-      // 如果是問題提交超時，回到上傳/拍照頁面重新開始
-      setPageState('home');
-      setMessages([]);
-      setCurrentThreadId(null);
-      // 清除之前的內容，讓用戶重新開始
-      setCurrentQuestion('');
-      setImagePreview(null);
-      setLastRequest(null);
-      // 手機自動收起側邊欄
-      if (typeof window !== 'undefined' && window.innerWidth < 768) {
-        setShowThreadList(false);
-      }
-    } else {
-      // 如果是聊天超時，重新發送聊天請求
-      await handleChatSubmit(null, true);
-    }
-  };
-
-  // 新增：重置超時狀態的函數
-  const resetTimeoutState = () => {
-    clearTimeouts();
-    setTimeoutWarning(false);
-    setApiTimeout(false);
-  };
 
   // 載入 Thread 列表
   const loadThreads = useCallback(async () => {
@@ -267,7 +218,6 @@ export default function SolverPage() {
     setPageState('chat');
     setCurrentThreadId(threadId);
     setMessages([]); // 清空當前消息以顯示載入狀態
-    resetTimeoutState(); // 清理超時狀態
     
     // 手機自動收起側邊欄
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
@@ -284,7 +234,7 @@ export default function SolverPage() {
         console.log('載入到的訊息數量:', data.messages?.length || 0);
         
         // 將 ChatMessage 轉換為 Message
-        const convertedMessages: Message[] = (data.messages || []).map((msg: { role: string; content: string; imageUrl?: string }) => ({
+        const convertedMessages: MessageWithTime[] = (data.messages || []).map((msg: { role: string; content: string; imageUrl?: string }) => ({
           role: msg.role as 'user' | 'assistant',
           content: msg.content,
           imageUrl: msg.imageUrl
@@ -343,227 +293,155 @@ export default function SolverPage() {
   };
 
   // 處理問題提交
-  const handleQuestionSubmit = async (e?: React.FormEvent | null, isRetry: boolean = false) => {
+  const handleQuestionSubmit = async (e?: React.FormEvent | null) => {
     if (e) e.preventDefault();
-    
-    console.log('=== handleQuestionSubmit 開始 ===');
-    console.log('currentQuestion.trim():', currentQuestion.trim());
-    console.log('currentQuestion.trim() 長度:', currentQuestion.trim().length);
-    console.log('imagePreview:', imagePreview);
-    console.log('loading:', loading);
-    console.log('user:', user);
-    console.log('!currentQuestion.trim():', !currentQuestion.trim());
-    console.log('!imagePreview:', !imagePreview);
-    console.log('!currentQuestion.trim() || !imagePreview || loading || !user:', !currentQuestion.trim() || !imagePreview || loading || !user);
     
     if (!currentQuestion.trim() || !imagePreview || loading || !user) {
-      console.log('條件檢查失敗，函式提前結束');
       return;
     }
 
-    const startTime = Date.now(); // 記錄開始時間
     setLoading(true);
-    resetTimeoutState(); // 重置超時狀態
-    setTimeoutHandlers(); // 設置新的超時計時器
+    setPageState('chat');
     
-    if (!isRetry) {
-      setPageState('chat');
-      // 手機自動收起側邊欄
-      if (typeof window !== 'undefined' && window.innerWidth < 768) {
-        setShowThreadList(false);
-      }
-
-      // 1. 送出時馬上顯示自己的訊息
-      const userMessage: Message = {
-        role: 'user',
-        content: currentQuestion,
-        imageUrl: imagePreview
-      };
-      console.log('送出用戶訊息前，當前 messages 數量:', messages.length);
-      setMessages(prev => {
-        console.log('setMessages 被呼叫，prev 長度:', prev.length);
-        const newMessages = [...prev, userMessage];
-        console.log('新的 messages 長度:', newMessages.length);
-        return newMessages;
-      });
-
-      // 保存請求資料以供重試使用
-      setLastRequest({
-        type: 'question',
-        data: {
-          message: currentQuestion,
-          userId: user?.uid || '',
-          questionImageUrl: imagePreview,
-          isNewThread: true
-        }
-      });
-    }
-
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 65000); // 65秒總超時
-
-      const response = await fetch('/api/solver', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(lastRequest?.data || {
-          message: currentQuestion,
-          userId: user?.uid || '',
-          questionImageUrl: imagePreview,
-          isNewThread: true
-        }),
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-      clearTimeouts(); // 清除超時計時器
-
-      if (response.ok) {
-        const data = await response.json();
-        const endTime = Date.now(); // 記錄結束時間
-        console.log('[AI 回應時間] handleQuestionSubmit 花費秒數:', ((endTime - startTime) / 1000).toFixed(2), '秒');
-        console.log('API 回傳:', data);
-        if (data.error) {
-          throw new Error('API 錯誤：' + data.error);
-        }
-        // 2. 等 AI 回覆後 append 到畫面
-        const aiMessage: Message = {
-          role: 'assistant',
-          content: data.message
-        };
-        setMessages(prev => [...prev, aiMessage]);
-        setCurrentThreadId(data.threadId);
-        await loadThreads();
-        setRetryCount(0); // 成功後重置重試次數
-        setLastRequest(null); // 清除保存的請求
-      } else {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-    } catch (error: unknown) {
-      console.error('Error:', error);
-      clearTimeouts();
-      const apiError = error as ApiError;
-      if (apiError.name === 'AbortError') {
-        setApiTimeout(true);
-      } else {
-        alert('請求失敗：' + apiError.message);
-      }
-    } finally {
-      setLoading(false);
-      setTimeoutWarning(false);
-    }
-  };
-
-  // 處理聊天輸入提交
-  const handleChatSubmit = async (e?: React.FormEvent | null, isRetry: boolean = false) => {
-    if (e) e.preventDefault();
-    
-    console.log('=== handleChatSubmit 開始 ===');
-    console.log('input.trim():', input.trim());
-    console.log('input.trim() 長度:', input.trim().length);
-    console.log('loading:', loading);
-    console.log('user:', user);
-    console.log('!input.trim():', !input.trim());
-    console.log('!input.trim() || loading || !user:', !input.trim() || loading || !user);
-    
-    if (!isRetry && (!input.trim() || loading || !user)) {
-      console.log('條件檢查失敗，函式提前結束');
-      return;
-    }
-
-    const startTime = Date.now(); // 記錄開始時間
-    const message = isRetry ? (lastRequest?.data?.message || '') : input.trim();
-    if (!isRetry) {
-      setInput('');
-      // 保存請求資料以供重試使用
-      setLastRequest({
-        type: 'chat',
-        data: {
-          message: message,
-          userId: user?.uid || '',
-          threadId: currentThreadId
-        }
-      });
-    }
-    
-    setLoading(true);
-    resetTimeoutState(); // 重置超時狀態
-    setTimeoutHandlers(); // 設置新的超時計時器
-    
-    // 手機自動收起側邊欄（如果有切換 chat 狀態）
+    // 手機自動收起側邊欄
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
       setShowThreadList(false);
     }
 
-    if (!isRetry) {
-      // 1. 送出時馬上顯示自己的訊息
-      const userMessage: Message = {
-        role: 'user',
-        content: message
-      };
-      console.log('送出用戶訊息前，當前 messages 數量:', messages.length);
-      setMessages(prev => {
-        console.log('setMessages 被呼叫，prev 長度:', prev.length);
-        const newMessages = [...prev, userMessage];
-        console.log('新的 messages 長度:', newMessages.length);
-        return newMessages;
-      });
-    }
+    // 記錄請求開始時間
+    const startTime = Date.now();
+    setRequestStartTime(startTime);
+
+    // 1. 送出時馬上顯示自己的訊息
+    const userMessage: MessageWithTime = {
+      role: 'user',
+      content: currentQuestion,
+      imageUrl: imagePreview,
+      timestamp: startTime
+    };
+    setMessages(prev => [...prev, userMessage]);
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 65000); // 65秒總超時
-
       const response = await fetch('/api/solver', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(lastRequest?.data || {
-          message: message,
+        body: JSON.stringify({
+          message: currentQuestion,
           userId: user?.uid || '',
-          threadId: currentThreadId
-        }),
-        signal: controller.signal
+          questionImageUrl: imagePreview,
+          isNewThread: true
+        })
       });
-
-      clearTimeout(timeoutId);
-      clearTimeouts(); // 清除超時計時器
 
       if (response.ok) {
         const data = await response.json();
-        const endTime = Date.now(); // 記錄結束時間
-        console.log('[AI 回應時間] handleChatSubmit 花費秒數:', ((endTime - startTime) / 1000).toFixed(2), '秒');
-        console.log('API 回傳:', data);
         if (data.error) {
           throw new Error('API 錯誤：' + data.error);
         }
+        
+        // 計算回答時間
+        const endTime = Date.now();
+        const responseTime = Math.round((endTime - startTime) / 1000); // 轉換為秒
+        
+        // 先 log 出模型的原始 output，方便 debug
+        console.log('[AI 原始 output]', data.message);
+        
         // 2. 等 AI 回覆後 append 到畫面
-        const aiMessage: Message = {
+        const aiMessage: MessageWithTime = {
           role: 'assistant',
-          content: data.message
+          content: data.message,
+          timestamp: endTime,
+          responseTime: responseTime
         };
         setMessages(prev => [...prev, aiMessage]);
+        setCurrentThreadId(data.threadId);
         await loadThreads();
-        setRetryCount(0); // 成功後重置重試次數
-        setLastRequest(null); // 清除保存的請求
       } else {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
     } catch (error: unknown) {
       console.error('Error:', error);
-      clearTimeouts();
       const apiError = error as ApiError;
-      if (apiError.name === 'AbortError') {
-        setApiTimeout(true);
-      } else {
-        alert('請求失敗：' + apiError.message);
-      }
+      alert('請求失敗：' + apiError.message);
     } finally {
       setLoading(false);
-      setTimeoutWarning(false);
+      setRequestStartTime(null);
+    }
+  };
+
+  // 處理聊天輸入提交
+  const handleChatSubmit = async (e?: React.FormEvent | null) => {
+    if (e) e.preventDefault();
+    
+    if (!input.trim() || loading || !user) {
+      return;
+    }
+
+    const message = input.trim();
+    setInput('');
+    setLoading(true);
+    
+    // 手機自動收起側邊欄
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setShowThreadList(false);
+    }
+
+    // 記錄請求開始時間
+    const startTime = Date.now();
+    setRequestStartTime(startTime);
+
+    // 1. 送出時馬上顯示自己的訊息
+    const userMessage: MessageWithTime = {
+      role: 'user',
+      content: message,
+      timestamp: startTime
+    };
+    setMessages(prev => [...prev, userMessage]);
+
+    try {
+      const response = await fetch('/api/solver', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: message,
+          userId: user?.uid || '',
+          threadId: currentThreadId
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.error) {
+          throw new Error('API 錯誤：' + data.error);
+        }
+        
+        // 計算回答時間
+        const endTime = Date.now();
+        const responseTime = Math.round((endTime - startTime) / 1000); // 轉換為秒
+        
+        // 2. 等 AI 回覆後 append 到畫面
+        const aiMessage: MessageWithTime = {
+          role: 'assistant',
+          content: data.message,
+          timestamp: endTime,
+          responseTime: responseTime
+        };
+        setMessages(prev => [...prev, aiMessage]);
+        await loadThreads();
+      } else {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+    } catch (error: unknown) {
+      console.error('Error:', error);
+      const apiError = error as ApiError;
+      alert('請求失敗：' + apiError.message);
+    } finally {
+      setLoading(false);
+      setRequestStartTime(null);
     }
   };
 
@@ -574,13 +452,11 @@ export default function SolverPage() {
     setCurrentQuestion('');
     setMessages([]);
     setCurrentThreadId(null);
-    resetTimeoutState();
   };
 
   // 回到提問頁
   const goToQuestion = () => {
     setPageState('question');
-    resetTimeoutState();
   };
 
   // 開始新對話
@@ -590,7 +466,6 @@ export default function SolverPage() {
     setCurrentQuestion('');
     setMessages([]);
     setCurrentThreadId(null);
-    resetTimeoutState();
   };
 
   // 返回主頁面
@@ -614,7 +489,6 @@ export default function SolverPage() {
   // 清理計時器
   useEffect(() => {
     return () => {
-      clearTimeouts();
     };
   }, []);
 
@@ -967,11 +841,6 @@ export default function SolverPage() {
                           <>
                             <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
                             分析中...
-                            {timeoutWarning && (
-                              <span className="text-green-200 ml-2">
-                                (處理時間較長...)
-                              </span>
-                            )}
                           </>
                         ) : (
                           <>
@@ -985,66 +854,7 @@ export default function SolverPage() {
                 </div>
 
                 {/* 超時錯誤顯示 */}
-                {apiTimeout && (
-                  <div className="bg-gradient-to-r from-orange-50 to-red-50 border border-orange-200 rounded-xl p-6 shadow-sm">
-                    <div className="flex items-start space-x-4">
-                      <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
-                        <Clock className="w-5 h-5 text-orange-600" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="mb-3">
-                          <h4 className="font-semibold text-orange-800 mb-2">處理時間過長</h4>
-                          <p className="text-sm text-orange-700">
-                            很抱歉，系統處理您的問題超過了預期時間。這可能是由於網路連線問題或題目較為複雜。
-                          </p>
-                        </div>
-                        
-                        {/* 重試按鈕 */}
-                        <div className="flex items-center space-x-3">
-                          <Button 
-                            onClick={retryRequest}
-                            className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg transition-colors"
-                            disabled={loading}
-                          >
-                            {loading ? (
-                              <>
-                                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                                重試中...
-                              </>
-                            ) : (
-                              <>
-                                <RefreshCw className="w-4 h-4 mr-2" />
-                                {lastRequest?.type === 'question' ? '重新上傳' : '重試'} {retryCount > 0 && `(第${retryCount + 1}次)`}
-                              </>
-                            )}
-                          </Button>
-                          
-                          <Button 
-                            onClick={() => {
-                              resetTimeoutState();
-                              setLastRequest(null);
-                              setRetryCount(0);
-                            }}
-                            variant="outline"
-                            className="px-6 py-2 border-orange-300 text-orange-700 hover:bg-orange-50"
-                          >
-                            取消
-                          </Button>
-                        </div>
-                        
-                        {/* 提示訊息 */}
-                        <div className="mt-4 text-xs text-orange-600 bg-orange-50 p-3 rounded-lg">
-                          <p className="font-medium mb-2">💡 小提示：</p>
-                          <ul className="space-y-1 text-orange-600">
-                            <li>• 複雜數學題目可能需要更長處理時間</li>
-                            <li>• 確保網路連線穩定</li>
-                            <li>• 如果問題持續，可以嘗試重新描述問題</li>
-                          </ul>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                {/* Removed timeout error display */}
 
                 {/* 額外的底部空間，確保所有內容都可以滾動到 */}
                 <div className="mobile-safe-bottom"></div>
@@ -1144,22 +954,6 @@ export default function SolverPage() {
                         key={index}
                         className={`flex items-start space-x-3 ${message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}
                       >
-                        {/* 頭像 */}
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
-                          {message.role === 'user' ? (
-                            <div className="w-full h-full bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center">
-                              <User className="w-4 h-4 text-white" />
-                            </div>
-                          ) : (
-                            <Image 
-                              src="/teacher-icon-192x192.png" 
-                              alt="青椒老師" 
-                              width={32}
-                              height={32}
-                              className="w-full h-full object-cover"
-                            />
-                          )}
-                        </div>
 
                         {/* 訊息內容 */}
                         <div className={`flex-1 ${message.role === 'user' ? 'flex justify-end' : ''}`}>
@@ -1168,30 +962,15 @@ export default function SolverPage() {
                               <div className="mb-2">
                                 <span className="text-sm font-medium text-gray-900">青椒老師</span>
                                 <span className="text-xs text-gray-500 ml-2">剛剛</span>
+                                {message.responseTime && (
+                                  <span className="text-xs text-blue-600 ml-2 bg-blue-50 px-2 py-1 rounded-full">
+                                    {message.responseTime}秒
+                                  </span>
+                                )}
                               </div>
                               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 overflow-hidden">
-                                <div className="prose max-w-none w-full overflow-hidden">
-                                  <ReactMarkdown
-                                    remarkPlugins={[remarkMath, remarkGfm]}
-                                    rehypePlugins={[rehypeKatex]}
-                                    components={{
-                                      h1: ({...props}) => <h1 className="text-xl font-bold text-gray-900 mb-3" {...props} />,
-                                      h2: ({...props}) => <h2 className="text-lg font-semibold text-gray-900 mb-2" {...props} />,
-                                      h3: ({...props}) => <h3 className="text-md font-semibold text-gray-900 mb-2" {...props} />,
-                                      p: ({...props}) => <p className="text-gray-700 mb-2 leading-relaxed" {...props} />,
-                                      ul: ({...props}) => <ul className="list-disc list-inside text-gray-700 mb-2 space-y-1" {...props} />,
-                                      ol: ({...props}) => <ol className="list-decimal list-inside text-gray-700 mb-2 space-y-1" {...props} />,
-                                      code: ({inline, ...props}: React.JSX.IntrinsicElements['code'] & { inline?: boolean }) => 
-                                        inline ? (
-                                          <code className="bg-gray-100 px-2 py-1 rounded text-sm font-mono text-gray-800" {...props} />
-                                        ) : (
-                                          <code className="block bg-gray-100 p-3 rounded-lg text-sm font-mono text-gray-800 overflow-x-auto" {...props} />
-                                        ),
-                                      blockquote: ({...props}) => <blockquote className="border-l-4 border-green-500 pl-4 py-2 bg-green-50 text-gray-700 mb-2" {...props} />,
-                                    }}
-                                  >
-                                    {fixLatexBlocks(message.content || "")}
-                                  </ReactMarkdown>
+                                <div className="prose prose-slate max-w-none">
+                                  <MarkdownMessage>{message.content || ""}</MarkdownMessage>
                                 </div>
                               </div>
                             </div>
@@ -1242,105 +1021,24 @@ export default function SolverPage() {
                       <div className="mb-2">
                         <span className="text-sm font-medium text-gray-900">青椒老師</span>
                         <span className="text-xs text-gray-500 ml-2">剛剛</span>
+                        {currentWaitTime > 0 && (
+                          <span className="text-xs text-orange-600 ml-2 bg-orange-50 px-2 py-1 rounded-full">
+                            {currentWaitTime}秒
+                          </span>
+                        )}
                       </div>
                       <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
                         <div className="flex items-center space-x-2">
                           <RefreshCw className="w-4 h-4 animate-spin text-green-500" />
                           <span className="text-gray-600">正在思考...</span>
-                          {timeoutWarning && (
-                            <span className="text-orange-500 text-sm ml-2">
-                              (處理時間較長，請稍候...)
-                            </span>
-                          )}
                         </div>
-                        {timeoutWarning && (
-                          <div className="mt-2 text-xs text-orange-600">
-                            💡 複雜題目可能需要更長時間處理
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>
                 )}
 
                 {/* 超時錯誤顯示 */}
-                {apiTimeout && (
-                  <div className="flex items-start space-x-3">
-                    <div className="w-8 h-8 rounded-full overflow-hidden">
-                      <Image 
-                        src="/teacher-icon-192x192.png" 
-                        alt="青椒老師" 
-                        width={32}
-                        height={32}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="max-w-3xl">
-                      <div className="mb-2">
-                        <span className="text-sm font-medium text-gray-900">青椒老師</span>
-                        <span className="text-xs text-gray-500 ml-2">剛剛</span>
-                      </div>
-                      <div className="bg-gradient-to-r from-orange-50 to-red-50 border border-orange-200 rounded-2xl p-4 shadow-sm">
-                        <div className="flex items-start space-x-3">
-                          <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
-                            <Clock className="w-4 h-4 text-orange-600" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="mb-2">
-                              <h4 className="font-semibold text-orange-800 mb-1">處理時間過長</h4>
-                              <p className="text-sm text-orange-700">
-                                很抱歉，系統處理您的問題超過了預期時間。這可能是由於網路連線問題或題目較為複雜。
-                              </p>
-                            </div>
-                            
-                            {/* 重試按鈕 */}
-                            <div className="flex items-center space-x-3">
-                              <Button 
-                                onClick={retryRequest}
-                                className="bg-orange-500 hover:bg-orange-600 text-white text-sm px-4 py-2 rounded-lg transition-colors"
-                                disabled={loading}
-                              >
-                                {loading ? (
-                                  <>
-                                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                                    重試中...
-                                  </>
-                                ) : (
-                                  <>
-                                    <RefreshCw className="w-4 h-4 mr-2" />
-                                    {lastRequest?.type === 'question' ? '重新上傳' : '重試'} {retryCount > 0 && `(${retryCount})`}
-                                  </>
-                                )}
-                              </Button>
-                              
-                              <Button 
-                                onClick={() => {
-                                  resetTimeoutState();
-                                  setLastRequest(null);
-                                  setRetryCount(0);
-                                }}
-                                variant="outline"
-                                className="text-sm px-4 py-2 border-orange-300 text-orange-700 hover:bg-orange-50"
-                              >
-                                取消
-                              </Button>
-                            </div>
-                            
-                            {/* 提示訊息 */}
-                            <div className="mt-3 text-xs text-orange-600 bg-orange-50 p-2 rounded-lg">
-                              <p className="font-medium mb-1">💡 小提示：</p>
-                              <ul className="space-y-1 text-orange-600">
-                                <li>• 複雜數學題目可能需要更長處理時間</li>
-                                <li>• 確保網路連線穩定</li>
-                                <li>• 如果問題持續，可以嘗試重新描述問題</li>
-                              </ul>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                {/* Removed timeout error display */}
                 <div ref={messagesEndRef} />
               </div>
             </div>

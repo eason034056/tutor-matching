@@ -22,7 +22,7 @@ export function MarkdownMessage({ children }: { children: string }) {
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
         components={{
-          code({ node, inline, className, children, ...props }: any) {
+          code({ inline, className, children }: React.ComponentPropsWithoutRef<'code'> & { inline?: boolean }) {
             const lang = /language-(\w+)/.exec(className || '')?.[1];
             if (inline) {
               return (
@@ -41,7 +41,7 @@ export function MarkdownMessage({ children }: { children: string }) {
               </pre>
             );
           },
-          a: (props: any) => <a {...props} target="_blank" rel="noopener noreferrer" />,
+          a: (props: React.ComponentPropsWithoutRef<'a'>) => <a {...props} target="_blank" rel="noopener noreferrer" />,
         }}
       >
         {normalizeDelimiters(children)}

@@ -263,12 +263,12 @@ export async function POST(request: NextRequest) {
       }
 
       aiResponse = completion.choices[0].message.content;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[ERROR] deepseek 模型回傳失敗:', error);
       console.error('[ERROR] 完整錯誤資訊:', {
-        錯誤類型: error. constructor. name || 'Unknown',
-        錯誤訊息: error?.message || 'Unknown error',
-        錯誤堆疊: error?.stack || 'No stack trace'
+        錯誤類型: error instanceof Error ? error.name : 'Unknown',
+        錯誤訊息: error instanceof Error ? error.message : 'Unknown error',
+        錯誤堆疊: error instanceof Error ? error.stack : 'No stack trace'
       });
       aiResponse = '抱歉，AI 回答時發生錯誤。可能的原因：\n1. 系統暫時無法連接\n2. 請求超時\n3. 模型暫時不可用\n\n請稍後再試。';
     }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/firebase-admin';
 import type { ChatThread, ChatMessage } from '@/lib/types';
 import OpenAI from 'openai';
+import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -200,9 +201,12 @@ async function processMathSubject(
     請開始數理教學`;
 
     // 構建訊息陣列
-    const messages: any[] = [
-      { role: 'system', content: mathSystemPrompt },
-      ...historyMessages
+    const messages: ChatCompletionMessageParam[] = [
+      { role: 'system', content: mathSystemPrompt } as ChatCompletionMessageParam,
+      ...historyMessages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }) as ChatCompletionMessageParam)
     ];
 
     // 如果有圖片，構建包含圖片的訊息
@@ -213,9 +217,12 @@ async function processMathSubject(
           { type: 'text', text: message },
           { type: 'image_url', image_url: { url: questionImageUrl } }
         ]
-      });
+      } as ChatCompletionMessageParam);
     } else {
-      messages.push({ role: 'user', content: message });
+      messages.push({ 
+        role: 'user', 
+        content: message 
+      } as ChatCompletionMessageParam);
     }
 
     // 呼叫 Gemini 模型
@@ -248,30 +255,7 @@ async function processOtherSubject(
 ): Promise<string> {
   try {
     // 準備 system prompt
-    const systemPrompt = `你是一位名叫「青椒老師」的 AI 家教老師，由清華與交大畢業生打造。你專門教國中與高中生，擅長用親切且專業的方式解題與引導思考。你的語氣應溫暖、鼓勵、有耐心。
-
-    🧑‍🏫 角色設定
-    - 你是「青椒老師」，不是 ChatGPT 或其他 AI
-    - 你能教授高中與國中所有科目：數學、物理、化學、生物、地理、公民、國文、英文等
-    - 請永遠以溫暖親切的語氣與學生互動，耐心解釋直到學生懂
-
-    📝 教學風格
-    - 使用清楚的步驟化教學：理解題意 → 分析重點 → 解題策略 → 詳細計算 → 驗證答案
-    - 適當使用標題和條列來組織內容
-    - 可加入生活化例子幫助理解
-    - 若學生看不懂，請改用其他方式再解釋一次（舉例、圖解、換句話說）
-
-    💡 回答格式
-    - 請用 markdown 格式回答，並且用 latex 格式化數學公式
-    - **數學式或數學符號請使用**
-      - 行內公式：用 \`$...$\`
-      - 區塊公式：用 \`$$...$$\` 獨佔一行
-
-    請開始教學`;
-
-    // 圖片轉 LaTeX 的 system prompt
-    const imageToMarkdownPrompt = `
-      你是一位由清大與交大團隊訓練的題目識別 AI，專門處理拍照上傳的國中與高中各科題目圖片，將其轉換為 Markdown 格式純文字，方便教師或學生閱讀與整理筆記。
+    const systemPrompt = `你是一位由清大與交大團隊訓練的題目識別 AI，專門處理拍照上傳的國中與高中各科題目圖片，將其轉換為 Markdown 格式純文字，方便教師或學生閱讀與整理筆記。
 
       🎯 你的任務是：
       將圖片中的題目內容，**不加一字刪減或改寫**，完整轉換為 Markdown 格式的文字輸出，包含所有可辨識的內容：題目敘述、公式、符號、圖表說明、選項、標題等。
@@ -328,7 +312,7 @@ async function processOtherSubject(
         const imageToLatexCompletion = await openai.chat.completions.create({
           model: 'gpt-4.1-nano',
           messages: [
-            { role: 'system', content: imageToMarkdownPrompt },
+            { role: 'system', content: systemPrompt },
             {
               role: 'user',
               content: [

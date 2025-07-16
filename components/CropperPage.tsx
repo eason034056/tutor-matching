@@ -125,6 +125,28 @@ export default function CropperPage({ image, onCancel, onCropComplete }: Cropper
   
   const imgRef = useRef<HTMLImageElement | null>(null);
 
+  // 處理完成裁切
+  const handleDone = useCallback(async () => {
+    if (!imgRef.current || !completedCrop) return;
+    
+    setIsLoading(true);
+    try {
+      const cropped = getCroppedImg(imgRef.current, completedCrop);
+      if (cropped) {
+        onCropComplete(cropped);
+      }
+    } catch (error) {
+      console.error('裁切失敗:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [completedCrop, onCropComplete]);
+
+  // 旋轉圖片
+  const handleRotate = useCallback(() => {
+    setRotation((prev) => (prev + 90) % 360);
+  }, []);
+
   // 初始化裁切區域
   const onImageLoad = useCallback(() => {
     if (imgRef.current) {
@@ -164,7 +186,7 @@ export default function CropperPage({ image, onCancel, onCropComplete }: Cropper
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [flipHorizontal, flipVertical, showHelp, onCancel]);
+  }, [flipHorizontal, flipVertical, showHelp, onCancel, handleDone, handleRotate]);
 
   // 更新預覽圖片
   useEffect(() => {
@@ -173,28 +195,6 @@ export default function CropperPage({ image, onCancel, onCropComplete }: Cropper
       setPreviewImage(preview);
     }
   }, [completedCrop]);
-
-  // 處理完成裁切
-  const handleDone = async () => {
-    if (!imgRef.current || !completedCrop) return;
-    
-    setIsLoading(true);
-    try {
-      const cropped = getCroppedImg(imgRef.current, completedCrop);
-      if (cropped) {
-        onCropComplete(cropped);
-      }
-    } catch (error) {
-      console.error('裁切失敗:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // 旋轉圖片
-  const handleRotate = () => {
-    setRotation((prev) => (prev + 90) % 360);
-  };
 
   // 重設所有設定
   const handleReset = () => {
@@ -407,10 +407,13 @@ export default function CropperPage({ image, onCancel, onCropComplete }: Cropper
             {/* 預覽圖片 */}
             {previewImage && (
               <div className="bg-gray-700 rounded-lg p-4">
-                <img
+                <Image
                   src={previewImage}
                   alt="裁切預覽"
+                  width={300}
+                  height={200}
                   className="w-full h-auto rounded border border-gray-600"
+                  unoptimized
                 />
               </div>
             )}
@@ -494,10 +497,13 @@ export default function CropperPage({ image, onCancel, onCropComplete }: Cropper
             {/* 預覽圖片 */}
             {previewImage && (
               <div className="bg-gray-700 rounded-lg p-3">
-                <img
+                <Image
                   src={previewImage}
                   alt="裁切預覽"
+                  width={300}
+                  height={200}
                   className="w-full h-auto rounded border border-gray-600 max-h-32 object-contain"
+                  unoptimized
                 />
               </div>
             )}

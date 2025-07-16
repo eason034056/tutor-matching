@@ -28,7 +28,8 @@ import { MarkdownMessage } from '@/components/MarkdownMessage';
 // 定義頁面狀態類型
 type PageState = 'home' | 'question' | 'chat';
 
-
+// 定義科目類型
+type SubjectType = 'math' | 'other';
 
 
 // 擴展 Message 接口，添加時間戳
@@ -44,6 +45,7 @@ interface RequestData {
   threadId?: string | null;
   questionImageUrl?: string;
   isNewThread?: boolean;
+  subjectType?: SubjectType | null; // 新增科目類型
 }
 
 
@@ -52,6 +54,7 @@ export default function SolverPage() {
   const [pageState, setPageState] = useState<PageState>('home');
   const [currentQuestion, setCurrentQuestion] = useState('');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [subjectType, setSubjectType] = useState<SubjectType | null>(null); // 新增科目類型狀態
 
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -256,13 +259,15 @@ export default function SolverPage() {
     }
   };
 
-  // 處理拍照
-  const handleCameraClick = () => {
+  // 處理科目類型選擇後的拍照
+  const handleSubjectCameraClick = (type: SubjectType) => {
+    setSubjectType(type);
     cameraInputRef.current?.click();
   };
 
-  // 處理相簿上傳
-  const handleUploadClick = () => {
+  // 處理科目類型選擇後的上傳
+  const handleSubjectUploadClick = (type: SubjectType) => {
+    setSubjectType(type);
     fileInputRef.current?.click();
   };
 
@@ -331,7 +336,7 @@ export default function SolverPage() {
   const handleQuestionSubmit = async (e?: React.FormEvent | null) => {
     if (e) e.preventDefault();
     
-    if (!currentQuestion.trim() || !imagePreview || loading || !user) {
+    if (!currentQuestion.trim() || !imagePreview || loading || !user || !subjectType) {
       return;
     }
 
@@ -365,7 +370,8 @@ export default function SolverPage() {
         message: currentQuestion,
         userId: user?.uid || '',
         questionImageUrl: imagePreview,
-        isNewThread: true
+        isNewThread: true,
+        subjectType: subjectType // 包含科目類型
       }
     });
 
@@ -381,7 +387,8 @@ export default function SolverPage() {
           message: currentQuestion,
           userId: user?.uid || '',
           questionImageUrl: imagePreview,
-          isNewThread: true
+          isNewThread: true,
+          subjectType: subjectType // 包含科目類型
         }),
         signal: controller.signal
       });
@@ -466,7 +473,8 @@ export default function SolverPage() {
       data: {
         message: message,
         userId: user?.uid || '',
-        threadId: currentThreadId
+        threadId: currentThreadId,
+        subjectType: subjectType // 包含科目類型
       }
     });
 
@@ -481,7 +489,8 @@ export default function SolverPage() {
         body: JSON.stringify({
           message: message,
           userId: user?.uid || '',
-          threadId: currentThreadId
+          threadId: currentThreadId,
+          subjectType: subjectType // 包含科目類型
         }),
         signal: controller.signal
       });
@@ -534,10 +543,12 @@ export default function SolverPage() {
       // 重新送出問題
       setCurrentQuestion(lastRequest.data.message);
       setImagePreview(lastRequest.data.questionImageUrl || null);
+      setSubjectType(lastRequest.data.subjectType || null);
       await handleQuestionSubmit();
     } else {
       // 重新送出聊天
       setInput(lastRequest.data.message);
+      setSubjectType(lastRequest.data.subjectType || null);
       await handleChatSubmit();
     }
   };
@@ -549,6 +560,7 @@ export default function SolverPage() {
     setCurrentQuestion('');
     setMessages([]);
     setCurrentThreadId(null);
+    setSubjectType(null); // 重置科目類型
     resetTimeoutState();
   };
 
@@ -565,6 +577,7 @@ export default function SolverPage() {
     setCurrentQuestion('');
     setMessages([]);
     setCurrentThreadId(null);
+    setSubjectType(null); // 重置科目類型
     resetTimeoutState();
   };
 
@@ -779,7 +792,7 @@ export default function SolverPage() {
           </div>
         </div>
 
-        {/* 首頁 - 拍照/上傳選擇 */}
+        {/* 首頁 - 科目類型選擇 */}
         {pageState === 'home' && (
           <div className="flex-1 flex items-center justify-center p-6 bg-gray-50 h-full mobile-keyboard-adjust min-h-0">
             <div className="max-w-md w-full mobile-content-area flex flex-col justify-center">
@@ -794,25 +807,68 @@ export default function SolverPage() {
                   />
                 </div>
                 <h2 className="text-2xl font-bold text-gray-900 mb-2">開始解題</h2>
-                <p className="text-gray-600">上傳題目圖片，青椒老師幫你解答</p>
+                <p className="text-gray-600">選擇科目類型，上傳題目圖片</p>
               </div>
 
-              {/* 拍照/上傳按鈕 */}
-              <div className="grid grid-cols-2 gap-4 mb-8">
-                <Button 
-                  onClick={handleCameraClick}
-                  className="h-20 bg-green-500 hover:bg-green-600 text-white rounded-xl flex-col space-y-2 shadow-lg"
-                >
-                  <Camera className="w-6 h-6" />
-                  <span>拍照</span>
-                </Button>
-                <Button 
-                  onClick={handleUploadClick}
-                  className="h-20 bg-gray-500 hover:bg-gray-600 text-white rounded-xl flex-col space-y-2 shadow-lg"
-                >
-                  <Upload className="w-6 h-6" />
-                  <span>上傳</span>
-                </Button>
+              {/* 科目類型選擇 */}
+              <div className="space-y-4 mb-8">
+                {/* 數理科目 */}
+                <div className="bg-white rounded-xl border-2 border-gray-200 p-4 shadow-sm">
+                  <div className="flex items-center mb-3">
+                    <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center mr-3">
+                      <span className="text-emerald-600 font-semibold text-lg">∑</span>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">數理科目</h3>
+                      <p className="text-sm text-gray-600">數學、物理、化學</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button 
+                      onClick={() => handleSubjectCameraClick('math')}
+                      className="h-14 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg flex-col space-y-1 shadow-sm"
+                    >
+                      <Camera className="w-5 h-5" />
+                      <span className="text-sm">拍照</span>
+                    </Button>
+                    <Button 
+                      onClick={() => handleSubjectUploadClick('math')}
+                      className="h-14 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex-col space-y-1 shadow-sm"
+                    >
+                      <Upload className="w-5 h-5" />
+                      <span className="text-sm">上傳</span>
+                    </Button>
+                  </div>
+                </div>
+
+                {/* 其他科目 */}
+                <div className="bg-white rounded-xl border-2 border-gray-200 p-4 shadow-sm">
+                  <div className="flex items-center mb-3">
+                    <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                      <span className="text-green-600 font-semibold text-lg">📚</span>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">其他科目</h3>
+                      <p className="text-sm text-gray-600">國文、英文、生物、地理、公民等</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button 
+                      onClick={() => handleSubjectCameraClick('other')}
+                      className="h-14 bg-green-500 hover:bg-green-600 text-white rounded-lg flex-col space-y-1 shadow-sm"
+                    >
+                      <Camera className="w-5 h-5" />
+                      <span className="text-sm">拍照</span>
+                    </Button>
+                    <Button 
+                      onClick={() => handleSubjectUploadClick('other')}
+                      className="h-14 bg-green-600 hover:bg-green-700 text-white rounded-lg flex-col space-y-1 shadow-sm"
+                    >
+                      <Upload className="w-5 h-5" />
+                      <span className="text-sm">上傳</span>
+                    </Button>
+                  </div>
+                </div>
               </div>
 
               {/* 隱藏的檔案輸入 */}
@@ -861,7 +917,18 @@ export default function SolverPage() {
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </Button>
-                <h1 className="text-lg font-semibold text-gray-900">輸入問題</h1>
+                <h1 className="text-lg font-semibold text-gray-900">
+                  輸入問題
+                  {subjectType && (
+                    <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${
+                      subjectType === 'math' 
+                        ? 'bg-blue-100 text-blue-700' 
+                        : 'bg-green-100 text-green-700'
+                    }`}>
+                      {subjectType === 'math' ? '數理科目' : '其他科目'}
+                    </span>
+                  )}
+                </h1>
               </div>
             </div>
 
@@ -899,7 +966,10 @@ export default function SolverPage() {
                       <Textarea
                         value={currentQuestion}
                         onChange={(e) => setCurrentQuestion(e.target.value)}
-                        placeholder="例如：這題怎麼解？請幫我分析關鍵字..."
+                        placeholder={subjectType === 'math' 
+                          ? "例如：這題怎麼解？請幫我分析關鍵步驟..." 
+                          : "例如：這題怎麼解？請幫我分析關鍵字..."
+                        }
                         className="min-h-[120px] resize-none border-gray-300 focus:border-green-500 focus:ring-green-500"
                         disabled={loading}
                         onFocus={() => {
@@ -916,27 +986,42 @@ export default function SolverPage() {
 
                     {/* 預設問題按鈕 */}
                     <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
-                      {['請教我這題', '這題單選題怎麼解？', '這題多選題怎麼解？', '請用不同方法解釋', '請列出詳細步驟', '請解釋這題的關鍵概念', '請列出這題的關鍵公式', '有其他解法嗎？'].map((preset, idx) => (
-                        <Button
-                          key={idx}
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="text-xs whitespace-nowrap flex-shrink-0"
-                          onClick={() => setCurrentQuestion(preset)}
-                          disabled={loading}
-                        >
-                          {preset}
-                        </Button>
-                      ))}
+                      {subjectType === 'math' 
+                        ? ['請教我這題', '請教我這題多選題', '請列出詳細步驟', '請解釋關鍵公式', '有其他解法嗎？', '請檢查我的計算'].map((preset, idx) => (
+                            <Button
+                              key={idx}
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="text-xs whitespace-nowrap flex-shrink-0 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                              onClick={() => setCurrentQuestion(preset)}
+                              disabled={loading}
+                            >
+                              {preset}
+                            </Button>
+                          ))
+                        : ['請教我這題', '請教我這題多選題', '請用不同方法解釋', '請解釋關鍵概念', '這題的重點是什麼？', '有相關例子嗎？'].map((preset, idx) => (
+                            <Button
+                              key={idx}
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="text-xs whitespace-nowrap flex-shrink-0 border-green-200 text-green-700 hover:bg-green-50"
+                              onClick={() => setCurrentQuestion(preset)}
+                              disabled={loading}
+                            >
+                              {preset}
+                            </Button>
+                          ))
+                      }
                     </div>
 
                     {/* 提交按鈕 */}
                     <div>
                       <Button 
                         type="submit" 
-                        className="w-full bg-green-500 hover:bg-green-600 text-white shadow-lg py-4"
-                        disabled={loading || !currentQuestion.trim()}
+                        className="w-full text-white shadow-lg py-4 bg-emerald-500 hover:bg-emerald-600"
+                        disabled={loading || !currentQuestion.trim()}   
                       >
                         {loading ? (
                           <>
@@ -980,7 +1065,7 @@ export default function SolverPage() {
                         <div className="mt-4 text-xs text-orange-600 bg-orange-50 p-3 rounded-lg">
                           <p className="font-medium mb-2">💡 小提示：</p>
                           <ul className="space-y-1 text-orange-600">
-                            <li>• 複雜數學題目可能需要更長處理時間</li>
+                            <li>• 複雜{subjectType === 'math' ? '數理' : '文理'}題目可能需要更長處理時間</li>
                             <li>• 確保網路連線穩定</li>
                             <li>• 如果問題持續，可以嘗試重新描述問題</li>
                           </ul>
@@ -1022,8 +1107,18 @@ export default function SolverPage() {
                       />
                     </div>
                     <div>
-                      <h1 className="text-lg font-semibold text-gray-900">青椒老師</h1>
-                      <p className="text-sm text-gray-500">AI 解題助手</p>
+                      <div className="flex items-center space-x-2">
+                        <h1 className="text-lg font-semibold text-gray-900">青椒老師</h1>
+                        {subjectType && (
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            subjectType === 'math' 
+                              ? 'bg-emerald-100 text-emerald-700' 
+                              : 'bg-green-100 text-green-700'
+                          }`}>
+                            {subjectType === 'math' ? '數理科目' : '其他科目'}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1113,7 +1208,9 @@ export default function SolverPage() {
                               <div className="mb-1">
                                 <span className="text-xs text-gray-500">Me • 剛剛</span>
                               </div>
-                              <div className="bg-green-500 text-white rounded-2xl p-4 shadow-sm overflow-hidden max-w-sm sm:max-w-md md:max-w-lg">
+                              <div className={`text-white rounded-2xl p-4 shadow-sm overflow-hidden max-w-sm sm:max-w-md md:max-w-lg ${
+                                subjectType === 'math' ? 'bg-emerald-500' : 'bg-green-500'
+                              }`}>
                                 {message.imageUrl && (
                                   <div className="mb-3">
                                     <Image 
@@ -1163,8 +1260,12 @@ export default function SolverPage() {
                       </div>
                       <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
                         <div className="flex items-center space-x-2">
-                          <RefreshCw className="w-4 h-4 animate-spin text-green-500" />
-                          <span className="text-gray-600">正在思考...</span>
+                          <RefreshCw className={`w-4 h-4 animate-spin ${
+                            subjectType === 'math' ? 'text-emerald-500' : 'text-green-500'
+                          }`} />
+                          <span className="text-gray-600">
+                            正在思考...
+                          </span>
                           {timeoutWarning && (
                             <span className="text-orange-500 text-sm ml-2">
                               (處理時間較長，請稍候...)
@@ -1173,7 +1274,7 @@ export default function SolverPage() {
                         </div>
                         {timeoutWarning && (
                           <div className="mt-2 text-xs text-orange-600">
-                            💡 複雜題目可能需要更長時間處理
+                            💡 複雜{subjectType === 'math' ? '數理' : '文理'}題目可能需要更長時間處理
                           </div>
                         )}
                       </div>
@@ -1213,7 +1314,7 @@ export default function SolverPage() {
                             <div className="mt-3 text-xs text-orange-600 bg-orange-50 p-2 rounded-lg">
                               <p className="font-medium mb-1">💡 小提示：</p>
                               <ul className="space-y-1 text-orange-600">
-                                <li>• 複雜數學題目可能需要更長處理時間</li>
+                                <li>• 複雜{subjectType === 'math' ? '數理' : '文理'}題目可能需要更長處理時間</li>
                                 <li>• 確保網路連線穩定</li>
                                 <li>• 如果問題持續，可以嘗試重新描述問題</li>
                               </ul>
@@ -1244,7 +1345,11 @@ export default function SolverPage() {
                   <Button
                     type="submit"
                     disabled={loading || !input.trim()}
-                    className="bg-green-500 hover:bg-green-600 text-white rounded-full w-10 h-10 p-0"
+                    className={`rounded-full w-10 h-10 p-0 text-white ${
+                      subjectType === 'math' 
+                        ? 'bg-emerald-500 hover:bg-emerald-600' 
+                        : 'bg-green-500 hover:bg-green-600'
+                    }`}
                   >
                     {loading ? (
                       <RefreshCw className="w-4 h-4 animate-spin" />
@@ -1257,19 +1362,34 @@ export default function SolverPage() {
                 {/* 預設問題按鈕 */}
                 <div className="mt-3">
                   <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
-                    {['請教我這題', '請用不同方法解釋', '請列出詳細步驟', '請解釋這題的關鍵概念', '請列出這題的關鍵公式', '有其他解法嗎？'].map((preset, idx) => (
-                      <Button
-                        key={idx}
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="text-xs bg-white hover:bg-gray-50 border-gray-200 rounded-full whitespace-nowrap flex-shrink-0"
-                        onClick={() => setInput(preset)}
-                        disabled={loading}
-                      >
-                        {preset}
-                      </Button>
-                    ))}
+                    {subjectType === 'math' 
+                      ? ['請教我這題', '請教我這題多選題', '請列出詳細步驟', '請解釋關鍵公式', '有其他解法嗎？'].map((preset, idx) => (
+                          <Button
+                            key={idx}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="text-xs bg-white hover:bg-emerald-50 border-emerald-200 text-emerald-700 rounded-full whitespace-nowrap flex-shrink-0"
+                            onClick={() => setInput(preset)}
+                            disabled={loading}
+                          >
+                            {preset}
+                          </Button>
+                        ))
+                      : ['請教我這題', '請教我這題多選題', '請列出詳細步驟', '請解釋關鍵概念', '請列出重點', '有相關例子嗎？'].map((preset, idx) => (
+                          <Button
+                            key={idx}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="text-xs bg-white hover:bg-green-50 border-green-200 text-green-700 rounded-full whitespace-nowrap flex-shrink-0"
+                            onClick={() => setInput(preset)}
+                            disabled={loading}
+                          >
+                            {preset}
+                          </Button>
+                        ))
+                    }
                   </div>
                 </div>
               </div>

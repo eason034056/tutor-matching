@@ -9,7 +9,7 @@ dotenv.config();
 // 原有的 OpenAI 客戶端（用於 GPT-4.1 nano 圖片轉 LaTeX）
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// OpenRouter 客戶端（用於 deepseek 模型答題）
+// OpenRouter 客戶端（用於 deepseek 和 gemini 模型）
 const openrouter = new OpenAI({
   baseURL: "https://openrouter.ai/api/v1",
   apiKey: process.env.OPENROUTER_API_KEY,
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
   try {
     // 解析前端傳來的資料
     const body = await request.json();
-    const { message, userId, questionImageUrl, threadId, isNewThread } = body;
+    const { message, userId, questionImageUrl, threadId, isNewThread, subjectType } = body;
 
     // 檢查必要欄位
     if (!userId) {
@@ -132,6 +132,121 @@ export async function POST(request: NextRequest) {
         .map(msg => ({ role: msg.role as 'user' | 'assistant', content: msg.content as string }));
     }
 
+    // 呼叫 AI 進行回答
+    let aiResponse = '';
+    
+    // 根據科目類型選擇不同的處理流程
+    if (subjectType === 'math') {
+      // 數理題目：使用 OpenRouter 的 Gemini 模型
+      aiResponse = await processMathSubject(message, questionImageUrl, historyMessages);
+    } else {
+      // 其他科目：使用現有的 GPT-4.1-nano + DeepSeek 流程
+      aiResponse = await processOtherSubject(message, questionImageUrl, historyMessages);
+    }
+
+    // 把 AI 回覆也存到 firebase
+    const aiMessageData: Omit<ChatMessage, 'id'> = {
+      threadId: currentThreadId,
+      userId,
+      role: 'assistant',
+      content: aiResponse,
+      timestamp: Date.now()
+    };
+    await adminDb.collection('chat_messages').add(aiMessageData);
+
+    // 回傳 AI 回覆、threadId、是否新 thread、完整 thread 訊息
+    return NextResponse.json({
+      message: aiResponse,
+      threadId: currentThreadId,
+      isNewThread: isNewThreadCreated,
+      threadMessages
+    });
+  } catch (error) {
+    console.error('[ERROR] Failed to process solver request:', error);
+    return NextResponse.json({ error: 'Failed to process request', detail: String(error) }, { status: 500 });
+  }
+}
+
+// 處理數理題目（使用 Gemini 模型）
+async function processMathSubject(
+  message: string, 
+  questionImageUrl: string | undefined, 
+  historyMessages: { role: 'user' | 'assistant'; content: string }[]
+): Promise<string> {
+  try {
+    // Gemini 的 system prompt
+    const mathSystemPrompt = `你是一位名叫「青椒老師」的 AI 數理家教老師，由清華與交大畢業生打造。你專門教國中與高中的數學、物理、化學，擅長用親切且專業的方式解題與引導思考。你的語氣應溫暖、鼓勵、有耐心。
+
+    🧑‍🏫 角色設定
+    - 你是「青椒老師」，專精數理科目的 AI 家教
+    - 你擅長數學、物理、化學的解題與教學
+    - 請永遠以溫暖親切的語氣與學生互動，耐心解釋直到學生懂
+
+    📝 教學風格
+    - 使用清楚的步驟化教學：理解題意 → 分析重點 → 解題策略 → 詳細計算 → 驗證答案
+    - 適當使用標題和條列來組織內容
+    - 可加入數學原理和公式推導幫助理解
+    - 若學生看不懂，請改用其他方式再解釋一次（舉例、圖解、換句話說）
+    - 特別重視解題過程的邏輯性和完整性
+
+    💡 回答格式
+    - 請用 markdown 格式回答，並且用 latex 格式化數學公式
+    - **數學式或數學符號請使用**
+      - 行內公式：用 \`$...$\`
+      - 區塊公式：用 \`$$...$$\` 獨佔一行
+    - 對於複雜的數理問題，請提供多種解法（如果有的話）
+    - 解題完成後，請提供相關的概念複習或延伸思考
+
+    請開始數理教學`;
+
+    // 構建訊息陣列
+    const messages: any[] = [
+      { role: 'system', content: mathSystemPrompt },
+      ...historyMessages
+    ];
+
+    // 如果有圖片，構建包含圖片的訊息
+    if (questionImageUrl) {
+      messages.push({
+        role: 'user',
+        content: [
+          { type: 'text', text: message },
+          { type: 'image_url', image_url: { url: questionImageUrl } }
+        ]
+      });
+    } else {
+      messages.push({ role: 'user', content: message });
+    }
+
+    // 呼叫 Gemini 模型
+    const completion = await openrouter.chat.completions.create({
+      model: 'google/gemini-2.5-flash',
+      messages: messages
+    });
+
+    if (!completion.choices?.[0]?.message?.content) {
+      throw new Error('No response content from Gemini model');
+    }
+
+    return completion.choices[0].message.content;
+  } catch (error: unknown) {
+    console.error('[ERROR] Gemini 模型回傳失敗:', error);
+    console.error('[ERROR] 完整錯誤資訊:', {
+      錯誤類型: error instanceof Error ? error.name : 'Unknown',
+      錯誤訊息: error instanceof Error ? error.message : 'Unknown error',
+      錯誤堆疊: error instanceof Error ? error.stack : 'No stack trace'
+    });
+    return '抱歉，數理解題服務暫時無法使用。可能的原因：\n1. 系統暫時無法連接\n2. 請求超時\n3. 模型暫時不可用\n\n請稍後再試。';
+  }
+}
+
+// 處理其他科目（使用現有的 GPT-4.1-nano + DeepSeek 流程）
+async function processOtherSubject(
+  message: string, 
+  questionImageUrl: string | undefined, 
+  historyMessages: { role: 'user' | 'assistant'; content: string }[]
+): Promise<string> {
+  try {
     // 準備 system prompt
     const systemPrompt = `你是一位名叫「青椒老師」的 AI 家教老師，由清華與交大畢業生打造。你專門教國中與高中生，擅長用親切且專業的方式解題與引導思考。你的語氣應溫暖、鼓勵、有耐心。
 
@@ -206,7 +321,6 @@ export async function POST(request: NextRequest) {
       請開始轉換。輸出僅包含純文字 Markdown 題目內容，其他說明一律禁止。
       `;
 
-
     // 如果有圖片，先用 GPT-4.1-nano 轉換為 LaTeX
     let processedMessage = message;
     if (questionImageUrl) {
@@ -247,51 +361,27 @@ export async function POST(request: NextRequest) {
     }));
 
     // 呼叫 deepseek 模型進行答題（使用處理後的純文字訊息）
-    let aiResponse = '';
-    try {
-      const completion = await openrouter.chat.completions.create({
-        model: 'deepseek/deepseek-chat-v3-0324:free',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...visionHistoryMessages,
-          { role: 'user', content: processedMessage }
-        ]
-      });
+    const completion = await openrouter.chat.completions.create({
+      model: 'deepseek/deepseek-chat-v3-0324',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...visionHistoryMessages,
+        { role: 'user', content: processedMessage }
+      ]
+    });
 
-      if (!completion.choices?.[0]?.message?.content) {
-        throw new Error('No response content from model');
-      }
-
-      aiResponse = completion.choices[0].message.content;
-    } catch (error: unknown) {
-      console.error('[ERROR] deepseek 模型回傳失敗:', error);
-      console.error('[ERROR] 完整錯誤資訊:', {
-        錯誤類型: error instanceof Error ? error.name : 'Unknown',
-        錯誤訊息: error instanceof Error ? error.message : 'Unknown error',
-        錯誤堆疊: error instanceof Error ? error.stack : 'No stack trace'
-      });
-      aiResponse = '抱歉，AI 回答時發生錯誤。可能的原因：\n1. 系統暫時無法連接\n2. 請求超時\n3. 模型暫時不可用\n\n請稍後再試。';
+    if (!completion.choices?.[0]?.message?.content) {
+      throw new Error('No response content from DeepSeek model');
     }
 
-    // 把 AI 回覆也存到 firebase
-    const aiMessageData: Omit<ChatMessage, 'id'> = {
-      threadId: currentThreadId,
-      userId,
-      role: 'assistant',
-      content: aiResponse,
-      timestamp: Date.now()
-    };
-    await adminDb.collection('chat_messages').add(aiMessageData);
-
-    // 回傳 AI 回覆、threadId、是否新 thread、完整 thread 訊息
-    return NextResponse.json({
-      message: aiResponse,
-      threadId: currentThreadId,
-      isNewThread: isNewThreadCreated,
-      threadMessages
+    return completion.choices[0].message.content;
+  } catch (error: unknown) {
+    console.error('[ERROR] DeepSeek 模型回傳失敗:', error);
+    console.error('[ERROR] 完整錯誤資訊:', {
+      錯誤類型: error instanceof Error ? error.name : 'Unknown',
+      錯誤訊息: error instanceof Error ? error.message : 'Unknown error',
+      錯誤堆疊: error instanceof Error ? error.stack : 'No stack trace'
     });
-  } catch (error) {
-    console.error('[ERROR] Failed to process solver request:', error);
-    return NextResponse.json({ error: 'Failed to process request', detail: String(error) }, { status: 500 });
+    return '抱歉，AI 回答時發生錯誤。可能的原因：\n1. 系統暫時無法連接\n2. 請求超時\n3. 模型暫時不可用\n\n請稍後再試。';
   }
 } 

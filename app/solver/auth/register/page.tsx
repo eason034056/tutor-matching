@@ -7,7 +7,7 @@ import Image from 'next/image';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Eye, EyeOff, Mail, Lock, AlertCircle, CheckCircle } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('');
@@ -17,21 +17,28 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showEmailVerification, setShowEmailVerification] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState(false);
+  const [checkingVerification, setCheckingVerification] = useState(false);
   const router = useRouter();
-  const { user, loading: authLoading, register } = useAuth();
+  const { user, loading: authLoading, register, resendVerificationEmail, refreshUser } = useAuth();
 
   // 密碼強度檢查
   const passwordRequirements = [
-    { label: '至少8個字符', check: password.length >= 8 },
-    { label: '包含大寫字母', check: /[A-Z]/.test(password) },
-    { label: '包含小寫字母', check: /[a-z]/.test(password) },
-    { label: '包含數字', check: /\d/.test(password) },
+    { label: '至少6個字符', check: password.length >= 6 },
   ];
 
-  // 監聽認證狀態變化，如果用戶已登入則重定向
+  // 監聽認證狀態變化
   useEffect(() => {
     if (!authLoading && user) {
-      router.push('/solver');
+      // 如果用戶已驗證 email，重定向到主頁
+      if (user.emailVerified) {
+        router.push('/solver');
+      } else {
+        // 如果用戶未驗證 email，顯示驗證頁面
+        setShowEmailVerification(true);
+      }
     }
   }, [user, authLoading, router]);
 
@@ -55,16 +62,50 @@ export default function RegisterPage() {
       return;
     }
 
-
-
     try {
       await register(email, password);
-      // 註冊成功後，useEffect 會自動處理重定向
+      // 註冊成功後會自動發送驗證郵件，顯示驗證頁面
+      setShowEmailVerification(true);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : '註冊失敗，請稍後再試';
       setError(errorMessage);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 重新發送驗證郵件
+  const handleResendVerification = async () => {
+    setResendLoading(true);
+    setResendSuccess(false);
+    setError('');
+
+    try {
+      await resendVerificationEmail();
+      setResendSuccess(true);
+      // 3秒後隱藏成功訊息
+      setTimeout(() => setResendSuccess(false), 3000);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : '重新發送驗證郵件失敗';
+      setError(errorMessage);
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
+  // 檢查驗證狀態
+  const handleCheckVerification = async () => {
+    setCheckingVerification(true);
+    setError('');
+
+    try {
+      await refreshUser();
+      // 重新載入後，useEffect 會檢查驗證狀態
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : '檢查驗證狀態失敗';
+      setError(errorMessage);
+    } finally {
+      setCheckingVerification(false);
     }
   };
 
@@ -80,13 +121,131 @@ export default function RegisterPage() {
     );
   }
 
-  // 如果用戶已登入，顯示重定向狀態
-  if (user) {
+  // 如果用戶已登入且已驗證，顯示重定向狀態
+  if (user && user.emailVerified) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-50 to-brand-100">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-4 border-brand-200 border-t-brand-500 mx-auto mb-4"></div>
           <p className="text-neutral-600 font-medium">重定向到解題助手...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 如果需要顯示 email 驗證頁面
+  if (showEmailVerification) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-50 to-brand-100 p-4">
+        <div className="w-full max-w-md">
+          {/* 品牌標識 */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-white rounded-2xl shadow-lg mb-4">
+              <Image
+                src="/teacher-icon.png"
+                alt="青椒老師"
+                width={48}
+                height={48}
+                className="rounded-xl"
+              />
+            </div>
+            <h1 className="text-3xl font-bold text-neutral-800 mb-2">驗證您的電子郵件</h1>
+            <p className="text-neutral-600">我們已經發送驗證郵件到您的信箱</p>
+          </div>
+
+          {/* 驗證說明卡片 */}
+          <div className="bg-white rounded-2xl shadow-xl p-8 border border-neutral-100">
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-100 rounded-full mb-4">
+                <Mail className="w-8 h-8 text-brand-500" />
+              </div>
+              <h2 className="text-xl font-semibold text-neutral-800 mb-2">檢查您的信箱</h2>
+              <p className="text-neutral-600 text-sm">
+                我們已經發送驗證連結到：<br />
+                <span className="font-medium text-brand-600">{user?.email}</span>
+              </p>
+            </div>
+
+            {/* 錯誤訊息 */}
+            {error && (
+              <div className="flex items-center p-4 bg-red-50 border border-red-200 rounded-xl mb-4">
+                <AlertCircle className="w-5 h-5 text-red-500 mr-3 flex-shrink-0" />
+                <p className="text-red-700 text-sm">{error}</p>
+              </div>
+            )}
+
+            {/* 重新發送成功訊息 */}
+            {resendSuccess && (
+              <div className="flex items-center p-4 bg-green-50 border border-green-200 rounded-xl mb-4">
+                <CheckCircle className="w-5 h-5 text-green-500 mr-3 flex-shrink-0" />
+                <p className="text-green-700 text-sm">驗證郵件已重新發送！</p>
+              </div>
+            )}
+
+            {/* 驗證說明 */}
+            <div className="bg-brand-50 rounded-xl p-4 mb-6">
+              <h3 className="font-semibold text-neutral-800 mb-2">請按照以下步驟進行驗證：</h3>
+              <ol className="text-sm text-neutral-600 space-y-1">
+                <li>1. 檢查您的電子郵件收件箱</li>
+                <li>2. 點擊驗證連結</li>
+                <li>3. 返回此頁面並點擊「我已驗證」</li>
+              </ol>
+            </div>
+
+            {/* 操作按鈕 */}
+            <div className="space-y-3">
+              <Button
+                onClick={handleCheckVerification}
+                disabled={checkingVerification}
+                className="w-full h-12 bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-xl transition-all duration-200"
+              >
+                {checkingVerification ? (
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2"></div>
+                    檢查中...
+                  </div>
+                ) : (
+                  <>
+                    <RefreshCw className="w-5 h-5 mr-2" />
+                    我已驗證
+                  </>
+                )}
+              </Button>
+
+              <Button
+                onClick={handleResendVerification}
+                disabled={resendLoading}
+                variant="outline"
+                className="w-full h-12 border-brand-200 text-brand-600 hover:bg-brand-50 font-semibold rounded-xl transition-all duration-200"
+              >
+                {resendLoading ? (
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-brand-500 border-t-transparent mr-2"></div>
+                    發送中...
+                  </div>
+                ) : (
+                  '重新發送驗證郵件'
+                )}
+              </Button>
+            </div>
+
+            {/* 說明文字 */}
+            <div className="mt-6 text-center">
+              <p className="text-xs text-neutral-500">
+                沒有收到郵件？請檢查垃圾郵件資料夾，或點擊重新發送
+              </p>
+            </div>
+          </div>
+
+          {/* 返回登入 */}
+          <div className="text-center mt-6">
+            <Link
+              href="/solver/auth/login"
+              className="text-neutral-500 hover:text-neutral-700 transition-colors text-sm"
+            >
+              ← 返回登入
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -218,8 +377,6 @@ export default function RegisterPage() {
                 </div>
               )}
             </div>
-
-
 
             {/* 註冊按鈕 */}
             <Button

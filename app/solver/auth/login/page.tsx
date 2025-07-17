@@ -19,10 +19,16 @@ export default function LoginPage() {
   const router = useRouter();
   const { user, loading: authLoading, login } = useAuth();
 
-  // 監聽認證狀態變化，如果用戶已登入則重定向
+  // 監聽認證狀態變化
   useEffect(() => {
     if (!authLoading && user) {
-      router.push('/solver');
+      // 如果用戶已驗證 email，重定向到主頁
+      if (user.emailVerified) {
+        router.push('/solver');
+      } else {
+        // 如果用戶未驗證 email，重定向到註冊頁面的驗證狀態
+        router.push('/solver/auth/register');
+      }
     }
   }, [user, authLoading, router]);
 
@@ -60,7 +66,9 @@ export default function LoginPage() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-50 to-brand-100">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-4 border-brand-200 border-t-brand-500 mx-auto mb-4"></div>
-          <p className="text-neutral-600 font-medium">重定向到解題助手...</p>
+          <p className="text-neutral-600 font-medium">
+            {user.emailVerified ? '重定向到解題助手...' : '重定向到驗證頁面...'}
+          </p>
         </div>
       </div>
     );

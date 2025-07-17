@@ -1364,7 +1364,7 @@ export default function SolverPage() {
                 <div className="mt-3">
                   <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
                     {subjectType === 'math' 
-                      ? ['請教我這題', '請教我這題多選題', '請列出詳細步驟', '請解釋關鍵公式', '有其他解法嗎？'].map((preset, idx) => (
+                      ? ['請教我這題', '請教我這題多選題', '請列出更詳細步驟', '請解釋關鍵公式', '如果我要把這題寫進筆記，該怎麼寫？', '有其他解法嗎？'].map((preset, idx) => (
                           <Button
                             key={idx}
                             type="button"
@@ -1377,7 +1377,7 @@ export default function SolverPage() {
                             {preset}
                           </Button>
                         ))
-                      : ['請教我這題', '請教我這題多選題', '請列出詳細步驟', '請解釋關鍵概念', '請列出重點', '有相關例子嗎？'].map((preset, idx) => (
+                      : ['請教我這題', '請教我這題多選題', '請解釋關鍵概念', '請列出重點', '如果我要把這題寫進筆記，該怎麼寫？', '有相關例子嗎？'].map((preset, idx) => (
                           <Button
                             key={idx}
                             type="button"

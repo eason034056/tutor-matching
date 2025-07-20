@@ -133,7 +133,7 @@ export default function CaseUploadForm() {
         region: formData.region,
         availableTime: formData.availableTime,
         teacherRequirements: formData.teacherRequirements,
-        hourlyFee: parseInt(formData.hourlyFee),
+        hourlyFee: Number(formData.hourlyFee),
         message: formData.message,
         idCardUrl,
         caseNumber,
@@ -511,6 +511,8 @@ export default function CaseUploadForm() {
               id="hourlyFee"
               name="hourlyFee"
               type="number"
+              step="1"
+              min="0"
               value={formData.hourlyFee}
               onChange={handleChange}
               required

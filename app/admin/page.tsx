@@ -565,13 +565,24 @@ export default function AdminPage() {
                     {case_.idCardUrl && (
                       <div className="mt-4">
                         <h4 className="font-semibold mb-2">身分證照片</h4>
-                        <Image
-                          src={case_.idCardUrl} 
-                          alt="身分證" 
-                          width={500}
-                          height={300}
-                          className="w-full rounded-lg shadow-md"
-                        />
+                        <div className="relative">
+                          <Image
+                            src={case_.idCardUrl} 
+                            alt="身分證" 
+                            width={500}
+                            height={300}
+                            className="w-full rounded-lg shadow-md"
+                            loading="lazy"
+                            onError={(e) => {
+                              console.error('圖片載入失敗:', case_.idCardUrl);
+                              // 設置一個預設圖片或錯誤提示
+                              e.currentTarget.src = '/placeholder.png';
+                            }}
+                          />
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1 break-all">
+                          圖片 URL: {case_.idCardUrl}
+                        </p>
                       </div>
                     )}
                     <div className="mt-4 flex gap-2">

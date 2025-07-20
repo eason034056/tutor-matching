@@ -1,7 +1,23 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    domains: ['firebasestorage.googleapis.com']
+    domains: [
+      'firebasestorage.googleapis.com',
+      'storage.googleapis.com',
+      'tutor-matching-5c608.firebasestorage.app'
+    ],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**.googleapis.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.firebasestorage.app',
+        pathname: '/**',
+      }
+    ]
   },
   async headers() {
     return [

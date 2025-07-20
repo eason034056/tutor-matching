@@ -53,6 +53,51 @@ export async function POST(request: NextRequest) {
     // 上傳到 Firebase Storage
     console.log('開始上傳到 Firebase Storage...')
     const bucket = adminStorage.bucket()
+    console.log('Storage bucket 名稱:', bucket.name)
+    
+    // 檢查 bucket 是否存在
+    try {
+      const [exists] = await bucket.exists()
+      console.log('Bucket 是否存在:', exists)
+      
+      if (!exists) {
+        console.error('Bucket 不存在，嘗試使用預設 bucket...')
+        // 嘗試使用預設的 bucket 名稱
+        const defaultBucket = adminStorage.bucket(`${process.env.FIREBASE_ADMIN_PROJECT_ID}.firebasestorage.app`)
+        console.log('嘗試使用預設 bucket:', defaultBucket.name)
+        
+        const [defaultExists] = await defaultBucket.exists()
+        console.log('預設 bucket 是否存在:', defaultExists)
+        
+        if (defaultExists) {
+          const fileUpload = defaultBucket.file(filePath)
+          await fileUpload.save(watermarkedBuffer, {
+            metadata: {
+              contentType: file.type,
+            },
+          })
+          console.log('文件上傳完成（使用預設 bucket）')
+          
+          // 生成下載 URL
+          const [url] = await fileUpload.getSignedUrl({
+            action: 'read',
+            expires: '03-01-2500',
+          })
+          
+          return NextResponse.json({
+            success: true,
+            url,
+            fileName,
+            filePath,
+          })
+        } else {
+          throw new Error('預設 bucket 也不存在')
+        }
+      }
+    } catch (bucketError) {
+      console.error('檢查 bucket 失敗:', bucketError)
+    }
+    
     const fileUpload = bucket.file(filePath)
     
     await fileUpload.save(watermarkedBuffer, {
@@ -91,6 +136,9 @@ export async function POST(request: NextRequest) {
       hasProjectId: !!process.env.FIREBASE_ADMIN_PROJECT_ID,
       hasClientEmail: !!process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
       hasPrivateKey: !!process.env.FIREBASE_ADMIN_PRIVATE_KEY,
+      hasStorageBucket: !!process.env.FIREBASE_STORAGE_BUCKET,
+      projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
+      storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
     })
 
     return NextResponse.json(

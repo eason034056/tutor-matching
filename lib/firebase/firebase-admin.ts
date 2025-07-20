@@ -6,24 +6,22 @@ import { getStorage } from 'firebase-admin/storage';
 const apps = getApps();
 
 function validateEnvironmentVariables() {
-  const requiredVars = {
-    projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
-    clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
-    privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY,
-  } as const;
+  const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY;
 
-  const missingVars = Object.entries(requiredVars)
-    .filter(([_, value]) => !value)
-    .map(([key]) => key);
-
-  if (missingVars.length > 0) {
-    throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
+  if (!projectId || !clientEmail || !privateKey) {
+    throw new Error('Missing required Firebase Admin SDK credentials');
   }
 
-  return requiredVars as {
-    projectId: string;
-    clientEmail: string;
-    privateKey: string;
+  // 構建完整的 bucket URL
+  const bucketUrl = `gs://tutor-matching-5c608.appspot.com`;
+
+  return {
+    projectId,
+    clientEmail,
+    privateKey,
+    bucketUrl,
   };
 }
 
@@ -31,7 +29,9 @@ function validateEnvironmentVariables() {
 if (!apps.length) {
   try {
     console.log('初始化 Firebase Admin...');
-    const { projectId, clientEmail, privateKey } = validateEnvironmentVariables();
+    const { projectId, clientEmail, privateKey, bucketUrl } = validateEnvironmentVariables();
+
+    console.log('使用的 Storage Bucket:', bucketUrl);
 
     const config = {
       credential: cert({
@@ -39,7 +39,7 @@ if (!apps.length) {
         clientEmail,
         privateKey: privateKey.replace(/\\n/g, '\n'),
       }),
-      storageBucket: `${projectId}.appspot.com`,
+      storageBucket: bucketUrl,
     };
 
     console.log('Firebase Admin 配置:', {
@@ -68,6 +68,11 @@ try {
 
   console.log('初始化 Storage...');
   adminStorage = getStorage();
+  
+  // 檢查 Storage 是否正確初始化
+  const bucket = adminStorage.bucket();
+  console.log('Storage bucket 名稱:', bucket.name);
+  
   console.log('Storage 初始化成功');
 } catch (error) {
   console.error('服務初始化失敗:', error);

@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminStorage } from '@/lib/firebase/firebase-admin'
-import { addWatermark } from '@/lib/imageUtils'
+import { addWatermark } from '@/lib/imageUtils.server'
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('開始處理圖片上傳請求...')
-    
     // 處理 CORS 預檢請求
     if (request.method === 'OPTIONS') {
       return new NextResponse(null, {
@@ -18,58 +16,51 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    console.log('開始處理圖片上傳請求...')
+
     const formData = await request.formData()
     const file = formData.get('file') as File
     const folder = formData.get('folder') as string // 'cases' 或 'tutors'
     const subfolder = formData.get('subfolder') as string // 'id-cards' 或 'student-ids'
 
-    console.log('接收到的參數:', { 
-      fileName: file?.name, 
-      fileSize: file?.size, 
-      fileType: file?.type,
-      folder, 
-      subfolder 
-    })
+    console.log('收到的參數:', { folder, subfolder, fileName: file?.name })
 
     if (!file || !folder || !subfolder) {
-      console.error('缺少必要參數:', { hasFile: !!file, folder, subfolder })
+      console.error('缺少必要參數:', { file: !!file, folder, subfolder })
       return NextResponse.json(
-        { error: '缺少必要參數', details: '請確保提供了文件、文件夾和子文件夾參數' },
+        { error: '缺少必要參數' },
         { status: 400 }
       )
     }
 
     console.log(`開始上傳圖片到 ${folder}/${subfolder}`)
 
+    // 將 File 對象轉換為 Buffer
+    const arrayBuffer = await file.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
+
     // 添加浮水印
     console.log('開始添加浮水印...')
-    const watermarkedBlob = await addWatermark(file)
+    const watermarkedBuffer = await addWatermark(buffer)
     console.log('浮水印添加完成')
     
     // 生成文件名
     const timestamp = Date.now()
     const fileName = `${timestamp}-${file.name}`
     const filePath = `${folder}/${subfolder}/${fileName}`
-
-    console.log('文件路徑:', filePath)
-
-    // 轉換為 Buffer
-    console.log('轉換文件為 Buffer...')
-    const arrayBuffer = await watermarkedBlob.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
-    console.log('Buffer 轉換完成，大小:', buffer.length)
+    console.log('準備上傳文件:', filePath)
 
     // 上傳到 Firebase Storage
     console.log('開始上傳到 Firebase Storage...')
     const bucket = adminStorage.bucket()
     const fileUpload = bucket.file(filePath)
     
-    await fileUpload.save(buffer, {
+    await fileUpload.save(watermarkedBuffer, {
       metadata: {
         contentType: file.type,
       },
     })
-    console.log('文件保存到 Storage 完成')
+    console.log('文件上傳完成')
 
     // 生成下載 URL
     console.log('生成下載 URL...')
@@ -90,26 +81,22 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('圖片上傳失敗:', error)
-    
-    // 提供更詳細的錯誤信息
-    let errorMessage = '圖片上傳失敗'
-    let errorDetails = '未知錯誤'
-    
-    if (error instanceof Error) {
-      errorMessage = error.message
-      errorDetails = error.stack || '無堆疊信息'
-    }
-    
     console.error('錯誤詳情:', {
-      message: errorMessage,
-      details: errorDetails,
-      error: error
+      message: error instanceof Error ? error.message : '未知錯誤',
+      stack: error instanceof Error ? error.stack : undefined,
+    })
+    
+    // 檢查環境變數
+    console.log('環境變數檢查:', {
+      hasProjectId: !!process.env.FIREBASE_ADMIN_PROJECT_ID,
+      hasClientEmail: !!process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
+      hasPrivateKey: !!process.env.FIREBASE_ADMIN_PRIVATE_KEY,
     })
 
     return NextResponse.json(
       { 
-        error: errorMessage,
-        details: errorDetails
+        error: '圖片上傳失敗',
+        details: error instanceof Error ? error.message : '未知錯誤'
       },
       { status: 500 }
     )

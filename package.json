@@ -46,6 +46,7 @@
     "remark-math": "^6.0.0",
     "schema-dts": "^1.1.2",
     "shadcn-ui": "^0.2.3",
+    "sharp": "^0.34.3",
     "showdown": "^2.1.0",
     "sonner": "^1.7.0",
     "tailwind-merge": "^2.5.5",

@@ -1,3 +1,5 @@
+'use client';
+
 export async function addWatermark(file: File): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const img = new Image();

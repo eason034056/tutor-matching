@@ -239,12 +239,14 @@ export default function RegisterPage() {
 
           {/* 返回登入 */}
           <div className="text-center mt-6">
-            <Link
-              href="/solver/auth/login"
+            <button
+              onClick={() => {
+                router.push('/solver/auth/login');
+              }}
               className="text-neutral-500 hover:text-neutral-700 transition-colors text-sm"
             >
               ← 返回登入
-            </Link>
+            </button>
           </div>
         </div>
       </div>

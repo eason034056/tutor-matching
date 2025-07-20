@@ -17,8 +17,9 @@ import Image from 'next/image'
 export default function AdminPage() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
-  const [pendingTutors, setPendingTutors] = useState<Tutor[]>([])
-  const [pendingCases, setPendingCases] = useState<TutorCase[]>([])
+  const [processing, setProcessing] = useState(false)
+  const [pendingTutors, setPendingTutors] = useState<(Tutor & { docId: string })[]>([])
+  const [pendingCases, setPendingCases] = useState<(TutorCase & { docId: string })[]>([])
   const [lastActivity, setLastActivity] = useState(Date.now())
   const [inactiveTime, setInactiveTime] = useState(0)
 
@@ -31,6 +32,8 @@ export default function AdminPage() {
         return;
       }
 
+      console.log('開始載入待審核資料...')
+
       // 使用 Firestore 查詢
       const tutorsQuery = query(collection(db, 'tutors'), where('status', '==', 'pending'));
       const casesQuery = query(collection(db, 'cases'), where('pending', '==', 'pending'));
@@ -40,21 +43,31 @@ export default function AdminPage() {
         getDocs(casesQuery)
       ]);
 
-      const tutors = tutorsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Tutor[];
+      const tutors = tutorsSnapshot.docs.map(doc => {
+        const data = doc.data()
+        return {
+          ...data,
+          docId: doc.id, // Firestore 文檔 ID
+          id: data.id || doc.id // 保留原始 ID，如果沒有則使用文檔 ID
+        }
+      }) as (Tutor & { docId: string })[];
 
-      const cases = casesSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as TutorCase[];
+      const cases = casesSnapshot.docs.map(doc => {
+        const data = doc.data()
+        console.log('案件資料:', { docId: doc.id, customId: data.id, caseNumber: data.caseNumber })
+        return {
+          ...data,
+          docId: doc.id, // Firestore 文檔 ID  
+          id: data.id || doc.id // 保留原始 ID，如果沒有則使用文檔 ID
+        }
+      }) as (TutorCase & { docId: string })[];
 
+      console.log('載入完成:', { tutors: tutors.length, cases: cases.length })
       setPendingTutors(tutors);
       setPendingCases(cases);
     } catch (error) {
       console.error('Fetch error:', error);
-      toast.error('載入失敗');
+      toast.error('載入失敗：' + (error instanceof Error ? error.message : '未知錯誤'));
     }
   };
 
@@ -141,15 +154,27 @@ export default function AdminPage() {
   }
 
   // 處理教師審核
-  const handleTutorApprove = async (id: string) => {
+  const handleTutorApprove = async (docId: string) => {
+    if (processing) return
+    setProcessing(true)
+    
     try {
-      const q = query(collection(db, 'tutors'), where('id', '==', id));
-      const querySnapshot = await getDocs(q)
-      if (querySnapshot.empty) {
+      console.log('開始審核教師，文檔 ID:', docId)
+      
+      if (!docId) {
+        throw new Error('教師ID無效')
+      }
+
+      // 直接使用文檔 ID 獲取教師
+      const tutorRef = doc(db, 'tutors', docId);
+      const tutorSnapshot = await getDoc(tutorRef);
+      
+      if (!tutorSnapshot.exists()) {
         throw new Error('找不到該教師')
       }
-      const tutorRef = querySnapshot.docs[0].ref
-      const tutorData = querySnapshot.docs[0].data();
+      
+      const tutorData = tutorSnapshot.data();
+      console.log('找到教師資料:', tutorData)
 
       // Validate required fields
       const requiredFields = ['experience', 'expertise', 'major', 'name', 'school', 'subjects'];
@@ -167,7 +192,7 @@ export default function AdminPage() {
 
       // Store approved tutor info in approvedTutors collection
       await addDoc(collection(db, 'approvedTutors'), {
-        tutorId: id,
+        tutorId: docId,
         experience: tutorData.experience,
         subjects: tutorData.subjects,
         expertise: tutorData.expertise,
@@ -178,31 +203,61 @@ export default function AdminPage() {
       });
       
       toast.success('審核通過')
-      fetchPendingData()
+      await fetchPendingData()
     } catch (error) {
       console.error('Error approving tutor:', error);
       toast.error(error instanceof Error ? error.message : '審核失敗')
+    } finally {
+      setProcessing(false)
     }
   }
 
   // 處理家教拒絕
-  const handleTutorReject = async (id: string) => {
+  const handleTutorReject = async (docId: string) => {
+    if (processing) return
+    setProcessing(true)
+    
     try {
-      const q = query(collection(db, 'tutors'), where('id', '==', id));
-      const querySnapshot = await getDocs(q)
-      if (querySnapshot.empty) {
+      console.log('開始拒絕教師，文檔 ID:', docId)
+      
+      if (!docId) {
+        throw new Error('教師ID無效')
+      }
+
+      // 直接使用文檔 ID 獲取教師
+      const tutorRef = doc(db, 'tutors', docId);
+      const tutorSnapshot = await getDoc(tutorRef);
+      
+      if (!tutorSnapshot.exists()) {
         throw new Error('找不到該教師')
       }
-      const tutorRef = querySnapshot.docs[0].ref
+      
+      const tutorData = tutorSnapshot.data();
+      console.log('找到教師資料:', tutorData)
 
       // Delete ID card images from storage
-      const tutorData = querySnapshot.docs[0].data();
-      
-      // Delete ID card photo if exists
       if (tutorData.idCardUrl) {
         try {
-          const idCardRef = ref(storage, tutorData.idCardUrl);
-          await deleteObject(idCardRef);
+          console.log('刪除身分證照片:', tutorData.idCardUrl)
+          const getStoragePath = (url: string) => {
+            try {
+              if (url.startsWith('gs://')) {
+                return url.replace(/^gs:\/\/[^\/]+\//, '')
+              }
+              const urlObj = new URL(url)
+              const pathMatch = urlObj.pathname.match(/\/v0\/b\/[^\/]+\/o\/(.+)/)
+              return pathMatch ? decodeURIComponent(pathMatch[1]) : null
+            } catch (error) {
+              console.error('解析 URL 失敗:', error)
+              return null
+            }
+          }
+          const storagePath = getStoragePath(tutorData.idCardUrl)
+          if (storagePath) {
+            const idCardRef = ref(storage, storagePath);
+            await deleteObject(idCardRef);
+            console.log('身分證照片已刪除')
+          }
         } catch (error) {
           console.error('Error deleting ID card:', error);
         }
@@ -211,45 +266,77 @@ export default function AdminPage() {
       // Delete student ID photo if exists  
       if (tutorData.studentIdCardUrl) {
         try {
-          const studentIdRef = ref(storage, tutorData.studentIdCardUrl);
-          await deleteObject(studentIdRef);
+          console.log('刪除學生證照片:', tutorData.studentIdCardUrl)
+          const getStoragePath = (url: string) => {
+            try {
+              if (url.startsWith('gs://')) {
+                return url.replace(/^gs:\/\/[^\/]+\//, '')
+              }
+              const urlObj = new URL(url)
+              const pathMatch = urlObj.pathname.match(/\/v0\/b\/[^\/]+\/o\/(.+)/)
+              return pathMatch ? decodeURIComponent(pathMatch[1]) : null
+            } catch (error) {
+              console.error('解析 URL 失敗:', error)
+              return null
+            }
+          }
+          const storagePath = getStoragePath(tutorData.studentIdCardUrl)
+          if (storagePath) {
+            const studentIdRef = ref(storage, storagePath);
+            await deleteObject(studentIdRef);
+            console.log('學生證照片已刪除')
+          }
         } catch (error) {
           console.error('Error deleting student ID:', error);
         }
       }
+      
       await deleteDoc(tutorRef)
       
       toast.success('已拒絕申請')
-      fetchPendingData()
+      await fetchPendingData()
     } catch (error) {
-      console.error('操作失敗: ', error)
+      console.error('拒絕教師失敗:', error)
+      toast.error(`操作失敗：${error instanceof Error ? error.message : '未知錯誤'}`)
+    } finally {
+      setProcessing(false)
     }
   }
 
   // 處理案件審核
-  const handleCaseApprove = async (id: string) => {
+  const handleCaseApprove = async (docId: string) => {
+    if (processing) return
+    setProcessing(true)
+    
     try {
-      if (!id) {
-        console.error('No case ID provided')
-        toast.error('案件ID無效')
-        return
+      console.log('開始審核案件，文檔 ID:', docId)
+      
+      if (!docId) {
+        throw new Error('案件ID無效')
       }
-      console.log(id)
 
-      const caseRef = doc(db, 'cases', id);
+      // 直接使用文檔 ID 獲取案件
+      const caseRef = doc(db, 'cases', docId);
       const caseSnapshot = await getDoc(caseRef);
-      const caseData = caseSnapshot.data();
-
-      if (!caseData) {
+      
+      if (!caseSnapshot.exists()) {
         throw new Error('找不到該案件')
       }
+      
+      const caseData = caseSnapshot.data();
+      console.log('找到案件資料:', caseData)
 
+      // 更新案件狀態
       await updateDoc(caseRef, {
-        pending: 'approved'
+        pending: 'approved',
+        approvedAt: new Date().toISOString()
       });
 
-      // Add approved case to approvedCases collection
-      await addDoc(collection(db, 'approvedCases'), {
+      console.log('案件狀態已更新為 approved')
+
+      // 將審核通過的案件加入 approvedCases 集合
+      const approvedCaseData = {
+        caseId: docId,
         caseNumber: caseData.caseNumber,
         subject: caseData.subject,
         grade: caseData.grade,
@@ -261,39 +348,89 @@ export default function AdminPage() {
         status: caseData.status,
         region: caseData.region,
         approvedAt: new Date().toISOString()
-      });
-      
+      }
+
+      await addDoc(collection(db, 'approvedCases'), approvedCaseData);
+      console.log('已加入 approvedCases 集合')
 
       toast.success('案件已通過審核')
-      fetchPendingData()
+      await fetchPendingData()
     } catch (error) {
       console.error('Error approving case:', error)
-      toast.error('審核失敗')
+      toast.error(`審核失敗：${error instanceof Error ? error.message : '未知錯誤'}`)
+    } finally {
+      setProcessing(false)
     }
   }
 
   // 處理案件拒絕
-  const handleCaseReject = async (id: string) => {
+  const handleCaseReject = async (docId: string) => {
+    if (processing) return
+    setProcessing(true)
+    
     try {
-      const caseRef = doc(db, 'cases', id);
+      console.log('開始拒絕案件，文檔 ID:', docId)
+      
+      if (!docId) {
+        throw new Error('案件ID無效')
+      }
 
-      // 刪除 storage 中的照片
-      if (caseRef) {
-        const caseSnapshot = await getDoc(caseRef);
-        const caseData = caseSnapshot.data();
-        if (caseData?.idCardUrl) {
-          const imageRef = ref(storage, caseData.idCardUrl);
-          await deleteObject(imageRef);
+      // 直接使用文檔 ID 獲取案件
+      const caseRef = doc(db, 'cases', docId);
+      const caseSnapshot = await getDoc(caseRef);
+      
+      if (!caseSnapshot.exists()) {
+        throw new Error('找不到該案件')
+      }
+      
+      const caseData = caseSnapshot.data();
+      console.log('找到案件資料:', caseData)
+
+      // 刪除 storage 中的身分證照片
+      if (caseData.idCardUrl) {
+        try {
+          console.log('刪除身分證照片:', caseData.idCardUrl)
+          
+          // 從 URL 中提取檔案路徑
+          const getStoragePath = (url: string) => {
+            try {
+              // 如果是 gs:// URL
+              if (url.startsWith('gs://')) {
+                return url.replace(/^gs:\/\/[^\/]+\//, '')
+              }
+              // 如果是 https:// URL，需要解析
+              const urlObj = new URL(url)
+              const pathMatch = urlObj.pathname.match(/\/v0\/b\/[^\/]+\/o\/(.+)/)
+              return pathMatch ? decodeURIComponent(pathMatch[1]) : null
+            } catch (error) {
+              console.error('解析 URL 失敗:', error)
+              return null
+            }
+          }
+
+          const storagePath = getStoragePath(caseData.idCardUrl)
+          if (storagePath) {
+            const imageRef = ref(storage, storagePath)
+            await deleteObject(imageRef)
+            console.log('身分證照片已刪除')
+          }
+        } catch (error) {
+          console.error('刪除身分證照片失敗:', error)
+          // 繼續執行，即使照片刪除失敗
         }
       }
 
+      // 刪除案件文檔
       await deleteDoc(caseRef);
+      console.log('案件文檔已刪除')
       
       toast.success('已拒絕案件')
-      fetchPendingData()
+      await fetchPendingData()
     } catch (error) {
-      console.error('操作失敗: ', error)
-      toast.error('操作失敗')
+      console.error('拒絕案件失敗:', error)
+      toast.error(`操作失敗：${error instanceof Error ? error.message : '未知錯誤'}`)
+    } finally {
+      setProcessing(false)
     }
   }
 
@@ -373,14 +510,22 @@ export default function AdminPage() {
                   <div className="mt-2 flex gap-2">
                     <Button 
                       variant="destructive" 
-                      onClick={() => handleTutorReject(tutor.id.toString())}
+                      onClick={() => {
+                        console.log('點擊拒絕教師按鈕，教師 ID:', tutor.id, '文檔 ID:', tutor.docId)
+                        handleTutorReject(tutor.docId) // 使用 docId
+                      }}
+                      disabled={processing}
                     >
-                      不通過
+                      {processing ? '處理中...' : '不通過'}
                     </Button>
                     <Button 
-                      onClick={() => handleTutorApprove(tutor.id.toString())}
+                      onClick={() => {
+                        console.log('點擊通過教師按鈕，教師 ID:', tutor.id, '文檔 ID:', tutor.docId)
+                        handleTutorApprove(tutor.docId) // 使用 docId
+                      }}
+                      disabled={processing}
                     >
-                      通過審核
+                      {processing ? '處理中...' : '通過審核'}
                     </Button>
                   </div>
                 </div>
@@ -392,47 +537,67 @@ export default function AdminPage() {
         <TabsContent value="cases">
           <Card>
             <CardHeader>
-              <CardTitle>待審核案件列表</CardTitle>
+              <CardTitle>
+                待審核案件列表 
+                <span className="text-sm font-normal text-gray-500 ml-2">
+                  (共 {pendingCases.length} 件)
+                </span>
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              {pendingCases.map((case_) => (
-                <div key={case_.id} className="border p-4 rounded mb-4">
-                  <h3 className="font-bold">案件編號：{case_.caseNumber}</h3>
-                  <div className="grid grid-cols-2 gap-4 my-2">
-                    <p>家長：{case_.parentName}</p>
-                    <p>電話：{case_.parentPhone}</p>
-                    <p>科目：{case_.subject}</p>
-                    <p>時薪：${case_.hourlyFee}</p>
-                  </div>
-                  <p>地點：{case_.location}</p>
-                  <p>時段：{case_.availableTime}</p>
-                  {case_.idCardUrl && (
-                    <div className="mt-4">
-                      <h4 className="font-semibold mb-2">身分證照片</h4>
-                      <Image
-                        src={case_.idCardUrl} 
-                        alt="身分證" 
-                        width={500}
-                        height={300}
-                        className="w-full rounded-lg shadow-md"
-                      />
+              {pendingCases.length === 0 ? (
+                <p className="text-center text-gray-500 py-8">目前沒有待審核的案件</p>
+              ) : (
+                pendingCases.map((case_) => (
+                  <div key={case_.id} className="border p-4 rounded mb-4">
+                    <h3 className="font-bold">案件編號：{case_.caseNumber}</h3>
+                    <div className="text-xs text-gray-500 mb-2">
+                      文檔 ID: {case_.docId} | 自定義 ID: {case_.id || '無'}
                     </div>
-                  )}
-                  <div className="mt-4 flex gap-2">
-                    <Button 
-                      variant="destructive" 
-                      onClick={() => handleCaseReject(case_.id)}
-                    >
-                      不通過
-                    </Button>
-                    <Button 
-                      onClick={() => handleCaseApprove(case_.id)}
-                    >
-                      通過審核
-                    </Button>
+                    <div className="grid grid-cols-2 gap-4 my-2">
+                      <p>家長：{case_.parentName}</p>
+                      <p>電話：{case_.parentPhone}</p>
+                      <p>科目：{case_.subject}</p>
+                      <p>時薪：${case_.hourlyFee}</p>
+                    </div>
+                    <p>地點：{case_.location}</p>
+                    <p>時段：{case_.availableTime}</p>
+                    {case_.idCardUrl && (
+                      <div className="mt-4">
+                        <h4 className="font-semibold mb-2">身分證照片</h4>
+                        <Image
+                          src={case_.idCardUrl} 
+                          alt="身分證" 
+                          width={500}
+                          height={300}
+                          className="w-full rounded-lg shadow-md"
+                        />
+                      </div>
+                    )}
+                    <div className="mt-4 flex gap-2">
+                      <Button 
+                        variant="destructive" 
+                        onClick={() => {
+                          console.log('點擊拒絕按鈕，案件 ID:', case_.id, '文檔 ID:', case_.docId)
+                          handleCaseReject(case_.docId) // 使用 docId 而不是 id
+                        }}
+                        disabled={processing}
+                      >
+                        {processing ? '處理中...' : '不通過'}
+                      </Button>
+                      <Button 
+                        onClick={() => {
+                          console.log('點擊通過按鈕，案件 ID:', case_.id, '文檔 ID:', case_.docId)
+                          handleCaseApprove(case_.docId) // 使用 docId 而不是 id
+                        }}
+                        disabled={processing}
+                      >
+                        {processing ? '處理中...' : '通過審核'}
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </CardContent>
           </Card>
         </TabsContent>

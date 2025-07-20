@@ -14,13 +14,14 @@ import {
 } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getAuth } from "firebase/auth";
+
 // Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: "tutor-matching-5c608.firebaseapp.com",
-  projectId: "tutor-matching-5c608",
-  storageBucket: "tutor-matching-5c608.appspot.com",
-  messagingSenderId: "645473434432",
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "tutor-matching-5c608.firebaseapp.com",
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "tutor-matching-5c608",
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "tutor-matching-5c608.appspot.com",
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "645473434432",
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
 

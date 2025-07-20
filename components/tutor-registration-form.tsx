@@ -12,6 +12,9 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "@/server/config/firebase";
 import { addWatermark } from "@/lib/imageUtils";
 import Image from 'next/image'
+import { XCircle, AlertCircle, Loader2, GraduationCap, Clock, ArrowRight, UserCheck } from 'lucide-react'
+import { useRouter } from "next/navigation";
+
 // 定義表單驗證規則
 const formSchema = z.object({
   name: z.string().min(2, { message: "姓名至少需要2個字" }),
@@ -29,6 +32,9 @@ const formSchema = z.object({
 
 export default function TutorRegistrationForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const [submitMessage, setSubmitMessage] = useState('')
+  const [tutorCode, setTutorCode] = useState('')
   const [previews, setPreviews] = useState({
     studentIdCard: '',
     idCard: ''
@@ -47,6 +53,8 @@ export default function TutorRegistrationForm() {
     },
   })
 
+  const router = useRouter();
+
   const handleImagePreview = async (
     file: File, 
     type: 'studentIdCard' | 'idCard'
@@ -59,6 +67,11 @@ export default function TutorRegistrationForm() {
         ...prev,
         [type]: previewUrl
       }))
+      
+      // 重置提交狀態
+      if (submitStatus !== 'idle') {
+        setSubmitStatus('idle')
+      }
     } catch (error) {
       console.error('預覽圖片失敗:', error)
       toast.error('預覽圖片失敗')
@@ -68,6 +81,7 @@ export default function TutorRegistrationForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
       setIsSubmitting(true)
+      setSubmitStatus('idle')
       
       // 處理圖片上傳
       const uploadImages = async () => {
@@ -76,14 +90,14 @@ export default function TutorRegistrationForm() {
           idCard: ''
         };
         
-        if (values.studentIdCard[0]) {
+        if (values.studentIdCard && values.studentIdCard[0]) {
           const watermarkedStudentId = await addWatermark(values.studentIdCard[0]);
           const studentIdRef = ref(storage, `tutors/student-ids/${Date.now()}-${values.studentIdCard[0].name}`);
           await uploadBytes(studentIdRef, watermarkedStudentId);
           imageUrls.studentIdCard = await getDownloadURL(studentIdRef);
         }
         
-        if (values.idCard[0]) {
+        if (values.idCard && values.idCard[0]) {
           const watermarkedId = await addWatermark(values.idCard[0]);
           const idRef = ref(storage, `tutors/id-cards/${Date.now()}-${values.idCard[0].name}`);
           await uploadBytes(idRef, watermarkedId);
@@ -93,7 +107,25 @@ export default function TutorRegistrationForm() {
         return imageUrls;
       };
 
+      console.log('開始上傳圖片...')
       const imageUrls = await uploadImages();
+      console.log('圖片上傳完成:', imageUrls)
+      
+      const generatedTutorCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+      
+      // 準備提交資料
+      const submitData = {
+        ...values,
+        studentIdCardUrl: imageUrls.studentIdCard,
+        idCardUrl: imageUrls.idCard,
+        tutorCode: generatedTutorCode,
+        isActive: false,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        subjects: values.subjects.split(' ').map(s => s.trim()),
+      }
+
+      console.log('準備提交資料:', submitData)
       
       // 提交表單資料
       const response = await fetch('/api/tutors/pending', {
@@ -101,33 +133,25 @@ export default function TutorRegistrationForm() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          ...values,
-          studentIdCardUrl: imageUrls.studentIdCard,
-          idCardUrl: imageUrls.idCard,
-          tutorCode: Math.random().toString(36).substring(2, 8).toUpperCase(),
-          isActive: false,
-          status: 'pending',
-          createdAt: new Date().toISOString(),
-          subjects: values.subjects.split(' ').map(s => s.trim()),
-        }),
+        body: JSON.stringify(submitData),
       });
       
       const data = await response.json()
-      console.log('Response:', data)
+      console.log('API Response:', data)
 
-      if (!response.ok) throw new Error('提交失敗')
+      if (!response.ok) {
+        throw new Error(data.error || data.details || '提交失敗')
+      }
 
-      toast.success("註冊成功！請等待管理員審核")
-      form.reset()
-      // 清空預覽圖片
-      setPreviews({
-        studentIdCard: '',
-        idCard: ''
-      })
+      // 成功狀態
+      setSubmitStatus('success')
+      setTutorCode(generatedTutorCode)
+      setSubmitMessage(`您的教師編號是 ${generatedTutorCode}，請妥善保存。我們會在 1-2 個工作天內完成審核。`)
+
     } catch (error) {
-      toast.error("提交失敗，請稍後再試")
-      console.error('Error:', error)
+      console.error('提交失敗:', error)
+      setSubmitStatus('error')
+      setSubmitMessage(error instanceof Error ? error.message : '提交失敗，請稍後再試')
     } finally {
       setIsSubmitting(false)
     }
@@ -139,6 +163,135 @@ export default function TutorRegistrationForm() {
       URL.revokeObjectURL(previews.idCard)
     }
   }, [previews])
+
+  // 監聽表單變化，重置提交狀態
+  useEffect(() => {
+    const subscription = form.watch(() => {
+      if (submitStatus !== 'idle') {
+        setSubmitStatus('idle')
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [form, submitStatus])
+
+  // 處理重置表單
+  const handleReset = () => {
+    form.reset()
+    setPreviews({
+      studentIdCard: '',
+      idCard: ''
+    })
+    setSubmitStatus('idle')
+  }
+
+  // 如果提交成功，顯示成功頁面
+  if (submitStatus === 'success') {
+    return (
+      <div className="min-h-[600px] flex items-center justify-center p-4">
+        <div className="max-w-md mx-auto text-center">
+          <div className="animate-bounce mb-6">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-4">
+              <UserCheck className="w-12 h-12 text-green-600" />
+            </div>
+          </div>
+          
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            註冊成功！
+          </h2>
+          
+          <div className="bg-green-50 border border-green-200 rounded-xl p-6 mb-6">
+            <div className="flex items-start space-x-3">
+              <GraduationCap className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+              <div className="text-left">
+                <p className="text-green-800 font-medium mb-2">歡迎加入我們的教師團隊</p>
+                <p className="text-green-700 text-sm leading-relaxed">
+                  {submitMessage}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+            <div className="text-center">
+              <p className="text-blue-800 font-semibold mb-2">您的教師編號</p>
+              <div className="bg-white border border-blue-200 rounded-lg px-4 py-3">
+                <span className="text-2xl font-mono font-bold text-blue-600 tracking-wider">
+                  {tutorCode}
+                </span>
+              </div>
+              <p className="text-blue-600 text-xs mt-2">請截圖保存此編號</p>
+            </div>
+          </div>
+
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+            <div className="flex items-center justify-center space-x-2 text-amber-700">
+              <Clock className="w-4 h-4" />
+              <span className="text-sm font-medium">預計審核時間：1-2 個工作天</span>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <Button 
+              onClick={handleReset}
+              className="w-full bg-brand-500 hover:bg-brand-600 text-white"
+            >
+              <ArrowRight className="w-4 h-4 mr-2" />
+              註冊新教師
+            </Button>
+            
+            <Button 
+              onClick={() => router.push('/')}
+              variant="outline"
+              className="w-full"
+            >
+              返回首頁
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // 如果提交失敗，顯示錯誤狀態
+  if (submitStatus === 'error') {
+    return (
+      <div className="min-h-[600px] flex items-center justify-center p-4">
+        <div className="max-w-md mx-auto text-center">
+          <div className="animate-pulse mb-6">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-red-100 rounded-full mb-4">
+              <XCircle className="w-12 h-12 text-red-600" />
+            </div>
+          </div>
+          
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            註冊失敗
+          </h2>
+          
+          <div className="bg-red-50 border border-red-200 rounded-xl p-6 mb-6">
+            <div className="flex items-start space-x-3">
+              <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+              <div className="text-left">
+                <p className="text-red-800 font-medium mb-2">註冊過程中發生錯誤</p>
+                <p className="text-red-700 text-sm leading-relaxed">
+                  {submitMessage}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <Button 
+              onClick={() => setSubmitStatus('idle')}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <ArrowRight className="w-4 h-4 mr-2" />
+              重新填寫表單
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <Form {...form}>
@@ -320,7 +473,14 @@ export default function TutorRegistrationForm() {
         </div>
 
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "提交中..." : "提交"}
+          {isSubmitting ? (
+            <div className="flex items-center justify-center">
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+              提交中...
+            </div>
+          ) : (
+            '提交'
+          )}
         </Button>
       </form>
     </Form>

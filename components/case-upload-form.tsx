@@ -8,14 +8,17 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, storage } from "@/server/config/firebase";
+import { storage } from "@/server/config/firebase";
 import { addWatermark } from "@/lib/imageUtils";
 import { toast } from "sonner"
-import { collection, addDoc} from 'firebase/firestore'
 import Image from 'next/image'
+import { CheckCircle, XCircle, AlertCircle, Loader2, FileText, Clock, ArrowRight } from 'lucide-react'
+
 export default function CaseUploadForm() {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const [submitMessage, setSubmitMessage] = useState('')
   const [preview, setPreview] = useState('')
   const [formData, setFormData] = useState({
     parentName: '',
@@ -43,10 +46,18 @@ export default function CaseUploadForm() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
     setFormData(prevState => ({ ...prevState, [name]: value }))
+    // 重置提交狀態當用戶開始編輯
+    if (submitStatus !== 'idle') {
+      setSubmitStatus('idle')
+    }
   }
 
   const handleSelectChange = (name: string, value: string) => {
     setFormData(prevState => ({ ...prevState, [name]: value }))
+    // 重置提交狀態當用戶開始編輯
+    if (submitStatus !== 'idle') {
+      setSubmitStatus('idle')
+    }
   }
 
   // 處理身分證預覽
@@ -59,6 +70,10 @@ export default function CaseUploadForm() {
         const previewUrl = URL.createObjectURL(watermarkedBlob)
         setPreview(previewUrl)
         setFormData(prev => ({ ...prev, idCard: file }))
+        // 重置提交狀態
+        if (submitStatus !== 'idle') {
+          setSubmitStatus('idle')
+        }
       } catch (error) {
         console.error('預覽圖片失敗:', error)
         toast.error('預覽圖片失敗')
@@ -69,6 +84,7 @@ export default function CaseUploadForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
+    setSubmitStatus('idle')
     
     try {
       let idCardUrl = ''
@@ -108,10 +124,26 @@ export default function CaseUploadForm() {
         createdAt: new Date().toISOString(),
       }
 
-      const casesRef = collection(db, 'cases')
-      const docRef = await addDoc(casesRef, caseData)
-      console.log('Case uploaded with ID:', docRef.id)
+      // 使用 API 路由提交資料
+      const response = await fetch('/api/cases/upload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(caseData),
+      })
 
+      const result = await response.json()
+      console.log('API Response:', result)
+
+      if (!response.ok) {
+        throw new Error(result.error || '提交失敗')
+      }
+
+      // 成功狀態
+      setSubmitStatus('success')
+      setSubmitMessage(`案件已成功提交！審核時間約需1-2天，請耐心等候。`)
+      
       // 清空表單資料
       setFormData({
         parentName: '',
@@ -137,12 +169,10 @@ export default function CaseUploadForm() {
       })
       setPreview('')
 
-      // 使用原生 alert
-      alert('需求已成功送出！案件審核時間大約需要1-2天，請耐心等候。')
-      router.push('/case-upload')
     } catch (error) {
       console.error('送出需求時發生錯誤:', error)
-      alert('送出需求失敗，請重試。')
+      setSubmitStatus('error')
+      setSubmitMessage(error instanceof Error ? error.message : '提交失敗，請重試')
     } finally {
       setIsSubmitting(false)
     }
@@ -156,6 +186,111 @@ export default function CaseUploadForm() {
       }
     }
   }, [preview])
+
+  // 如果提交成功，顯示成功頁面
+  if (submitStatus === 'success') {
+    return (
+      <div className="min-h-[600px] flex items-center justify-center p-4">
+        <div className="max-w-md mx-auto text-center">
+          <div className="animate-bounce mb-6">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-4">
+              <CheckCircle className="w-12 h-12 text-green-600" />
+            </div>
+          </div>
+          
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            提交成功！
+          </h2>
+          
+          <div className="bg-green-50 border border-green-200 rounded-xl p-6 mb-6">
+            <div className="flex items-start space-x-3">
+              <FileText className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+              <div className="text-left">
+                <p className="text-green-800 font-medium mb-2">您的需求已成功送出</p>
+                <p className="text-green-700 text-sm leading-relaxed">
+                  {submitMessage}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+            <div className="flex items-center justify-center space-x-2 text-blue-700">
+              <Clock className="w-4 h-4" />
+              <span className="text-sm font-medium">預計審核時間：1-2 個工作天</span>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <Button 
+              onClick={() => router.push('/case-upload')}
+              className="w-full bg-brand-500 hover:bg-brand-600 text-white"
+            >
+              <ArrowRight className="w-4 h-4 mr-2" />
+              返回首頁
+            </Button>
+            
+            <Button 
+              onClick={() => setSubmitStatus('idle')}
+              variant="outline"
+              className="w-full"
+            >
+              繼續提交新案件
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // 如果提交失敗，顯示錯誤狀態
+  if (submitStatus === 'error') {
+    return (
+      <div className="min-h-[600px] flex items-center justify-center p-4">
+        <div className="max-w-md mx-auto text-center">
+          <div className="animate-pulse mb-6">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-red-100 rounded-full mb-4">
+              <XCircle className="w-12 h-12 text-red-600" />
+            </div>
+          </div>
+          
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            提交失敗
+          </h2>
+          
+          <div className="bg-red-50 border border-red-200 rounded-xl p-6 mb-6">
+            <div className="flex items-start space-x-3">
+              <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+              <div className="text-left">
+                <p className="text-red-800 font-medium mb-2">提交過程中發生錯誤</p>
+                <p className="text-red-700 text-sm leading-relaxed">
+                  {submitMessage}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <Button 
+              onClick={() => setSubmitStatus('idle')}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <ArrowRight className="w-4 h-4 mr-2" />
+              重新填寫表單
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              onClick={() => router.push('/case-upload')}
+              className="w-full"
+            >
+              返回首頁
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -414,7 +549,14 @@ export default function CaseUploadForm() {
       </div>
 
       <Button type="submit" disabled={isSubmitting}>
-        {isSubmitting ? "提交中..." : "送出需求"}
+        {isSubmitting ? (
+          <div className="flex items-center justify-center">
+            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+            提交中...
+          </div>
+        ) : (
+          '送出需求'
+        )}
       </Button>
     </form>
   )

@@ -1,5 +1,6 @@
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
 
 // 檢查是否已經初始化
 const apps = getApps();
@@ -18,9 +19,11 @@ if (!apps.length) {
       projectId: process.env.NEXT_PUBLIC_FIREBASE_ADMIN_PROJECT_ID,
       clientEmail: process.env.NEXT_PUBLIC_FIREBASE_ADMIN_CLIENT_EMAIL,
       privateKey: process.env.NEXT_PUBLIC_FIREBASE_ADMIN_PRIVATE_KEY.replace(/\\n/g, '\n')
-    })
+    }),
+    storageBucket: `${process.env.NEXT_PUBLIC_FIREBASE_ADMIN_PROJECT_ID}.appspot.com`,
   });
 }
 
 // 導出 Firestore 實例
-export const adminDb = getFirestore(); 
+export const adminDb = getFirestore();
+export const adminStorage = getStorage(); 

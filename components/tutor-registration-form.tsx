@@ -8,8 +8,6 @@ import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "@/server/config/firebase";
 import { addWatermark } from "@/lib/imageUtils";
 import Image from 'next/image'
 import { XCircle, AlertCircle, Loader2, GraduationCap, Clock, ArrowRight, UserCheck } from 'lucide-react'
@@ -78,6 +76,27 @@ export default function TutorRegistrationForm() {
     }
   }
 
+  // 上傳圖片到 API
+  const uploadImage = async (file: File, folder: string, subfolder: string): Promise<string> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('folder', folder)
+    formData.append('subfolder', subfolder)
+
+    const response = await fetch('/api/upload-image', {
+      method: 'POST',
+      body: formData,
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || '圖片上傳失敗')
+    }
+
+    const result = await response.json()
+    return result.url
+  }
+
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
       setIsSubmitting(true)
@@ -91,17 +110,15 @@ export default function TutorRegistrationForm() {
         };
         
         if (values.studentIdCard && values.studentIdCard[0]) {
-          const watermarkedStudentId = await addWatermark(values.studentIdCard[0]);
-          const studentIdRef = ref(storage, `tutors/student-ids/${Date.now()}-${values.studentIdCard[0].name}`);
-          await uploadBytes(studentIdRef, watermarkedStudentId);
-          imageUrls.studentIdCard = await getDownloadURL(studentIdRef);
+          console.log('開始上傳學生證...')
+          imageUrls.studentIdCard = await uploadImage(values.studentIdCard[0], 'tutors', 'student-ids')
+          console.log('學生證上傳完成:', imageUrls.studentIdCard)
         }
         
         if (values.idCard && values.idCard[0]) {
-          const watermarkedId = await addWatermark(values.idCard[0]);
-          const idRef = ref(storage, `tutors/id-cards/${Date.now()}-${values.idCard[0].name}`);
-          await uploadBytes(idRef, watermarkedId);
-          imageUrls.idCard = await getDownloadURL(idRef);
+          console.log('開始上傳身分證...')
+          imageUrls.idCard = await uploadImage(values.idCard[0], 'tutors', 'id-cards')
+          console.log('身分證上傳完成:', imageUrls.idCard)
         }
         
         return imageUrls;

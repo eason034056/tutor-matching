@@ -7,8 +7,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "@/server/config/firebase";
 import { addWatermark } from "@/lib/imageUtils";
 import { toast } from "sonner"
 import Image from 'next/image'
@@ -81,6 +79,27 @@ export default function CaseUploadForm() {
     }
   }
 
+  // 上傳圖片到 API
+  const uploadImage = async (file: File, folder: string, subfolder: string): Promise<string> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('folder', folder)
+    formData.append('subfolder', subfolder)
+
+    const response = await fetch('/api/upload-image', {
+      method: 'POST',
+      body: formData,
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || '圖片上傳失敗')
+    }
+
+    const result = await response.json()
+    return result.url
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
@@ -91,10 +110,9 @@ export default function CaseUploadForm() {
       
       // 上傳身分證照片
       if (formData.idCard) {
-        const watermarkedId = await addWatermark(formData.idCard)
-        const idRef = ref(storage, `cases/id-cards/${Date.now()}-${formData.idCard.name}`)
-        await uploadBytes(idRef, watermarkedId)
-        idCardUrl = await getDownloadURL(idRef)
+        console.log('開始上傳身分證照片...')
+        idCardUrl = await uploadImage(formData.idCard, 'cases', 'id-cards')
+        console.log('身分證照片上傳完成:', idCardUrl)
       }
 
       const caseNumber = 'C' + Math.random().toString(36).substring(2, 8).toUpperCase()

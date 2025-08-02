@@ -11,6 +11,7 @@ import { addWatermark } from "@/lib/imageUtils";
 import { toast } from "sonner"
 import Image from 'next/image'
 import { CheckCircle, XCircle, AlertCircle, Loader2, FileText, Clock, ArrowRight } from 'lucide-react'
+import { sendWebhookNotification } from "@/webhook-config"
 
 export default function CaseUploadForm() {
   const router = useRouter()
@@ -161,6 +162,9 @@ export default function CaseUploadForm() {
       // 成功狀態
       setSubmitStatus('success')
       setSubmitMessage(`案件已成功提交！審核時間約需1-2天，請耐心等候。`)
+      
+      // 觸發 n8n webhook 發送管理員通知
+      await sendWebhookNotification('new_case', caseData)
       
       // 清空表單資料
       setFormData({

@@ -1,6 +1,7 @@
 export interface Tutor {
     id: string;
     name: string;
+    email: string;
     phoneNumber: string;
     subjects: string[];
     experience: string;
@@ -21,6 +22,7 @@ export interface ApprovedTutor {
     expertise: string;
     major: string;
     name: string;
+    email: string;
     school: string;
     approvedAt: string;
 }

@@ -12,10 +12,12 @@ import { addWatermark } from "@/lib/imageUtils";
 import Image from 'next/image'
 import { XCircle, AlertCircle, Loader2, GraduationCap, Clock, ArrowRight, UserCheck } from 'lucide-react'
 import { useRouter } from "next/navigation";
+import { sendWebhookNotification } from "@/webhook-config";
 
 // 定義表單驗證規則
 const formSchema = z.object({
   name: z.string().min(2, { message: "姓名至少需要2個字" }),
+  email: z.string().email({ message: "請輸入有效的電子郵件" }),
   phoneNumber: z.string().min(10, { message: "請輸入有效的電話號碼" }),
   subjects: z.string().min(1, { message: "請輸入教學科目" }),
   experience: z.string().min(1, { message: "請輸入教學經驗" }),
@@ -42,6 +44,7 @@ export default function TutorRegistrationForm() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
+      email: "",
       phoneNumber: "",
       subjects: "",
       experience: "",
@@ -165,6 +168,9 @@ export default function TutorRegistrationForm() {
       setTutorCode(generatedTutorCode)
       setSubmitMessage(`您的教師編號是 ${generatedTutorCode}，請妥善保存。我們會在 1-2 個工作天內完成審核。`)
 
+      // 觸發 n8n webhook 發送管理員通知
+      await sendWebhookNotification('new_tutor', submitData)
+
     } catch (error) {
       console.error('提交失敗:', error)
       setSubmitStatus('error')
@@ -180,16 +186,6 @@ export default function TutorRegistrationForm() {
       URL.revokeObjectURL(previews.idCard)
     }
   }, [previews])
-
-  // 監聽表單變化，重置提交狀態
-  useEffect(() => {
-    const subscription = form.watch(() => {
-      if (submitStatus !== 'idle') {
-        setSubmitStatus('idle')
-      }
-    })
-    return () => subscription.unsubscribe()
-  }, [form, submitStatus])
 
   // 處理重置表單
   const handleReset = () => {
@@ -327,6 +323,20 @@ export default function TutorRegistrationForm() {
           )}
         />
         
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>電子郵件</FormLabel>
+              <FormControl>
+                <Input {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
         <FormField
           control={form.control}
           name="phoneNumber"

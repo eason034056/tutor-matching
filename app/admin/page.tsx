@@ -219,6 +219,7 @@ export default function AdminPage() {
         expertise: tutorData.expertise,
         major: tutorData.major,
         name: tutorData.name,
+        email: tutorData.email,
         school: tutorData.school,
         approvedAt: new Date().toISOString()
       });
@@ -501,6 +502,7 @@ export default function AdminPage() {
                 <div key={tutor.id} className="border p-4 rounded mb-4">
                   <h3 className="font-bold">{tutor.name}</h3>
                   <p>電話：{tutor.phoneNumber}</p>
+                  <p>電子郵件：{tutor.email}</p>
                   <p>科目：{tutor.subjects.join(', ')}</p>
                   <p>經驗：{tutor.experience}</p>
                   <p>學校：{tutor.school}</p>

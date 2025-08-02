@@ -73,16 +73,37 @@ export default function AdminPage() {
 
   // 監聽使用者登入狀態
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user)
-      setLoading(false)
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        fetchPendingData()
+        try {
+          // 檢查是否為管理員
+          const adminRef = collection(db, 'admins');
+          const q = query(adminRef, where('email', '==', user.email));
+          const querySnapshot = await getDocs(q);
+          
+          if (querySnapshot.empty) {
+            // 如果不是管理員，強制登出
+            await signOut(auth);
+            toast.error('您沒有管理員權限');
+            setUser(null);
+          } else {
+            setUser(user);
+            fetchPendingData();
+          }
+        } catch (error) {
+          console.error('檢查管理員權限時發生錯誤:', error);
+          toast.error('檢查權限時發生錯誤');
+          await signOut(auth);
+          setUser(null);
+        }
+      } else {
+        setUser(null);
       }
-    })
+      setLoading(false);
+    });
 
-    return () => unsubscribe()
-  }, [])
+    return () => unsubscribe();
+  }, []);
 
   // 自動登出計時器
   useEffect(() => {

@@ -12,6 +12,8 @@ import { toast } from "sonner"
 import Image from 'next/image'
 import { CheckCircle, XCircle, AlertCircle, Loader2, FileText, Clock, ArrowRight } from 'lucide-react'
 import { sendWebhookNotification } from "@/webhook-config"
+import TermsDialog from "@/components/TermsDialog"
+import { Checkbox } from "@/components/ui/checkbox"
 
 export default function CaseUploadForm() {
   const router = useRouter()
@@ -19,6 +21,9 @@ export default function CaseUploadForm() {
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [submitMessage, setSubmitMessage] = useState('')
   const [preview, setPreview] = useState('')
+  // 追蹤用戶是否同意服務條款
+  const [hasAgreedToTerms, setHasAgreedToTerms] = useState(false)
+  
   const [formData, setFormData] = useState({
     parentName: '',
     parentPhone: '',
@@ -103,6 +108,13 @@ export default function CaseUploadForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // 檢查是否同意服務條款
+    if (!hasAgreedToTerms) {
+      toast.error('請先閱讀並同意服務條款')
+      return
+    }
+    
     setIsSubmitting(true)
     setSubmitStatus('idle')
     
@@ -190,6 +202,7 @@ export default function CaseUploadForm() {
         idCardUrl: '',
       })
       setPreview('')
+      setHasAgreedToTerms(false) // 重置條款同意狀態
 
     } catch (error) {
       console.error('送出需求時發生錯誤:', error)
@@ -572,14 +585,53 @@ export default function CaseUploadForm() {
         </div>
       </div>
 
-      <Button type="submit" disabled={isSubmitting}>
+      {/* 服務條款同意區域 */}
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">服務條款</h2>
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <div className="flex items-start space-x-3">
+            <div className="pt-1">
+              <Checkbox
+                id="terms-agreement"
+                checked={hasAgreedToTerms}
+                onCheckedChange={(checked) => setHasAgreedToTerms(!!checked)}
+              />
+            </div>
+            <div className="flex-1">
+              <Label htmlFor="terms-agreement" className="text-sm font-medium cursor-pointer">
+                我已閱讀並同意
+              </Label>
+              <div className="mt-2">
+                <TermsDialog onAgree={() => setHasAgreedToTerms(true)}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    查看服務條款
+                  </Button>
+                </TermsDialog>
+              </div>
+              <p className="text-xs text-amber-700 mt-2">
+                ⚠️ 提交前請先閱讀並同意我們的服務條款
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <Button type="submit" disabled={isSubmitting || !hasAgreedToTerms}>
         {isSubmitting ? (
           <div className="flex items-center justify-center">
             <Loader2 className="w-5 h-5 mr-2 animate-spin" />
             提交中...
           </div>
-        ) : (
+        ) : hasAgreedToTerms ? (
           '送出需求'
+        ) : (
+          '請先同意服務條款'
         )}
       </Button>
     </form>

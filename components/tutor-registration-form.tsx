@@ -11,9 +11,10 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
 import { addWatermark } from "@/lib/imageUtils";
 import Image from 'next/image'
-import { XCircle, AlertCircle, Loader2, GraduationCap, Clock, ArrowRight, UserCheck } from 'lucide-react'
+import { XCircle, AlertCircle, Loader2, GraduationCap, Clock, ArrowRight, UserCheck, FileText } from 'lucide-react'
 import { useRouter } from "next/navigation";
 import { sendWebhookNotification } from "@/webhook-config";
+import TermsDialog from "@/components/TermsDialog"
 
 // 定義表單驗證規則
 const formSchema = z.object({
@@ -26,6 +27,9 @@ const formSchema = z.object({
   major: z.string().min(1, { message: "請輸入主修科系" }),
   expertise: z.string().min(1, { message: "請輸入專長" }),
   receiveNewCaseNotifications: z.boolean().default(true),
+  agreedToTerms: z.boolean().refine((val) => val === true, {
+    message: "請閱讀並同意服務條款"
+  }),
   studentIdCard: z.any()
     .refine((files) => !files || files instanceof FileList, "請上傳學生證照片"),
   idCard: z.any()
@@ -54,6 +58,7 @@ export default function TutorRegistrationForm() {
       major: "",
       expertise: "",
       receiveNewCaseNotifications: true,
+      agreedToTerms: false,
     },
   })
 
@@ -192,7 +197,18 @@ export default function TutorRegistrationForm() {
 
   // 處理重置表單
   const handleReset = () => {
-    form.reset()
+    form.reset({
+      name: "",
+      email: "",
+      phoneNumber: "",
+      subjects: "",
+      experience: "",
+      school: "",
+      major: "",
+      expertise: "",
+      receiveNewCaseNotifications: true,
+      agreedToTerms: false, // 重置條款同意狀態
+    })
     setPreviews({
       studentIdCard: '',
       idCard: ''
@@ -524,6 +540,47 @@ export default function TutorRegistrationForm() {
             )}
           />
         </div>
+
+        <FormField
+          control={form.control}
+          name="agreedToTerms"
+          render={({ field }) => (
+            <FormItem className="space-y-4">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <div className="flex items-start space-x-3">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <div className="flex-1">
+                    <FormLabel className="text-sm font-medium cursor-pointer">
+                      我已閱讀並同意服務條款 *
+                    </FormLabel>
+                    <div className="mt-2">
+                      <TermsDialog onAgree={() => form.setValue('agreedToTerms', true)}>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                        >
+                          <FileText className="w-4 h-4 mr-2" />
+                          查看服務條款
+                        </Button>
+                      </TermsDialog>
+                    </div>
+                    <p className="text-xs text-amber-700 mt-2">
+                      ⚠️ 註冊前請先閱讀並同意我們的服務條款
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? (

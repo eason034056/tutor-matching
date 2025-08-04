@@ -74,6 +74,11 @@ export default function Footer() {
                   費用參考
                 </Link>
               </li>
+              <li>
+                <Link href="/terms" className="text-neutral-600 hover:text-brand-700 transition-colors">
+                  服務條款
+                </Link>
+              </li>
             </ul>
           </div>
         </div>

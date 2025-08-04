@@ -45,9 +45,11 @@ export async function POST(
         expertise: tutorData.expertise,
         major: tutorData.major,
         name: tutorData.name,
+        email: tutorData.email,
         school: tutorData.school,
         subjects: tutorData.subjects,
-        approvedAt: new Date().toISOString()
+        approvedAt: new Date().toISOString(),
+        receiveNewCaseNotifications: tutorData.receiveNewCaseNotifications || false
       })
     } catch (error) {
       console.error('Error storing approved tutor data:', error)

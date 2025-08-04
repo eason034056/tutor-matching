@@ -10,11 +10,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import { Tutor, TutorCase } from '@/server/types'
+import { Tutor, TutorCase, CaseNotificationData } from '@/server/types'
 import { collection, query, where, getDocs, doc, updateDoc, deleteDoc, addDoc, getDoc} from 'firebase/firestore'
 import { ref } from 'firebase/storage'
 import { deleteObject } from 'firebase/storage'
 import Image from 'next/image'
+import { sendNewCaseEmailNotification } from '@/webhook-config'
 
 export default function AdminPage() {
   const [user, setUser] = useState<User | null>(null)
@@ -155,6 +156,76 @@ export default function AdminPage() {
     setTutorCode('');
     setCaseId('');
     setSearchResults({ tutor: null, case: null });
+  };
+
+  // 獲取所有已審核且願意接收通知的教師email列表
+  const getApprovedTutorEmails = async () => {
+    try {
+      console.log('開始獲取已審核教師的email列表...')
+      
+      // 查詢所有已審核的教師
+      const approvedTutorsQuery = query(
+        collection(db, 'approvedTutors')
+      );
+      const approvedTutorsSnapshot = await getDocs(approvedTutorsQuery);
+      
+      // 提取email並過濾條件：
+      // 1. 有效的email格式
+      // 2. 願意接收新案件通知
+      const emailList = approvedTutorsSnapshot.docs
+        .map(doc => {
+          const data = doc.data();
+          return {
+            email: data.email,
+            receiveNotifications: data.receiveNewCaseNotifications
+          };
+        })
+        .filter(({ email, receiveNotifications }) => {
+          // 過濾掉空值、undefined、無效的email格式，以及不願意接收通知的教師
+          return email && 
+                 typeof email === 'string' && 
+                 email.includes('@') && 
+                 email.includes('.') &&
+                 receiveNotifications === true; // 只有同意接收通知的教師
+        })
+        .map(({ email }) => email); // 只回傳email字串
+
+      console.log(`找到 ${emailList.length} 個願意接收通知的有效教師email:`, emailList);
+      return emailList;
+    } catch (error) {
+      console.error('獲取教師email列表失敗:', error);
+      return [];
+    }
+  };
+
+  // 發送新案件郵件通知
+  const sendNewCaseNotification = async (caseData: CaseNotificationData) => {
+    try {
+      console.log('準備發送新案件郵件通知...');
+      
+      // 獲取教師email列表
+      const emailList = await getApprovedTutorEmails();
+      
+      // 使用webhook配置文件中的專用函數發送通知
+      const result = await sendNewCaseEmailNotification(caseData, emailList);
+      
+      if (result.success) {
+        toast.success(`郵件通知已發送給 ${emailList.length} 位教師`);
+      } else {
+        // 如果是因為沒有email或webhook未啟用，不顯示錯誤
+        if (result.message === '沒有有效的教師email') {
+          console.log('沒有找到有效的教師email，跳過郵件通知');
+        } else if (result.message === 'Webhook功能未啟用') {
+          console.log('Webhook功能未啟用，跳過郵件通知');
+        } else {
+          toast.error('郵件通知發送失敗，但案件已成功審核');
+        }
+      }
+    } catch (error) {
+      console.error('發送郵件通知失敗:', error);
+      // 不要因為郵件發送失敗而影響案件審核流程
+      toast.error('郵件通知發送失敗，但案件已成功審核');
+    }
   };
 
   // 監聽使用者登入狀態
@@ -307,7 +378,8 @@ export default function AdminPage() {
         name: tutorData.name,
         email: tutorData.email,
         school: tutorData.school,
-        approvedAt: new Date().toISOString()
+        approvedAt: new Date().toISOString(),
+        receiveNewCaseNotifications: tutorData.receiveNewCaseNotifications || false // 確保包含通知設定
       });
       
       toast.success('審核通過')
@@ -462,6 +534,19 @@ export default function AdminPage() {
       console.log('已加入 approvedCases 集合')
 
       toast.success('案件已通過審核')
+      
+      // 發送新案件郵件通知給所有已審核的教師
+      const notificationData: CaseNotificationData = {
+        caseNumber: caseData.caseNumber,
+        subject: caseData.subject,
+        hourlyFee: caseData.hourlyFee,
+        location: caseData.location,
+        availableTime: caseData.availableTime,
+        teacherRequirements: caseData.teacherRequirements || '',
+        studentDescription: caseData.studentDescription || ''
+      };
+      await sendNewCaseNotification(notificationData);
+      
       await fetchPendingData()
     } catch (error) {
       console.error('Error approving case:', error)
@@ -602,6 +687,12 @@ export default function AdminPage() {
                   <p>學校：{tutor.school}</p>
                   <p>專長：{tutor.expertise}</p>
                   <p>學位：{tutor.major}</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span>接收新案件通知：</span>
+                    <Badge variant={tutor.receiveNewCaseNotifications ? "default" : "secondary"}>
+                      {tutor.receiveNewCaseNotifications ? "✅ 是" : "❌ 否"}
+                    </Badge>
+                  </div>
                   <div className="grid grid-cols-2 gap-4 mt-4">
                     <div>
                       <h4 className="font-semibold mb-2">學生證</h4>
@@ -839,16 +930,23 @@ export default function AdminPage() {
                           <p className="text-sm">{searchResults.tutor.expertise}</p>
                         </div>
 
-                                                  <div>
-                            <p className="text-sm text-gray-600 mb-2">授課科目</p>
-                            <div className="flex flex-wrap gap-1">
-                             {searchResults.tutor.subjects?.map((subject, index) => (
-                                <Badge key={index} variant="outline" className="text-xs">
-                                  {subject}
-                                </Badge>
-                              ))}
-                            </div>
+                        <div className="mb-3">
+                          <p className="text-sm text-gray-600 mb-2">授課科目</p>
+                          <div className="flex flex-wrap gap-1">
+                           {searchResults.tutor.subjects?.map((subject, index) => (
+                              <Badge key={index} variant="outline" className="text-xs">
+                                {subject}
+                              </Badge>
+                            ))}
                           </div>
+                        </div>
+
+                        <div className="mb-3">
+                          <p className="text-sm text-gray-600 mb-1">新案件通知設定</p>
+                          <Badge variant={searchResults.tutor.receiveNewCaseNotifications ? "default" : "secondary"}>
+                            {searchResults.tutor.receiveNewCaseNotifications ? "✅ 接收通知" : "❌ 不接收通知"}
+                          </Badge>
+                        </div>
 
                           {/* 證件照片 */}
                           <div className="mt-6">

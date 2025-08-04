@@ -7,6 +7,7 @@ import * as z from "zod"
 import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
 import { addWatermark } from "@/lib/imageUtils";
 import Image from 'next/image'
@@ -24,6 +25,7 @@ const formSchema = z.object({
   school: z.string().min(1, { message: "請輸入就讀學校" }),
   major: z.string().min(1, { message: "請輸入主修科系" }),
   expertise: z.string().min(1, { message: "請輸入專長" }),
+  receiveNewCaseNotifications: z.boolean().default(true),
   studentIdCard: z.any()
     .refine((files) => !files || files instanceof FileList, "請上傳學生證照片"),
   idCard: z.any()
@@ -51,6 +53,7 @@ export default function TutorRegistrationForm() {
       school: "",
       major: "",
       expertise: "",
+      receiveNewCaseNotifications: true,
     },
   })
 
@@ -417,6 +420,29 @@ export default function TutorRegistrationForm() {
                 <Input {...field} placeholder="例如：高中數學、大學微積分"/>
               </FormControl>
               <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="receiveNewCaseNotifications"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 bg-blue-50/50">
+              <FormControl>
+                <Checkbox
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              </FormControl>
+              <div className="space-y-1 leading-none">
+                <FormLabel className="text-sm font-medium">
+                  📧 接收新案件通知
+                </FormLabel>
+                <p className="text-xs text-muted-foreground">
+                  當有新的家教案件審核通過時，我願意透過電子郵件接收通知
+                </p>
+              </div>
             </FormItem>
           )}
         />

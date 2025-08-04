@@ -13,6 +13,7 @@ export interface Tutor {
     isActive: boolean; 
     studentIdCardUrl: string;
     idCardUrl: string;
+    receiveNewCaseNotifications: boolean; // 是否接收新案件通知
 }
 
 export interface ApprovedTutor {
@@ -25,6 +26,7 @@ export interface ApprovedTutor {
     email: string;
     school: string;
     approvedAt: string;
+    receiveNewCaseNotifications: boolean; // 是否接收新案件通知
 }
 
 export interface TutorCase {
@@ -96,4 +98,15 @@ export interface ChatHistory {
   question: string;
   answer: string;
   timestamp: any; // Firestore Timestamp 或 Date
+}
+
+// 新案件郵件通知用的案件資料型別
+export interface CaseNotificationData {
+  caseNumber: string;
+  subject: string;
+  hourlyFee: number;
+  location: string;
+  availableTime: string;
+  teacherRequirements?: string;
+  studentDescription?: string;
 }

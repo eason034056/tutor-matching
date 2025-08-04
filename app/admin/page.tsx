@@ -7,9 +7,11 @@ import { auth, db, storage } from '@/server/config/firebase'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { Tutor, TutorCase } from '@/server/types'
-import { collection, query, where, getDocs, doc, updateDoc, deleteDoc, addDoc, getDoc } from 'firebase/firestore'
+import { collection, query, where, getDocs, doc, updateDoc, deleteDoc, addDoc, getDoc} from 'firebase/firestore'
 import { ref } from 'firebase/storage'
 import { deleteObject } from 'firebase/storage'
 import Image from 'next/image'
@@ -22,6 +24,16 @@ export default function AdminPage() {
   const [pendingCases, setPendingCases] = useState<(TutorCase & { docId: string })[]>([])
   const [lastActivity, setLastActivity] = useState(Date.now())
   const [inactiveTime, setInactiveTime] = useState(0)
+
+  // 搜尋相關的狀態
+  const [tutorCode, setTutorCode] = useState('')
+  const [caseId, setCaseId] = useState('')
+  const [searchResults, setSearchResults] = useState<{
+    tutor: (Tutor & { docId: string }) | null
+    case: (TutorCase & { docId: string }) | null
+  }>({ tutor: null, case: null })
+  const [searching, setSearching] = useState(false)
+
 
   const fetchPendingData = async () => {
     try {
@@ -69,6 +81,80 @@ export default function AdminPage() {
       console.error('Fetch error:', error);
       toast.error('載入失敗：' + (error instanceof Error ? error.message : '未知錯誤'));
     }
+  };
+
+  // 搜尋功能
+  const handleSearch = async () => {
+    if (!tutorCode && !caseId) {
+      toast.info('請輸入教師編號或案件編號')
+      return
+    }
+
+    setSearching(true)
+    try {
+      let tutorResult = null
+      let caseResult = null
+
+      // 搜尋教師
+      if (tutorCode) {
+        const tutorsQuery = query(
+          collection(db, 'tutors'),
+          where('tutorCode', '==', tutorCode)
+        );
+        const tutorsSnapshot = await getDocs(tutorsQuery);
+        
+        if (!tutorsSnapshot.empty) {
+          const tutorDoc = tutorsSnapshot.docs[0];
+          tutorResult = {
+            ...tutorDoc.data(),
+            docId: tutorDoc.id,
+            id: tutorDoc.data().id || tutorDoc.id
+          } as (Tutor & { docId: string });
+        }
+      }
+
+      // 搜尋案件
+      if (caseId) {
+        const casesQuery = query(
+          collection(db, 'cases'),
+          where('caseId', '==', caseId)
+        );
+        const casesSnapshot = await getDocs(casesQuery);
+        
+        if (!casesSnapshot.empty) {
+          const caseDoc = casesSnapshot.docs[0];
+          caseResult = {
+            ...caseDoc.data(),
+            docId: caseDoc.id,
+            id: caseDoc.data().id || caseDoc.id
+          } as (TutorCase & { docId: string });
+        }
+      }
+
+      setSearchResults({ 
+        tutor: tutorResult, 
+        case: caseResult 
+      });
+
+      if (!tutorResult && !caseResult) {
+        toast.error('找不到符合的資料');
+      } else {
+        toast.success('搜尋完成！');
+      }
+
+    } catch (error) {
+      console.error('搜尋失敗:', error);
+      toast.error('搜尋失敗：' + (error instanceof Error ? error.message : '未知錯誤'));
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  // 清除搜尋
+  const clearSearch = () => {
+    setTutorCode('');
+    setCaseId('');
+    setSearchResults({ tutor: null, case: null });
   };
 
   // 監聽使用者登入狀態
@@ -490,6 +576,14 @@ export default function AdminPage() {
               </span>
             )}
           </TabsTrigger>
+          <TabsTrigger value="search">
+            🔍 搜尋系統
+            {searchResults.tutor !== null || searchResults.case !== null && (
+              <Badge variant="secondary" className="ml-2">
+                找到資料
+              </Badge>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="tutors">
@@ -634,6 +728,281 @@ export default function AdminPage() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="search">
+          <div className="space-y-6">
+            {/* 搜尋表單 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  🔍 智能搜尋系統
+                  <Badge variant="outline">已審核通過資料</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                  {/* 教師編號搜尋 */}
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium mb-2">教師編號</label>
+                    <Input
+                      placeholder="輸入教師編號 (如: T001)"
+                      value={tutorCode}
+                      onChange={(e) => setTutorCode(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* 案件編號搜尋 */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">案件編號</label>
+                    <Input
+                      placeholder="輸入案件編號 (如: C001)"
+                      value={caseId}
+                      onChange={(e) => setCaseId(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+
+                {/* 搜尋按鈕 */}
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={handleSearch} 
+                    disabled={searching}
+                    className="flex items-center gap-2"
+                  >
+                    {searching ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        搜尋中...
+                      </>
+                    ) : (
+                      <>
+                        🔍 開始搜尋
+                      </>
+                    )}
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    onClick={clearSearch}
+                    disabled={searching}
+                  >
+                    🗑️ 清除條件
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 搜尋結果 */}
+            {searchResults.tutor !== null && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    👨‍🏫 教師搜尋結果
+                    <Badge>{searchResults.tutor ? '找到' : '無'}</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {searchResults.tutor ? (
+                    <div className="grid gap-4">
+                      <div className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                        <div className="flex justify-between items-start mb-3">
+                          <h3 className="font-bold text-lg text-blue-600">{searchResults.tutor.name}</h3>
+                          <Badge variant="secondary" className="bg-green-100 text-green-800">
+                            ✅ 已審核
+                          </Badge>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+                          <div>
+                            <p className="text-sm text-gray-600">聯絡資訊</p>
+                            <p>📞 {searchResults.tutor.phoneNumber}</p>
+                            <p>📧 {searchResults.tutor.email}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">學歷背景</p>
+                            <p>🏫 {searchResults.tutor.school}</p>
+                            <p>🎓 {searchResults.tutor.major}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">教學經驗</p>
+                            <p>{searchResults.tutor.experience}</p>
+                          </div>
+                        </div>
+
+                        <div className="mb-3">
+                          <p className="text-sm text-gray-600 mb-1">教學專長</p>
+                          <p className="text-sm">{searchResults.tutor.expertise}</p>
+                        </div>
+
+                                                  <div>
+                            <p className="text-sm text-gray-600 mb-2">授課科目</p>
+                            <div className="flex flex-wrap gap-1">
+                             {searchResults.tutor.subjects?.map((subject, index) => (
+                                <Badge key={index} variant="outline" className="text-xs">
+                                  {subject}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* 證件照片 */}
+                          <div className="mt-6">
+                            <p className="text-sm font-medium text-gray-600 mb-4">證件照片</p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {/* 身分證照片 */}
+                              {searchResults.tutor.idCardUrl && (
+                                <div>
+                                  <p className="text-sm text-gray-600 mb-2">身分證</p>
+                                  <div className="relative aspect-[3/2] overflow-hidden rounded-lg border">
+                                    <Image
+                                      src={searchResults.tutor.idCardUrl}
+                                      alt="身分證"
+                                      fill
+                                      className="object-cover"
+                                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* 學生證照片 */}
+                              {searchResults.tutor.studentIdCardUrl && (
+                                <div>
+                                  <p className="text-sm text-gray-600 mb-2">學生證</p>
+                                  <div className="relative aspect-[3/2] overflow-hidden rounded-lg border">
+                                    <Image
+                                      src={searchResults.tutor.studentIdCardUrl}
+                                      alt="學生證"
+                                      fill
+                                      className="object-cover"
+                                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                   ) : (
+                     <p className="text-center text-gray-500 py-8">找不到符合的教師資料</p>
+                   )}
+                  </CardContent>
+                </Card>
+              )}
+
+            {searchResults.case !== null && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    📚 案件搜尋結果
+                    <Badge>{searchResults.case ? '找到' : '無'}</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {searchResults.case ? (
+                    <div className="grid gap-4">
+                      <div className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                        <div className="flex justify-between items-start mb-3">
+                          <h3 className="font-bold text-lg text-purple-600">
+                            案件編號：{searchResults.case.caseNumber}
+                          </h3>
+                          <Badge variant="secondary" className="bg-green-100 text-green-800">
+                            ✅ 已審核
+                          </Badge>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                          <div>
+                            <p className="text-sm text-gray-600">家長資訊</p>
+                            <p>👤 {searchResults.case.parentName}</p>
+                            <p>📞 {searchResults.case.parentPhone}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">課程資訊</p>
+                            <p>📖 {searchResults.case.subject}</p>
+                            <p>💰 時薪 ${searchResults.case.hourlyFee}</p>
+                          </div>
+                        </div>
+
+                        <div className="mb-3">
+                          <p className="text-sm text-gray-600">上課地點</p>
+                          <p>📍 {searchResults.case.location}</p>
+                        </div>
+
+                        <div className="mb-3">
+                          <p className="text-sm text-gray-600">可上課時間</p>
+                          <p>⏰ {searchResults.case.availableTime}</p>
+                        </div>
+
+                        {searchResults.case.teacherRequirements && (
+                          <div className="mb-3">
+                            <p className="text-sm text-gray-600">教師要求</p>
+                            <p className="text-sm bg-yellow-50 p-2 rounded border-l-4 border-yellow-400">
+                              {searchResults.case.teacherRequirements}
+                            </p>
+                          </div>
+                        )}
+
+                                                  {searchResults.case.studentDescription && (
+                           <div>
+                             <p className="text-sm text-gray-600">學生狀況</p>
+                             <p className="text-sm bg-blue-50 p-2 rounded border-l-4 border-blue-400">
+                               {searchResults.case.studentDescription}
+                             </p>
+                           </div>
+                          )}
+
+                          {/* 案件相關照片 */}
+                          {searchResults.case.idCardUrl && (
+                            <div className="mt-6">
+                              <p className="text-sm font-medium text-gray-600 mb-4">身分證照片</p>
+                              <div className="max-w-lg">
+                                <div className="relative aspect-[3/2] overflow-hidden rounded-lg border">
+                                  <Image
+                                    src={searchResults.case.idCardUrl}
+                                    alt="身分證"
+                                    fill
+                                    className="object-cover"
+                                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                   ) : (
+                     <p className="text-center text-gray-500 py-8">找不到符合的案件資料</p>
+                   )}
+                  </CardContent>
+                </Card>
+              )}
+
+            {/* 無搜尋結果 */}
+            {!searching && 
+             searchResults.tutor === null && 
+             searchResults.case === null && 
+             (tutorCode || caseId) && (
+              <Card>
+                <CardContent className="text-center py-8">
+                  <div className="text-6xl mb-4">🔍</div>
+                  <h3 className="text-lg font-semibold mb-2">找不到符合條件的資料</h3>
+                  <p className="text-gray-600 mb-4">
+                    請嘗試調整搜尋條件或關鍵字
+                  </p>
+                  <Button variant="outline" onClick={clearSearch}>
+                    重新搜尋
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </TabsContent>
       </Tabs>
     </div>

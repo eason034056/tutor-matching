@@ -94,8 +94,10 @@ graph LR
     classDef server fill:#e8f5e8,stroke:#388e3c,color:#000
     classDef auto fill:#fce4ec,stroke:#c2185b,color:#000
     
-    class A,B client
-    class C,D server  
+    class A client
+    class B client
+    class C server
+    class D server
     class E auto
 ```
 

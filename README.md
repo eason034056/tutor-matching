@@ -167,9 +167,9 @@ graph LR
     B --> C[🔍 Subject Detection]
     C --> D{📚 Subject Routing}
     
-    D -->|Math & Physics| E1[🤖 OpenAI GPT-4]
-    D -->|Chemistry & Biology| E2[🧬 Google Gemini]
-    D -->|Programming & Logic| E3[💻 DeepSeek API]
+    D -->|Image to LaTeX| E1[🤖 OpenAI GPT-4]
+    D -->|Math/Physics/Chemistry| E2[🧬 Google Gemini]
+    D -->|Chinese/English/History/Geography/Civics| E3[💻 DeepSeek API]
     
     E1 --> F[📊 LaTeX Rendering]
     E2 --> F

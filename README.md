@@ -65,25 +65,185 @@ We believe education should be accessible to everyone, regardless of economic st
 
 ```mermaid
 graph TB
-    A[User Interface] --> B[Next.js App Router]
-    B --> C[Firebase Auth]
-    B --> D[Firestore Database]
-    B --> E[OpenAI API]
-    B --> F[Firebase Storage]
+    subgraph "Frontend Layer"
+        A[Next.js 15 App Router]
+        B[React 18 Components]
+        C[TypeScript Interface]
+        D[Tailwind CSS + shadcn/ui]
+        A --> B
+        B --> C
+        C --> D
+    end
     
-    G[Admin Panel] --> H[n8n Workflows]
-    H --> I[Email Notifications]
-    H --> D
+    subgraph "Authentication & Security"
+        E[Firebase Auth]
+        F[JWT Tokens]
+        G[Role-based Access]
+        E --> F
+        F --> G
+    end
     
-    J[Tutor Registration] --> K[Image Processing]
-    K --> F
-    J --> L[Approval Pipeline]
-    L --> G
+    subgraph "AI Processing Pipeline"
+        H[Image Upload]
+        I[Image Compression]
+        J[OpenAI Vision API]
+        K[GPT-4 Processing]
+        L[LaTeX/KaTeX Rendering]
+        H --> I
+        I --> J
+        J --> K
+        K --> L
+    end
     
-    M[AI Solver] --> E
-    M --> N[Thread Management]
-    N --> D
-    M --> O[Mathematical Rendering]
+    subgraph "Database Layer"
+        M[(Firestore)]
+        N[Chat Threads]
+        O[User Profiles]
+        P[Tutor Data]
+        Q[Case Management]
+        M --> N
+        M --> O
+        M --> P
+        M --> Q
+    end
+    
+    subgraph "Automation & Workflows"
+        R[n8n Engine]
+        S[Webhook Triggers]
+        T[SMTP Integration]
+        U[Admin Notifications]
+        V[Auto Approval Pipeline]
+        R --> S
+        S --> T
+        T --> U
+        S --> V
+    end
+    
+    subgraph "File Management"
+        W[Firebase Storage]
+        X[Image Processing]
+        Y[Watermark System]
+        Z[CDN Distribution]
+        W --> X
+        X --> Y
+        Y --> Z
+    end
+    
+    subgraph "API Layer"
+        AA[RESTful APIs]
+        BB[Solver Endpoint]
+        CC[Admin Endpoints]
+        DD[Upload Endpoints]
+        AA --> BB
+        AA --> CC
+        AA --> DD
+    end
+    
+    %% Frontend connections
+    A --> E
+    A --> AA
+    
+    %% AI Pipeline connections
+    BB --> J
+    BB --> M
+    L --> B
+    
+    %% Data flow connections
+    AA --> M
+    AA --> W
+    E --> M
+    
+    %% Automation connections
+    CC --> R
+    P --> S
+    Q --> S
+    
+    %% Storage connections
+    DD --> W
+    H --> W
+    
+    %% Cross-system integration
+    G --> CC
+    V --> M
+    U --> T
+    
+    %% Styling
+    classDef frontend fill:#e1f5fe
+    classDef auth fill:#f3e5f5
+    classDef ai fill:#fff3e0
+    classDef database fill:#e8f5e8
+    classDef automation fill:#fce4ec
+    classDef storage fill:#f1f8e9
+    classDef api fill:#e3f2fd
+    
+    class A,B,C,D frontend
+    class E,F,G auth
+    class H,I,J,K,L ai
+    class M,N,O,P,Q database
+    class R,S,T,U,V automation
+    class W,X,Y,Z storage
+    class AA,BB,CC,DD api
+```
+
+---
+
+## 🔄 **Data Flow & User Journey**
+
+```mermaid
+sequenceDiagram
+    participant S as Student
+    participant UI as Frontend UI
+    participant Auth as Firebase Auth
+    participant API as API Layer
+    participant AI as OpenAI API
+    participant DB as Firestore
+    participant N8N as n8n Workflow
+    participant Admin as Admin Panel
+    participant Tutor as Tutor
+
+    %% AI Solver Flow
+    rect rgb(230, 245, 255)
+        Note over S,AI: AI Problem Solving Journey
+        S->>UI: Upload problem image
+        UI->>Auth: Verify authentication
+        Auth-->>UI: Return user token
+        UI->>API: POST /api/solver (image + question)
+        API->>AI: Process with GPT-4 Vision
+        AI-->>API: Return solution with LaTeX
+        API->>DB: Save thread & messages
+        API-->>UI: Stream response
+        UI-->>S: Display formatted solution
+    end
+
+    %% Tutor Registration Flow  
+    rect rgb(255, 245, 230)
+        Note over Tutor,Admin: Tutor Onboarding Process
+        Tutor->>UI: Submit registration form
+        UI->>API: POST /api/tutors/pending
+        API->>DB: Store tutor data
+        API->>N8N: Trigger webhook notification
+        N8N->>Admin: Send email notification
+        Admin->>UI: Review application
+        Admin->>API: Approve/Reject decision
+        API->>DB: Update tutor status
+        API->>N8N: Trigger approval webhook
+        N8N-->>Tutor: Send confirmation email
+    end
+
+    %% Case Matching Flow
+    rect rgb(240, 255, 240)
+        Note over S,Tutor: Case Matching Process
+        S->>UI: Submit tutoring case
+        UI->>API: POST /api/cases/upload
+        API->>DB: Store case data
+        API->>N8N: Trigger case notification
+        N8N->>Admin: Notify pending case
+        Admin->>API: Approve case
+        API->>DB: Move to approved cases
+        API->>N8N: Trigger tutor notifications
+        N8N-->>Tutor: Send case opportunities
+        Tutor->>UI: Apply for case
+    end
 ```
 
 ---
@@ -100,48 +260,6 @@ graph TB
 - **💻 Desktop Enhanced**: Rich experience with sidebar navigation
 - **🎯 Accessibility**: WCAG 2.1 compliant design patterns
 
----
-
-## 🚀 **Getting Started**
-
-### **Prerequisites**
-- Node.js 18+ 
-- Firebase Account
-- OpenAI API Key
-- n8n Instance (optional for full automation)
-
-### **Installation**
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/tutor-matching.git
-cd tutor-matching
-
-# Install dependencies
-npm install
-
-# Set up environment variables
-cp .env.example .env.local
-# Edit .env.local with your configuration
-
-# Run development server
-npm run dev
-```
-
-### **Environment Configuration**
-
-```env
-# Firebase Configuration
-NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_auth_domain
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
-
-# OpenAI Configuration
-OPENAI_API_KEY=your_openai_api_key
-
-# n8n Webhook (Optional)
-N8N_WEBHOOK_URL=your_n8n_webhook_url
-```
 
 ---
 

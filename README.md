@@ -115,9 +115,9 @@ graph TD
     end
     
     subgraph "AI Model Layer"
-        OpenAI[OpenAI GPT-4<br/>Math & Physics]
-        Gemini[Google Gemini<br/>Chemistry & Biology]
-        DeepSeek[DeepSeek API<br/>Programming & Logic]
+        OpenAI[OpenAI GPT-4<br/>Image to LaTeX]
+        Gemini[Google Gemini<br/>Math/Physics/Chemistry]
+        DeepSeek[DeepSeek API<br/>Chinese/English/History/Geography/Civics]
     end
     
     subgraph "Integration Layer"

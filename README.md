@@ -19,6 +19,7 @@ We believe education should be accessible to everyone, regardless of economic st
 
 ### 🤖 **AI Problem Solver (Core Innovation)**
 - **📸 Image-First Approach**: Upload photos of math/science problems for instant solutions
+- **🧠 Multi-Model Intelligence**: Smart routing to OpenAI GPT-4 (Math/Physics), Google Gemini (Chemistry/Biology), DeepSeek (Programming/Logic)
 - **🧵 Thread Management**: Organize conversations by problem topics with memory persistence
 - **📊 Mathematical Rendering**: Advanced LaTeX and KaTeX support for complex formulas
 - **🔄 Interactive Learning**: Follow-up questions and step-by-step explanations
@@ -49,7 +50,7 @@ We believe education should be accessible to everyone, regardless of economic st
   - **Authentication** - Secure user management
   - **Firestore** - Scalable NoSQL database
   - **Storage** - Image upload and management
-- **🤖 OpenAI API** - GPT-powered problem solving
+- **🤖 Multi-Model AI** - OpenAI GPT-4, Google Gemini, DeepSeek API for specialized problem solving
 - **🔄 n8n Workflows** - Automated notification and task management
 - **📧 SMTP Integration** - Professional email notifications
 
@@ -73,7 +74,7 @@ graph LR
     
     subgraph "Server Side"  
         C[Firebase Auth<br/>Firestore DB<br/>Storage]
-        D[OpenAI API<br/>GPT-4 Vision<br/>LaTeX Processing]
+        D[Multi-Model AI<br/>OpenAI + Gemini + DeepSeek<br/>Subject-Based Routing]
     end
     
     subgraph "Automation"
@@ -111,7 +112,12 @@ graph TD
     subgraph "Data Layer"
         DB[(Firestore Database)]
         Storage[(Firebase Storage)]
-        AI[OpenAI API]
+    end
+    
+    subgraph "AI Model Layer"
+        OpenAI[OpenAI GPT-4<br/>Math & Physics]
+        Gemini[Google Gemini<br/>Chemistry & Biology]
+        DeepSeek[DeepSeek API<br/>Programming & Logic]
     end
     
     subgraph "Integration Layer"
@@ -127,7 +133,9 @@ graph TD
     API --> Admin  
     API --> Upload
     
-    Solver --> AI
+    Solver --> OpenAI
+    Solver --> Gemini
+    Solver --> DeepSeek
     Solver --> DB
     
     Admin --> DB
@@ -138,15 +146,17 @@ graph TD
     
     N8N --> Email
     
-    %% Styling
-    classDef ui fill:#bbdefb,stroke:#1976d2
-    classDef logic fill:#c8e6c9,stroke:#388e3c
-    classDef data fill:#fff3e0,stroke:#f57c00
-    classDef integration fill:#f8bbd9,stroke:#c2185b
+    %% Styling with black text
+    classDef ui fill:#bbdefb,stroke:#1976d2,color:#000
+    classDef logic fill:#c8e6c9,stroke:#388e3c,color:#000
+    classDef data fill:#fff3e0,stroke:#f57c00,color:#000
+    classDef ai fill:#e8eaf6,stroke:#3f51b5,color:#000
+    classDef integration fill:#f8bbd9,stroke:#c2185b,color:#000
     
     class UI,Auth ui
     class API,Solver,Admin,Upload logic
-    class DB,Storage,AI data
+    class DB,Storage data
+    class OpenAI,Gemini,DeepSeek ai
     class N8N,Email integration
 ```
 
@@ -154,13 +164,25 @@ graph TD
 ```mermaid
 graph LR
     A[📸 Image Upload] --> B[🗜️ Compression]
-    B --> C[🔍 OCR Processing]
-    C --> D[🤖 GPT-4 Analysis]
-    D --> E[📊 LaTeX Rendering]
-    E --> F[💬 Chat Response]
+    B --> C[🔍 Subject Detection]
+    C --> D{📚 Subject Routing}
     
-    classDef process fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
-    class A,B,C,D,E,F process
+    D -->|Math & Physics| E1[🤖 OpenAI GPT-4]
+    D -->|Chemistry & Biology| E2[🧬 Google Gemini]
+    D -->|Programming & Logic| E3[💻 DeepSeek API]
+    
+    E1 --> F[📊 LaTeX Rendering]
+    E2 --> F
+    E3 --> F
+    F --> G[💬 Chat Response]
+    
+    classDef process fill:#e1f5fe,stroke:#0277bd,stroke-width:2px,color:#000
+    classDef decision fill:#fff3e0,stroke:#ff9800,stroke-width:2px,color:#000
+    classDef ai fill:#e8eaf6,stroke:#3f51b5,stroke-width:2px,color:#000
+    
+    class A,B,C,F,G process
+    class D decision
+    class E1,E2,E3 ai
 ```
 
 ---
@@ -274,6 +296,7 @@ sequenceDiagram
 ## 🔧 **Development Highlights**
 
 ### **🎯 Technical Challenges Solved**
+- **Multi-Model AI Routing**: Intelligent subject detection and model selection for optimal problem-solving accuracy
 - **Image Processing**: Client-side compression with server-side optimization
 - **Mathematical Rendering**: KaTeX integration with React Markdown
 

@@ -63,126 +63,104 @@ We believe education should be accessible to everyone, regardless of economic st
 
 ## 🏗️ **System Architecture**
 
+### **🔧 Core Technology Stack**
 ```mermaid
-graph TB
-    subgraph "Frontend Layer"
-        A[Next.js 15 App Router]
-        B[React 18 Components]
-        C[TypeScript Interface]
-        D[Tailwind CSS + shadcn/ui]
-        A --> B
-        B --> C
-        C --> D
+graph LR
+    subgraph "Client Side"
+        A[Next.js 15<br/>React 18<br/>TypeScript]
+        B[Tailwind CSS<br/>shadcn/ui<br/>KaTeX]
     end
     
-    subgraph "Authentication & Security"
-        E[Firebase Auth]
-        F[JWT Tokens]
-        G[Role-based Access]
-        E --> F
-        F --> G
+    subgraph "Server Side"  
+        C[Firebase Auth<br/>Firestore DB<br/>Storage]
+        D[OpenAI API<br/>GPT-4 Vision<br/>LaTeX Processing]
     end
     
-    subgraph "AI Processing Pipeline"
-        H[Image Upload]
-        I[Image Compression]
-        J[OpenAI Vision API]
-        K[GPT-4 Processing]
-        L[LaTeX/KaTeX Rendering]
-        H --> I
-        I --> J
-        J --> K
-        K --> L
+    subgraph "Automation"
+        E[n8n Workflows<br/>SMTP Integration<br/>Admin Notifications]
     end
     
-    subgraph "Database Layer"
-        M[(Firestore)]
-        N[Chat Threads]
-        O[User Profiles]
-        P[Tutor Data]
-        Q[Case Management]
-        M --> N
-        M --> O
-        M --> P
-        M --> Q
+    A --> C
+    A --> D
+    C --> E
+    
+    classDef client fill:#e3f2fd,stroke:#1976d2,color:#000
+    classDef server fill:#e8f5e8,stroke:#388e3c,color:#000
+    classDef auto fill:#fce4ec,stroke:#c2185b,color:#000
+    
+    class A,B client
+    class C,D server  
+    class E auto
+```
+
+### **🔄 Data Flow Architecture**
+```mermaid
+graph TD
+    subgraph "User Interface Layer"
+        UI[Frontend Components]
+        Auth[Authentication]
     end
     
-    subgraph "Automation & Workflows"
-        R[n8n Engine]
-        S[Webhook Triggers]
-        T[SMTP Integration]
-        U[Admin Notifications]
-        V[Auto Approval Pipeline]
-        R --> S
-        S --> T
-        T --> U
-        S --> V
+    subgraph "Business Logic Layer"
+        API[API Routes]
+        Solver[AI Solver Service]
+        Admin[Admin Service]
+        Upload[Upload Service]
     end
     
-    subgraph "File Management"
-        W[Firebase Storage]
-        X[Image Processing]
-        Y[Watermark System]
-        Z[CDN Distribution]
-        W --> X
-        X --> Y
-        Y --> Z
+    subgraph "Data Layer"
+        DB[(Firestore Database)]
+        Storage[(Firebase Storage)]
+        AI[OpenAI API]
     end
     
-    subgraph "API Layer"
-        AA[RESTful APIs]
-        BB[Solver Endpoint]
-        CC[Admin Endpoints]
-        DD[Upload Endpoints]
-        AA --> BB
-        AA --> CC
-        AA --> DD
+    subgraph "Integration Layer"
+        N8N[n8n Workflows]
+        Email[Email Service]
     end
     
-    %% Frontend connections
-    A --> E
-    A --> AA
+    %% Clean connections
+    UI --> Auth
+    UI --> API
     
-    %% AI Pipeline connections
-    BB --> J
-    BB --> M
-    L --> B
+    API --> Solver
+    API --> Admin  
+    API --> Upload
     
-    %% Data flow connections
-    AA --> M
-    AA --> W
-    E --> M
+    Solver --> AI
+    Solver --> DB
     
-    %% Automation connections
-    CC --> R
-    P --> S
-    Q --> S
+    Admin --> DB
+    Admin --> N8N
     
-    %% Storage connections
-    DD --> W
-    H --> W
+    Upload --> Storage
+    Upload --> DB
     
-    %% Cross-system integration
-    G --> CC
-    V --> M
-    U --> T
+    N8N --> Email
     
     %% Styling
-    classDef frontend fill:#e1f5fe
-    classDef auth fill:#f3e5f5
-    classDef ai fill:#fff3e0
-    classDef database fill:#e8f5e8
-    classDef automation fill:#fce4ec
-    classDef storage fill:#f1f8e9
-    classDef api fill:#e3f2fd
+    classDef ui fill:#bbdefb,stroke:#1976d2
+    classDef logic fill:#c8e6c9,stroke:#388e3c
+    classDef data fill:#fff3e0,stroke:#f57c00
+    classDef integration fill:#f8bbd9,stroke:#c2185b
     
-    class A,B,C,D frontend
-    class E,F,G auth
-    class H,I,J,K,L ai
-    class M,N,O,P,Q database
-    class R,S,T,U,V automation
-    class W,X,Y,Z storage
-    class AA,BB,CC,DD api
+    class UI,Auth ui
+    class API,Solver,Admin,Upload logic
+    class DB,Storage,AI data
+    class N8N,Email integration
+```
+
+### **🚀 AI Processing Pipeline**
+```mermaid
+graph LR
+    A[📸 Image Upload] --> B[🗜️ Compression]
+    B --> C[🔍 OCR Processing]
+    C --> D[🤖 GPT-4 Analysis]
+    D --> E[📊 LaTeX Rendering]
+    E --> F[💬 Chat Response]
+    
+    classDef process fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
+    class A,B,C,D,E,F process
 ```
 
 ---
@@ -202,7 +180,7 @@ sequenceDiagram
     participant Tutor as Tutor
 
     %% AI Solver Flow
-    rect rgb(230, 245, 255)
+    rect rgb(160, 195, 225)
         Note over S,AI: AI Problem Solving Journey
         S->>UI: Upload problem image
         UI->>Auth: Verify authentication
@@ -216,7 +194,7 @@ sequenceDiagram
     end
 
     %% Tutor Registration Flow  
-    rect rgb(255, 245, 230)
+    rect rgb(195, 180, 170)
         Note over Tutor,Admin: Tutor Onboarding Process
         Tutor->>UI: Submit registration form
         UI->>API: POST /api/tutors/pending
@@ -231,7 +209,7 @@ sequenceDiagram
     end
 
     %% Case Matching Flow
-    rect rgb(240, 255, 240)
+    rect rgb(170, 190, 170)
         Note over S,Tutor: Case Matching Process
         S->>UI: Submit tutoring case
         UI->>API: POST /api/cases/upload

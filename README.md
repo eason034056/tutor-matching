@@ -68,19 +68,19 @@ We believe education should be accessible to everyone, regardless of economic st
 ```mermaid
 graph LR
     subgraph "Client Side"
-        A[Next.js 15\nReact 18\nTypeScript]
-        B[Tailwind CSS\nshadcn/ui\nKaTeX]
+        A[Next.js 15<br/>React 18<br/>TypeScript]
+        B[Tailwind CSS<br/>shadcn/ui<br/>KaTeX]
         A --> B
     end
     
     subgraph "Server Side"  
-        C[Firebase Auth\nFirestore DB\nStorage]
-        D[Multi-Model AI\nOpenAI + Gemini + DeepSeek\nSubject-Based Routing]
+        C[Firebase Auth<br/>Firestore DB<br/>Storage]
+        D[Multi-Model AI<br/>OpenAI + Gemini + DeepSeek<br/>Subject-Based Routing]
         C -.-> D
     end
     
     subgraph "Automation"
-        E[n8n Workflows\nSMTP Integration\nAdmin Notifications]
+        E[n8n Workflows<br/>SMTP Integration<br/>Admin Notifications]
     end
     
     %% Cross-layer connections

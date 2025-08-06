@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
 import { Tutor, TutorCase, CaseNotificationData } from '@/server/types'
 import { collection, query, where, getDocs, doc, updateDoc, deleteDoc, addDoc, getDoc} from 'firebase/firestore'
@@ -28,12 +29,16 @@ export default function AdminPage() {
 
   // 搜尋相關的狀態
   const [tutorCode, setTutorCode] = useState('')
-  const [caseId, setCaseId] = useState('')
+  const [caseNumber, setCaseNumber] = useState('')
   const [searchResults, setSearchResults] = useState<{
     tutor: (Tutor & { docId: string }) | null
     case: (TutorCase & { docId: string }) | null
   }>({ tutor: null, case: null })
   const [searching, setSearching] = useState(false)
+  
+  // 案件狀態更新相關
+  const [selectedStatus, setSelectedStatus] = useState<'急徵' | '已徵到' | '有人接洽' | ''>('')
+  const [updatingStatus, setUpdatingStatus] = useState(false)
 
 
   const fetchPendingData = async () => {
@@ -86,7 +91,7 @@ export default function AdminPage() {
 
   // 搜尋功能
   const handleSearch = async () => {
-    if (!tutorCode && !caseId) {
+    if (!tutorCode && !caseNumber) {
       toast.info('請輸入教師編號或案件編號')
       return
     }
@@ -115,10 +120,10 @@ export default function AdminPage() {
       }
 
       // 搜尋案件
-      if (caseId) {
+      if (caseNumber) {
         const casesQuery = query(
           collection(db, 'cases'),
-          where('caseId', '==', caseId)
+          where('caseNumber', '==', caseNumber)
         );
         const casesSnapshot = await getDocs(casesQuery);
         
@@ -154,8 +159,113 @@ export default function AdminPage() {
   // 清除搜尋
   const clearSearch = () => {
     setTutorCode('');
-    setCaseId('');
+    setCaseNumber('');
     setSearchResults({ tutor: null, case: null });
+    setSelectedStatus('');
+  };
+  
+  // 處理案件狀態更新
+  const handleCaseStatusUpdate = async (caseDocId: string, newStatus: '急徵' | '已徵到' | '有人接洽') => {
+    if (updatingStatus) return;
+    setUpdatingStatus(true);
+    
+    try {
+      console.log('開始更新案件狀態，案件 docId:', caseDocId, '新狀態:', newStatus);
+      
+      if (!caseDocId) {
+        throw new Error('案件ID無效');
+      }
+      
+      // 1. 從搜尋結果獲取案件的id來查找 approvedCases
+      const searchedCase = searchResults.case;
+      if (!searchedCase || !searchedCase.id) {
+        throw new Error('無法找到案件識別碼');
+      }
+      
+      // 2. 更新原始 cases 集合中的案件狀態
+      const originalCaseRef = doc(db, 'cases', caseDocId);
+      const originalCaseSnapshot = await getDoc(originalCaseRef);
+      
+      if (originalCaseSnapshot.exists()) {
+        await updateDoc(originalCaseRef, {
+          status: newStatus,
+          statusUpdatedAt: new Date().toISOString()
+        });
+        console.log('已更新 cases 集合中的狀態');
+      }
+      
+      // 3. 更新 approvedCases 集合中對應的案件狀態（用 caseNumber 查找）
+      if (searchedCase.caseNumber) {
+        const approvedCasesQuery = query(
+          collection(db, 'approvedCases'),
+          where('caseNumber', '==', searchedCase.caseNumber)
+        );
+        const approvedCasesSnapshot = await getDocs(approvedCasesQuery);
+        
+        if (!approvedCasesSnapshot.empty) {
+          const approvedCaseDoc = approvedCasesSnapshot.docs[0];
+          await updateDoc(approvedCaseDoc.ref, {
+            status: newStatus,
+            statusUpdatedAt: new Date().toISOString()
+          });
+          console.log('已更新 approvedCases 集合中的狀態，案件編號:', searchedCase.caseNumber);
+        } else {
+          console.warn('在 approvedCases 中找不到案件編號:', searchedCase.caseNumber);
+        }
+      } else {
+        console.error('案件缺少 caseNumber，無法更新 approvedCases');
+      }
+      
+      // 4. 更新搜尋結果中顯示的狀態
+      if (searchResults.case) {
+        setSearchResults({
+          ...searchResults,
+          case: {
+            ...searchResults.case,
+            status: newStatus
+          }
+        });
+      }
+      
+      toast.success(`案件狀態已更新為「${newStatus}」`);
+      setSelectedStatus(''); // 重置選擇
+      
+    } catch (error) {
+      console.error('更新案件狀態失敗:', error);
+      toast.error(`狀態更新失敗：${error instanceof Error ? error.message : '未知錯誤'}`);
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  // 獲取狀態 Badge 的樣式
+  const getStatusBadgeStyle = (status: string) => {
+    switch (status) {
+      case '急徵':
+        return { 
+          variant: 'destructive' as const,
+          className: 'bg-red-500 hover:bg-red-600 text-white',
+          icon: '🚨'
+        };
+      case '有人接洽':
+        return { 
+          variant: 'secondary' as const,
+          className: 'bg-yellow-500 hover:bg-yellow-600 text-white',
+          icon: '💬'
+        };
+      case '已徵到':
+        return { 
+          variant: 'default' as const,
+          className: 'bg-green-500 hover:bg-green-600 text-white',
+          icon: '✅'
+        };
+      default:
+        return { 
+          variant: 'outline' as const,
+          className: 'bg-gray-100 text-gray-600',
+          icon: '❓'
+        };
+    }
   };
 
   // 獲取所有已審核且願意接收通知的教師email列表
@@ -849,9 +959,9 @@ export default function AdminPage() {
                   <div>
                     <label className="block text-sm font-medium mb-2">案件編號</label>
                     <Input
-                      placeholder="輸入案件編號 (如: C001)"
-                      value={caseId}
-                      onChange={(e) => setCaseId(e.target.value)}
+                      placeholder="輸入案件編號 (如: CWBKOXV)"
+                      value={caseNumber}
+                      onChange={(e) => setCaseNumber(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                       className="w-full"
                     />
@@ -1038,6 +1148,82 @@ export default function AdminPage() {
                           <p>⏰ {searchResults.case.availableTime}</p>
                         </div>
 
+                        {/* 案件狀態顯示和修改 */}
+                        <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                          <div className="mb-3">
+                            <p className="text-sm font-medium text-gray-700 mb-2">案件狀態</p>
+                            {searchResults.case.status && (() => {
+                              const statusStyle = getStatusBadgeStyle(searchResults.case.status);
+                              return (
+                                <Badge 
+                                  variant={statusStyle.variant}
+                                  className={statusStyle.className}
+                                >
+                                  {statusStyle.icon} {searchResults.case.status}
+                                </Badge>
+                              );
+                            })()}
+                          </div>
+                          
+                          {/* 狀態更新控制項 */}
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+                            <div className="md:col-span-2">
+                              <label className="block text-xs text-gray-600 mb-1">更新狀態</label>
+                              <Select 
+                                value={selectedStatus} 
+                                onValueChange={(value) => setSelectedStatus(value as '急徵' | '已徵到' | '有人接洽' | '')}
+                                disabled={updatingStatus}
+                              >
+                                <SelectTrigger className="h-8">
+                                  <SelectValue placeholder="選擇新狀態..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="急徵">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-red-500">🚨</span>
+                                      急徵
+                                    </div>
+                                  </SelectItem>
+                                  <SelectItem value="有人接洽">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-yellow-500">💬</span>
+                                      有人接洽
+                                    </div>
+                                  </SelectItem>
+                                  <SelectItem value="已徵到">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-green-500">✅</span>
+                                      已徵到
+                                    </div>
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <Button 
+                              size="sm"
+                              onClick={() => {
+                                if (selectedStatus && searchResults.case) {
+                                  handleCaseStatusUpdate(
+                                    searchResults.case.docId, 
+                                    selectedStatus as '急徵' | '已徵到' | '有人接洽'
+                                  );
+                                }
+                              }}
+                              disabled={!selectedStatus || updatingStatus}
+                              className="h-8"
+                            >
+                              {updatingStatus ? (
+                                <div className="flex items-center gap-1">
+                                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                                  更新中...
+                                </div>
+                              ) : (
+                                '🔄 更新'
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+
                         {searchResults.case.teacherRequirements && (
                           <div className="mb-3">
                             <p className="text-sm text-gray-600">教師要求</p>
@@ -1086,7 +1272,7 @@ export default function AdminPage() {
             {!searching && 
              searchResults.tutor === null && 
              searchResults.case === null && 
-             (tutorCode || caseId) && (
+             (tutorCode || caseNumber) && (
               <Card>
                 <CardContent className="text-center py-8">
                   <div className="text-6xl mb-4">🔍</div>

@@ -63,11 +63,30 @@ export default function RegisterPage() {
     }
 
     try {
+      console.log('[註冊頁面] 開始註冊流程，郵件:', email);
       await register(email, password);
+      console.log('[註冊頁面] 註冊成功，準備顯示驗證頁面');
       // 註冊成功後會自動發送驗證郵件，顯示驗證頁面
       setShowEmailVerification(true);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : '註冊失敗，請稍後再試';
+      console.error('[註冊頁面] 註冊失敗:', error);
+      let errorMessage = '註冊失敗，請稍後再試';
+      
+      if (error instanceof Error) {
+        // Firebase 錯誤代碼處理
+        if (error.message.includes('auth/email-already-in-use')) {
+          errorMessage = '此郵件地址已被註冊，請使用其他郵件或前往登入頁面';
+        } else if (error.message.includes('auth/invalid-email')) {
+          errorMessage = '郵件地址格式不正確，請檢查後重試';
+        } else if (error.message.includes('auth/weak-password')) {
+          errorMessage = '密碼強度不足，請使用更複雜的密碼';
+        } else if (error.message.includes('auth/network-request-failed')) {
+          errorMessage = '網路連接問題，請檢查網路後重試';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -81,12 +100,26 @@ export default function RegisterPage() {
     setError('');
 
     try {
+      console.log('[重新發送頁面] 開始重新發送驗證郵件');
       await resendVerificationEmail();
+      console.log('[重新發送頁面] 重新發送成功');
       setResendSuccess(true);
       // 3秒後隱藏成功訊息
       setTimeout(() => setResendSuccess(false), 3000);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : '重新發送驗證郵件失敗';
+      console.error('[重新發送頁面] 重新發送失敗:', error);
+      let errorMessage = '重新發送驗證郵件失敗';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('auth/network-request-failed')) {
+          errorMessage = '網路連接問題，請檢查網路後重試';
+        } else if (error.message.includes('auth/too-many-requests')) {
+          errorMessage = '發送過於頻繁，請稍後再試';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       setError(errorMessage);
     } finally {
       setResendLoading(false);

@@ -38,11 +38,18 @@ export function useAuth() {
 
   const register = async (email: string, password: string) => {
     try {
+      console.log('[註冊] 開始註冊用戶:', email);
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      console.log('[註冊] 用戶註冊成功:', userCredential.user.uid);
+      
       // 註冊成功後自動發送驗證郵件
+      console.log('[註冊] 準備發送驗證郵件到:', email);
       await sendEmailVerification(userCredential.user);
+      console.log('[註冊] 驗證郵件發送成功');
+      
       return userCredential.user;
     } catch (error) {
+      console.error('[註冊] 註冊失敗:', error);
       throw error;
     }
   };
@@ -59,11 +66,16 @@ export function useAuth() {
   const resendVerificationEmail = async () => {
     try {
       if (user) {
+        console.log('[重新發送] 準備重新發送驗證郵件到:', user.email);
+        console.log('[重新發送] 用戶資訊:', { uid: user.uid, emailVerified: user.emailVerified });
         await sendEmailVerification(user);
+        console.log('[重新發送] 驗證郵件重新發送成功');
       } else {
+        console.error('[重新發送] 錯誤：沒有登入的用戶');
         throw new Error('沒有登入的用戶');
       }
     } catch (error) {
+      console.error('[重新發送] 重新發送驗證郵件失敗:', error);
       throw error;
     }
   };

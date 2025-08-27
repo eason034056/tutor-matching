@@ -563,7 +563,29 @@ export default function CaseUploadForm() {
       <div className="space-y-4">
         <h2 className="text-lg font-semibold">家長身分證上傳</h2>
         <div>
-          <Label htmlFor="idCard">若學生為大學以上，請上傳自己的身分證照片，證件皆會加上浮水印，僅供家教網審核使用</Label>
+          <Label htmlFor="idCard">
+            <div className="space-y-2">
+              <div className="font-medium text-gray-900">身分證件上傳 - 安全保障措施</div>
+              <div className="text-sm text-gray-600 space-y-1">
+                <div className="bg-green-50 p-3 rounded-md border-l-4 border-green-400">
+                  <div className="font-medium text-green-800 mb-1">🛡️ 為什麼需要身分證驗證？</div>
+                  <div className="text-green-700">為了保障家教老師與學生的安全，我們需要核實雙方身分，確保教學環境安全可靠</div>
+                </div>
+                <div className="mt-2">
+                  <div className="font-medium text-gray-700">📋 上傳說明：</div>
+                  • 若學生為高中以下（含高中），請上傳家長的身分證照片<br/>
+                  • 若學生為大學以上，請上傳學生本人的身分證照片<br/>
+                </div>
+                <div className="mt-2">
+                  <div className="font-medium text-gray-700">🔒 隱私保護承諾：</div>
+                  • 系統會自動為您的證件加上浮水印保護<br/>
+                  • 證件資料僅用於身分驗證，絕不外流或作其他用途<br/>
+                  • 審核完成後，原始檔案將會立即安全刪除<br/>
+                  • 符合個資法規範，您的隱私受到完整保障
+                </div>
+              </div>
+            </div>
+          </Label>
           <Input
             id="idCard"
             type="file"
@@ -572,7 +594,7 @@ export default function CaseUploadForm() {
             required
           />
           {preview && (
-            <div className="mt-2">
+            <div className="mt-4">
               <Image
                 src={preview} 
                 alt="身分證預覽" 

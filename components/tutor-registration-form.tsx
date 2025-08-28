@@ -54,7 +54,7 @@ const formSchema = z.object({
       // 檢查檔案大小（5MB = 5 * 1024 * 1024 bytes）
       if (file && file.size > 5 * 1024 * 1024) return false;
       // 檢查檔案類型
-      if (file && !['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(file.type)) return false;
+      if (file && !['image/*'].includes(file.type)) return false;
       return true;
     }, "請上傳學生證照片（格式：JPG、PNG、WebP，大小不超過5MB）"),
   idCard: z.any()
@@ -64,7 +64,7 @@ const formSchema = z.object({
       // 檢查檔案大小（5MB = 5 * 1024 * 1024 bytes）
       if (file && file.size > 5 * 1024 * 1024) return false;
       // 檢查檔案類型
-      if (file && !['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(file.type)) return false;
+      if (file && !['image/*'].includes(file.type)) return false;
       return true;
     }, "請上傳身分證照片（格式：JPG、PNG、WebP，大小不超過5MB）"),
 })
@@ -120,7 +120,7 @@ export default function TutorRegistrationForm() {
       console.log(`檔案資訊: 名稱=${file.name}, 大小=${originalSizeInMB}MB, 類型=${file.type}, 上傳類型=${type}`)
 
       // 檢查檔案類型
-      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+      const allowedTypes = ['image/*']
       if (!allowedTypes.includes(file.type)) {
         // 設置UI錯誤訊息
         setFileErrors(prev => ({
@@ -712,7 +712,7 @@ export default function TutorRegistrationForm() {
                       <div className="relative">
                         <Input
                           type="file"
-                          accept="image/jpeg,image/jpg,image/png,image/webp"
+                          accept="image/*"
                           onChange={(e) => {
                             const file = e.target.files?.[0]
                             if (file) {
@@ -845,7 +845,7 @@ export default function TutorRegistrationForm() {
                       <div className="relative">
                         <Input
                           type="file"
-                          accept="image/jpeg,image/jpg,image/png,image/webp"
+                          accept="image/*"
                           onChange={(e) => {
                             const file = e.target.files?.[0]
                             if (file) {

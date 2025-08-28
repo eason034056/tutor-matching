@@ -78,7 +78,7 @@ export default function CaseUploadForm() {
         console.log(`檔案資訊: 名稱=${file.name}, 大小=${originalSizeInMB}MB, 類型=${file.type}`)
 
         // 檢查檔案類型
-        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+        const allowedTypes = ['image/*']
         if (!allowedTypes.includes(file.type)) {
           // 設置UI錯誤訊息
           setFileError(`不支援的檔案格式！您選擇的是：${file.type}，請選擇JPG、PNG或WebP格式`)
@@ -788,7 +788,7 @@ export default function CaseUploadForm() {
               <Input
                 id="idCard"
                 type="file"
-                accept="image/jpeg,image/jpg,image/png,image/webp"
+                accept="image/*"
                 onChange={handleIdCardChange}
                 required
                 disabled={isCompressing}

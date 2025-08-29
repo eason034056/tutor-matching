@@ -77,16 +77,15 @@ export default function CaseUploadForm() {
         const originalSizeInMB = (file.size / (1024 * 1024)).toFixed(1)
         console.log(`檔案資訊: 名稱=${file.name}, 大小=${originalSizeInMB}MB, 類型=${file.type}`)
 
-        // 檢查檔案類型
-        const allowedTypes = ['image/*']
-        if (!allowedTypes.includes(file.type)) {
+        // 檢查檔案類型 - 支援所有圖片格式
+        if (!file.type.startsWith('image/')) {
           // 設置UI錯誤訊息
-          setFileError(`不支援的檔案格式！您選擇的是：${file.type}，請選擇JPG、PNG或WebP格式`)
+          setFileError(`不支援的檔案格式！您選擇的是：${file.type}，請選擇圖片格式`)
           setFileInfo('')
           setPreview('')
           setFormData(prev => ({ ...prev, idCard: null }))
           
-          toast.error('不支援的檔案格式！請選擇JPG、PNG或WebP格式的圖片')
+          toast.error('不支援的檔案格式！請選擇圖片檔案')
           // 清空input的值
           e.target.value = ''
           return
@@ -764,7 +763,7 @@ export default function CaseUploadForm() {
             <div className="text-sm text-emerald-800 space-y-2">
               <div className="flex items-center space-x-2">
                 <CheckCircle className="w-4 h-4 text-emerald-600" />
-                <span>支援 JPG、PNG、WebP 格式</span>
+                <span>支援所有圖片格式 (JPG、PNG、WebP、GIF、TIFF 等)</span>
               </div>
               <div className="flex items-center space-x-2">
                 <CheckCircle className="w-4 h-4 text-emerald-600" />
@@ -807,7 +806,7 @@ export default function CaseUploadForm() {
                       <CreditCard className="w-6 h-6 text-emerald-600" />
                     </div>
                     <p className="text-sm font-medium text-emerald-700 mb-1">點擊或拖拽上傳身分證照片</p>
-                    <p className="text-xs text-emerald-600">支援 JPG、PNG、WebP 格式</p>
+                    <p className="text-xs text-emerald-600">支援所有圖片格式</p>
                   </>
                 ) : (
                   <>

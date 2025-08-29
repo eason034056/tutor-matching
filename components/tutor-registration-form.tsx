@@ -53,20 +53,20 @@ const formSchema = z.object({
       const file = files[0];
       // 檢查檔案大小（5MB = 5 * 1024 * 1024 bytes）
       if (file && file.size > 5 * 1024 * 1024) return false;
-      // 檢查檔案類型
-      if (file && !['image/*'].includes(file.type)) return false;
+      // 檢查檔案類型 - 支援所有圖片格式
+      if (file && !file.type.startsWith('image/')) return false;
       return true;
-    }, "請上傳學生證照片（格式：JPG、PNG、WebP，大小不超過5MB）"),
+    }, "請上傳學生證照片（支援所有圖片格式，大小不超過5MB）"),
   idCard: z.any()
     .refine((files) => {
       if (!files || files.length === 0) return false;
       const file = files[0];
       // 檢查檔案大小（5MB = 5 * 1024 * 1024 bytes）
       if (file && file.size > 5 * 1024 * 1024) return false;
-      // 檢查檔案類型
-      if (file && !['image/*'].includes(file.type)) return false;
+      // 檢查檔案類型 - 支援所有圖片格式
+      if (file && !file.type.startsWith('image/')) return false;
       return true;
-    }, "請上傳身分證照片（格式：JPG、PNG、WebP，大小不超過5MB）"),
+    }, "請上傳身分證照片（支援所有圖片格式，大小不超過5MB）"),
 })
 
 export default function TutorRegistrationForm() {
@@ -119,18 +119,17 @@ export default function TutorRegistrationForm() {
       const originalSizeInMB = (file.size / (1024 * 1024)).toFixed(1)
       console.log(`檔案資訊: 名稱=${file.name}, 大小=${originalSizeInMB}MB, 類型=${file.type}, 上傳類型=${type}`)
 
-      // 檢查檔案類型
-      const allowedTypes = ['image/*']
-      if (!allowedTypes.includes(file.type)) {
+      // 檢查檔案類型 - 支援所有圖片格式
+      if (!file.type.startsWith('image/')) {
         // 設置UI錯誤訊息
         setFileErrors(prev => ({
           ...prev,
-          [type]: `不支援的檔案格式！您選擇的是：${file.type}，請選擇JPG、PNG或WebP格式`
+          [type]: `不支援的檔案格式！您選擇的是：${file.type}，請選擇圖片格式`
         }))
         setFileInfos(prev => ({ ...prev, [type]: '' }))
         setPreviews(prev => ({ ...prev, [type]: '' }))
         
-        toast.error('不支援的檔案格式！請選擇JPG、PNG或WebP格式的圖片')
+        toast.error('不支援的檔案格式！請選擇圖片檔案')
         return
       }
 
@@ -694,7 +693,7 @@ export default function TutorRegistrationForm() {
                     <div className="text-sm text-emerald-800 space-y-1">
                       <div className="flex items-center space-x-2">
                         <CheckCircle className="w-4 h-4 text-emerald-600" />
-                        <span>支援 JPG、PNG、WebP 格式</span>
+                        <span>支援所有圖片格式 (JPG、PNG、WebP、GIF、TIFF 等)</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <CheckCircle className="w-4 h-4 text-emerald-600" />
@@ -737,7 +736,7 @@ export default function TutorRegistrationForm() {
                                 <GraduationCap className="w-6 h-6 text-emerald-600" />
                               </div>
                               <p className="text-sm font-medium text-emerald-700 mb-1">點擊或拖拽上傳學生證照片</p>
-                              <p className="text-xs text-emerald-600">支援 JPG、PNG、WebP 格式</p>
+                              <p className="text-xs text-emerald-600">支援所有圖片格式</p>
                             </>
                           ) : (
                             <>
@@ -827,7 +826,7 @@ export default function TutorRegistrationForm() {
                     <div className="text-sm text-emerald-800 space-y-1">
                       <div className="flex items-center space-x-2">
                         <CheckCircle className="w-4 h-4 text-emerald-600" />
-                        <span>支援 JPG、PNG、WebP 格式</span>
+                        <span>支援所有圖片格式 (JPG、PNG、WebP、GIF、TIFF 等)</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <CheckCircle className="w-4 h-4 text-emerald-600" />
@@ -870,7 +869,7 @@ export default function TutorRegistrationForm() {
                                 <CreditCard className="w-6 h-6 text-emerald-600" />
                               </div>
                               <p className="text-sm font-medium text-emerald-700 mb-1">點擊或拖拽上傳身分證照片</p>
-                              <p className="text-xs text-emerald-600">支援 JPG、PNG、WebP 格式</p>
+                              <p className="text-xs text-emerald-600">支援所有圖片格式</p>
                             </>
                           ) : (
                             <>

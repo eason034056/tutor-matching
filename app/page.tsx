@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import TutorCasesClient from './tutor-cases/client'
 import InfiniteCarousel from '@/components/infinite-carousel'
 import { ScrollAnimationWrapper } from '@/hooks/useScrollAnimation'
+import { Users, ArrowRight, Sparkles } from 'lucide-react'
 
 // 圖片路徑
 const logos = [
@@ -65,12 +66,34 @@ export default function Home() {
             幫助家長根據需求找到最適合的家教老師
           </p>
           
-          {/* CTA Button */}
-          <Link href="/case-upload">
-            <Button size="lg" className="bg-brand-500 text-white hover:bg-brand-600 px-8 py-4 rounded-full text-lg font-medium transition-colors">
-              免費諮詢 →
-            </Button>
-          </Link>
+          {/* 超級醒目的 CTA Button */}
+          <div className="relative">
+            {/* 背景光暈效果 */}
+            <div className="absolute inset-0 -m-4 "></div>
+            
+            <Link href="/case-upload" className="relative block">
+              <Button 
+                size="lg" 
+                className="relative overflow-hidden bg-gradient-to-r from-green-500 via-emerald-600 to-teal-600 hover:from-green-600 hover:via-emerald-700 hover:to-teal-700 text-white font-bold px-12 py-6 rounded-full text-xl shadow-2xl hover:shadow-3xl transform hover:-translate-y-1 transition-all duration-300 hover:scale-105 border-2 border-white/20"
+              >
+                {/* 按鈕內部光效 */}
+                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                
+                {/* 閃爍效果 */}
+                <div className="absolute top-0 left-0 w-full h-full">
+                  <Sparkles className="absolute top-2 left-4 w-4 h-4 text-white/80 animate-pulse" />
+                  <Sparkles className="absolute bottom-2 right-6 w-3 h-3 text-yellow-200 animate-pulse" style={{animationDelay: '1s'}} />
+                </div>
+                
+                <div className="relative flex items-center justify-center space-x-3">
+                  <Users className="w-6 h-6" />
+                  <span className="font-extrabold tracking-wide">家長找家教</span>
+                  <ArrowRight className="w-6 h-6 transition-transform group-hover:translate-x-1" />
+                </div>
+                
+              </Button>
+            </Link>
+          </div>
         </div>
       </section>
 

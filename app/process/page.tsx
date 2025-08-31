@@ -35,7 +35,7 @@ export default function ProcessPage() {
         <div className="flex gap-4">
           <span className="font-bold">4.</span>
           <p className="text-gray-700 leading-relaxed whitespace-pre-line">
-            點擊「應徵」按鈕後寄信給家教中心取得合約書以及同意書
+            點擊「應徵」按鈕後傳line給家教中心取得合約書以及同意書
           </p>
         </div>
 
@@ -49,7 +49,7 @@ export default function ProcessPage() {
         <div className="flex gap-4">
           <span className="font-bold">6.</span>
           <p className="text-gray-700 leading-relaxed whitespace-pre-line">
-            取得家長聯絡資訊之後三天內要用email回報試教時間，否則案件會被重新開放應徵
+            取得家長聯絡資訊之後三天內要用line回報試教時間，否則案件會被重新開放應徵
           </p>
         </div>
 

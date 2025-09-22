@@ -1,5 +1,21 @@
 'use client';
 
+// 🔧 新增：檢測瀏覽器是否支援 WebP
+function isWebPSupported(): boolean {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return false;
+    
+    // 嘗試創建WebP格式的blob
+    return canvas.toDataURL('image/webp').indexOf('image/webp') === 5;
+  } catch {
+    return false;
+  }
+}
+
 export async function addWatermark(file: File): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -42,11 +58,46 @@ export async function addWatermark(file: File): Promise<Blob> {
         ctx.restore();
       }
       
-      // 轉換為 blob（使用 PNG 格式保持原始品質）
+      // 🔧 改進：智能格式選擇 - 保持支援品質參數的格式，優化不支援的格式
+      let outputType = file.type;
+      let quality: number | undefined = 0.9; // 品質設定
+      
+      // 支援品質參數的格式：保持原格式
+      if (file.type.includes('jpeg') || file.type.includes('jpg')) {
+        // JPEG格式：品質0.9
+        outputType = file.type;
+        quality = 0.9;
+      } else if (file.type.includes('webp')) {
+        // WebP格式：品質0.9（WebP通常比PNG小很多）
+        outputType = file.type;
+        quality = 0.9;
+      } else if (file.type.includes('avif')) {
+        // AVIF格式：品質0.9（最新的高效格式）
+        outputType = file.type;
+        quality = 0.9;
+      } else {
+        // 不支援品質參數的格式（PNG, GIF, BMP, TIFF等）
+        // 優先選擇：WebP > JPEG > PNG
+        if (isWebPSupported()) {
+          outputType = 'image/webp';
+          quality = 0.9;
+        } else {
+          outputType = 'image/jpeg';
+          quality = 0.9;
+        }
+      }
+      
+      console.log(`使用輸出格式: ${outputType}${quality ? `, 品質: ${quality}` : ''}`);
+      
+      // 轉換為blob，保持原始格式
       canvas.toBlob((blob) => {
-        if (blob) resolve(blob);
-        else reject(new Error('Failed to create blob'));
-      }, 'image/png');
+        if (blob) {
+          console.log(`浮水印處理完成: ${(blob.size / 1024 / 1024).toFixed(2)}MB (${outputType})`);
+          resolve(blob);
+        } else {
+          reject(new Error('Failed to create blob'));
+        }
+      }, outputType, quality);
     };
     
     img.onerror = () => reject(new Error('Failed to load image'));
@@ -118,10 +169,20 @@ async function compressWithQuality(
 ): Promise<File> {
   const maxBytes = maxSizeMB * 1024 * 1024;
   
-  // 確定輸出格式 - 如果不是JPEG，轉換為JPEG以獲得更好的壓縮
+  // 🔧 改進：智能選擇最佳壓縮格式
   let outputType = fileType;
-  if (!fileType.includes('jpeg') && !fileType.includes('jpg')) {
-    outputType = 'image/jpeg';
+  
+  // 如果原格式支援品質參數，保持原格式
+  if (fileType.includes('jpeg') || fileType.includes('jpg') || 
+      fileType.includes('webp') || fileType.includes('avif')) {
+    outputType = fileType;
+  } else {
+    // 不支援品質參數的格式，選擇最佳壓縮格式
+    if (isWebPSupported()) {
+      outputType = 'image/webp'; // WebP壓縮效果最好
+    } else {
+      outputType = 'image/jpeg'; // 退回JPEG
+    }
   }
 
   // 嘗試不同的品質設定
@@ -190,4 +251,47 @@ function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number):
       else reject(new Error('無法建立 blob'));
     }, type, quality);
   });
+}
+
+// 🔧 新增：完整的圖片處理函數（壓縮 + 浮水印 + 二次壓縮）
+export async function processImageComplete(file: File, maxSizeMB: number = 5): Promise<File> {
+  console.log(`開始完整圖片處理: ${file.name}, 原始大小: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+  
+  // 第一步：如果檔案太大，先進行初步壓縮
+  let processedFile = file;
+  if (file.size > maxSizeMB * 1024 * 1024) {
+    console.log('檔案超過限制，進行初步壓縮...');
+    processedFile = await compressImage(file, maxSizeMB);
+    console.log(`初步壓縮完成: ${(processedFile.size / 1024 / 1024).toFixed(2)}MB`);
+  }
+  
+  // 第二步：添加浮水印
+  console.log('添加浮水印...');
+  const watermarkedBlob = await addWatermark(processedFile);
+  console.log(`浮水印添加完成: ${(watermarkedBlob.size / 1024 / 1024).toFixed(2)}MB`);
+  
+  // 第三步：檢查浮水印後的檔案是否超過限制，如需要進行二次壓縮
+  if (watermarkedBlob.size > maxSizeMB * 1024 * 1024) {
+    console.log('添加浮水印後檔案超過限制，進行二次壓縮...');
+    
+    // 將 blob 轉為 File 以便進行壓縮
+    const watermarkedFile = new File([watermarkedBlob], processedFile.name, {
+      type: watermarkedBlob.type,
+      lastModified: Date.now()
+    });
+    
+    // 進行二次壓縮
+    const finalFile = await compressImage(watermarkedFile, maxSizeMB);
+    console.log(`二次壓縮完成: ${(finalFile.size / 1024 / 1024).toFixed(2)}MB`);
+    return finalFile;
+  }
+  
+  // 如果浮水印後檔案大小合適，直接返回
+  const finalFile = new File([watermarkedBlob], processedFile.name, {
+    type: watermarkedBlob.type,
+    lastModified: Date.now()
+  });
+  
+  console.log(`圖片處理完成: ${(finalFile.size / 1024 / 1024).toFixed(2)}MB`);
+  return finalFile;
 } 

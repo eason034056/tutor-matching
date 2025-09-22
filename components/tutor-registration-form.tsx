@@ -9,7 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
-import { addWatermark, compressImage } from "@/lib/imageUtils";
+import { processImageComplete } from "@/lib/imageUtils";
 import Image from 'next/image'
 import { XCircle, AlertCircle, Loader2, GraduationCap, Clock, ArrowRight, UserCheck, FileText, CheckCircle, CreditCard } from 'lucide-react'
 import { useRouter } from "next/navigation";
@@ -51,22 +51,20 @@ const formSchema = z.object({
     .refine((files) => {
       if (!files || files.length === 0) return false;
       const file = files[0];
-      // 檢查檔案大小（5MB = 5 * 1024 * 1024 bytes）
-      if (file && file.size > 5 * 1024 * 1024) return false;
+      // 🔧 修復：只檢查檔案類型，大小由 processImageComplete 自動處理
       // 檢查檔案類型 - 支援所有圖片格式
       if (file && !file.type.startsWith('image/')) return false;
       return true;
-    }, "請上傳學生證照片（支援所有圖片格式，大小不超過5MB）"),
+    }, "請上傳學生證照片（支援所有圖片格式，系統會自動壓縮大檔案）"),
   idCard: z.any()
     .refine((files) => {
       if (!files || files.length === 0) return false;
       const file = files[0];
-      // 檢查檔案大小（5MB = 5 * 1024 * 1024 bytes）
-      if (file && file.size > 5 * 1024 * 1024) return false;
+      // 🔧 修復：只檢查檔案類型，大小由 processImageComplete 自動處理
       // 檢查檔案類型 - 支援所有圖片格式
       if (file && !file.type.startsWith('image/')) return false;
       return true;
-    }, "請上傳身分證照片（支援所有圖片格式，大小不超過5MB）"),
+    }, "請上傳身分證照片（支援所有圖片格式，系統會自動壓縮大檔案）"),
 })
 
 export default function TutorRegistrationForm() {
@@ -136,82 +134,74 @@ export default function TutorRegistrationForm() {
       // 清除之前的錯誤訊息
       setFileErrors(prev => ({ ...prev, [type]: '' }))
       
-      // 自動壓縮圖片
-      let processedFile = file
-      const maxSize = 5 * 1024 * 1024 // 5MB
-      
-      if (file.size > maxSize) {
-        // 顯示壓縮進度
-        setIsCompressing(prev => ({ ...prev, [type]: true }))
-        setFileInfos(prev => ({ 
-          ...prev, 
-          [type]: `🔄 檔案較大 (${originalSizeInMB}MB)，正在自動壓縮...` 
-        }))
-        
-        toast.info(`📦 正在自動壓縮${type === 'studentIdCard' ? '學生證' : '身分證'}圖片，請稍候...`)
-        
-        try {
-          processedFile = await compressImage(file, 5) // 壓縮至5MB以下
-          const compressedSizeInMB = (processedFile.size / (1024 * 1024)).toFixed(1)
-          
-          setFileInfos(prev => ({ 
-            ...prev, 
-            [type]: `✅ 壓縮完成！從 ${originalSizeInMB}MB 壓縮至 ${compressedSizeInMB}MB` 
-          }))
-          toast.success(`🎉 ${type === 'studentIdCard' ? '學生證' : '身分證'}自動壓縮成功！從 ${originalSizeInMB}MB 壓縮至 ${compressedSizeInMB}MB`)
-          
-        } catch (compressionError) {
-          console.error('圖片壓縮失敗:', compressionError)
-          setFileErrors(prev => ({ 
-            ...prev, 
-            [type]: '圖片壓縮失敗！請嘗試選擇較小的圖片或使用其他圖片' 
-          }))
-          setFileInfos(prev => ({ ...prev, [type]: '' }))
-          toast.error('圖片壓縮失敗，請嘗試選擇較小的圖片')
-          return
-        } finally {
-          setIsCompressing(prev => ({ ...prev, [type]: false }))
-        }
-      } else {
-        // 檔案已經小於限制
-        setFileInfos(prev => ({ 
-          ...prev, 
-          [type]: `✅ 檔案大小適中！大小：${originalSizeInMB}MB` 
-        }))
-        toast.success(`${type === 'studentIdCard' ? '學生證' : '身分證'}圖片選擇成功！大小：${originalSizeInMB}MB`)
-      }
-
-      // 添加浮水印並預覽 - 浮水印版本將上傳到雲端
-      const watermarkedBlob = await addWatermark(processedFile)
-      
-      // 將浮水印版本轉換為File對象，這個版本會上傳到雲端
-      const watermarkedFile = new File([watermarkedBlob], processedFile.name, {
-        type: watermarkedBlob.type,
-        lastModified: Date.now()
-      })
-      
-      // 更新表單數據為浮水印版本
-      // 創建一個FileList-like對象來符合表單期望的類型
-      const fileList = Object.assign([watermarkedFile], {
-        item: (index: number) => index === 0 ? watermarkedFile : null,
-        length: 1
-      }) as FileList
-      form.setValue(type, fileList)
-      
-      // 顯示預覽
-      const previewUrl = URL.createObjectURL(watermarkedBlob)
-      setPreviews(prev => ({
-        ...prev,
-        [type]: previewUrl
+      // 🔧 修復：使用新的 processImageComplete 函數進行完整處理
+      // 顯示處理進度
+      setIsCompressing(prev => ({ ...prev, [type]: true }))
+      setFileInfos(prev => ({ 
+        ...prev, 
+        [type]: `🔄 正在處理圖片 (${originalSizeInMB}MB)...`
       }))
       
-      // 重置提交狀態
-      if (submitStatus !== 'idle') {
-        setSubmitStatus('idle')
+      toast.info(`📦 正在處理${type === 'studentIdCard' ? '學生證' : '身分證'}圖片，請稍候...`)
+      
+      try {
+        // 完整處理圖片（壓縮 + 浮水印 + 二次壓縮）
+        const processedFile = await processImageComplete(file, 5)
+        const finalSizeInMB = (processedFile.size / (1024 * 1024)).toFixed(1)
+        
+        console.log(`圖片處理完成: ${file.name} -> ${processedFile.name}, ${originalSizeInMB}MB -> ${finalSizeInMB}MB`)
+        
+        // 更新UI狀態
+        if (originalSizeInMB !== finalSizeInMB) {
+          setFileInfos(prev => ({ 
+            ...prev, 
+            [type]: `✅ 處理完成！從 ${originalSizeInMB}MB 優化至 ${finalSizeInMB}MB` 
+          }))
+          toast.success(`🎉 ${type === 'studentIdCard' ? '學生證' : '身分證'}處理成功！從 ${originalSizeInMB}MB 優化至 ${finalSizeInMB}MB`)
+        } else {
+          setFileInfos(prev => ({ 
+            ...prev, 
+            [type]: `✅ 圖片處理完成！大小：${finalSizeInMB}MB`
+          }))
+          toast.success(`🎉 ${type === 'studentIdCard' ? '學生證' : '身分證'}處理完成！大小：${finalSizeInMB}MB`)
+        }
+        
+        // 更新表單數據
+        // 創建一個FileList-like對象來符合表單期望的類型
+        const fileList = Object.assign([processedFile], {
+          item: (index: number) => index === 0 ? processedFile : null,
+          length: 1
+        }) as FileList
+        form.setValue(type, fileList)
+        
+        // 顯示預覽
+        const previewUrl = URL.createObjectURL(processedFile)
+        setPreviews(prev => ({
+          ...prev,
+          [type]: previewUrl
+        }))
+        
+        // 重置提交狀態
+        if (submitStatus !== 'idle') {
+          setSubmitStatus('idle')
+        }
+        
+      } catch (processingError) {
+        console.error('圖片處理失敗:', processingError)
+        setFileErrors(prev => ({ 
+          ...prev, 
+          [type]: '圖片處理失敗！請嘗試選擇其他圖片或確認檔案是否有效' 
+        }))
+        setFileInfos(prev => ({ ...prev, [type]: '' }))
+        setPreviews(prev => ({ ...prev, [type]: '' }))
+        toast.error('圖片處理失敗，請嘗試選擇其他圖片')
+        return
+      } finally {
+        setIsCompressing(prev => ({ ...prev, [type]: false }))
       }
       
     } catch (error) {
-      console.error('預覽圖片失敗:', error)
+      console.error('圖片預覽失敗:', error)
       
       // 設置UI錯誤訊息
       setFileErrors(prev => ({

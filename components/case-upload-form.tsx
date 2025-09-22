@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { addWatermark, compressImage } from "@/lib/imageUtils";
+import { processImageComplete } from "@/lib/imageUtils";
 import { toast } from "sonner"
 import Image from 'next/image'
 import { CheckCircle, XCircle, AlertCircle, Loader2, FileText, Clock, ArrowRight, CreditCard } from 'lucide-react'
@@ -69,7 +69,7 @@ export default function CaseUploadForm() {
     }
   }
 
-  // 處理身分證預覽 - 加入自動壓縮功能
+  // 🔧 修復：處理身分證預覽 - 使用完整的圖片處理流程
   const handleIdCardChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
@@ -94,56 +94,50 @@ export default function CaseUploadForm() {
         // 清除之前的錯誤訊息
         setFileError('')
         
-        // 自動壓縮圖片
-        let processedFile = file
-        const maxSize = 5 * 1024 * 1024 // 5MB
+        // 🔧 修復：使用新的 processImageComplete 函數進行完整處理
+        // 顯示處理進度
+        setIsCompressing(true)
+        setFileInfo(`🔄 正在處理圖片 (${originalSizeInMB}MB)...`)
         
-        if (file.size > maxSize) {
-          // 顯示壓縮進度
-          setIsCompressing(true)
-          setFileInfo(`🔄 檔案較大 (${originalSizeInMB}MB)，正在自動壓縮...`)
+        toast.info('📦 正在處理身分證圖片，請稍候...')
+        
+        try {
+          // 完整處理圖片（壓縮 + 浮水印 + 二次壓縮）
+          const processedFile = await processImageComplete(file, 5)
+          const finalSizeInMB = (processedFile.size / (1024 * 1024)).toFixed(1)
           
-          toast.info('📦 正在自動壓縮圖片，請稍候...')
+          console.log(`圖片處理完成: ${file.name} -> ${processedFile.name}, ${originalSizeInMB}MB -> ${finalSizeInMB}MB`)
           
-          try {
-            processedFile = await compressImage(file, 5) // 壓縮至5MB以下
-            const compressedSizeInMB = (processedFile.size / (1024 * 1024)).toFixed(1)
-            
-            setFileInfo(`✅ 壓縮完成！從 ${originalSizeInMB}MB 壓縮至 ${compressedSizeInMB}MB`)
-            toast.success(`🎉 自動壓縮成功！從 ${originalSizeInMB}MB 壓縮至 ${compressedSizeInMB}MB`)
-            
-          } catch (compressionError) {
-            console.error('圖片壓縮失敗:', compressionError)
-            setFileError('圖片壓縮失敗！請嘗試選擇較小的圖片或使用其他圖片')
-            toast.error('圖片壓縮失敗，請嘗試選擇較小的圖片')
-            e.target.value = ''
-            return
-          } finally {
-            setIsCompressing(false)
+          // 更新UI狀態
+          if (originalSizeInMB !== finalSizeInMB) {
+            setFileInfo(`✅ 處理完成！從 ${originalSizeInMB}MB 優化至 ${finalSizeInMB}MB`)
+            toast.success(`🎉 身分證處理成功！從 ${originalSizeInMB}MB 優化至 ${finalSizeInMB}MB`)
+          } else {
+            setFileInfo(`✅ 圖片處理完成！大小：${finalSizeInMB}MB`)
+            toast.success(`🎉 身分證處理完成！大小：${finalSizeInMB}MB`)
           }
-        } else {
-          // 檔案已經小於限制
-          setFileInfo(`✅ 檔案大小適中！大小：${originalSizeInMB}MB`)
-          toast.success(`圖片選擇成功！大小：${originalSizeInMB}MB`)
-        }
-
-        // 添加浮水印並預覽 - 浮水印版本將上傳到雲端
-        const watermarkedBlob = await addWatermark(processedFile)
-        
-        // 將浮水印版本轉換為File對象，這個版本會上傳到雲端
-        const watermarkedFile = new File([watermarkedBlob], processedFile.name, {
-          type: watermarkedBlob.type,
-          lastModified: Date.now()
-        })
-        
-        // 顯示預覽並更新表單數據為浮水印版本
-        const previewUrl = URL.createObjectURL(watermarkedBlob)
-        setPreview(previewUrl)
-        setFormData(prev => ({ ...prev, idCard: watermarkedFile }))
-        
-        // 重置提交狀態
-        if (submitStatus !== 'idle') {
-          setSubmitStatus('idle')
+          
+          // 顯示預覽並更新表單數據
+          const previewUrl = URL.createObjectURL(processedFile)
+          setPreview(previewUrl)
+          setFormData(prev => ({ ...prev, idCard: processedFile }))
+          
+          // 重置提交狀態
+          if (submitStatus !== 'idle') {
+            setSubmitStatus('idle')
+          }
+          
+        } catch (processingError) {
+          console.error('圖片處理失敗:', processingError)
+          setFileError('圖片處理失敗！請嘗試選擇其他圖片或確認檔案是否有效')
+          setFileInfo('')
+          setPreview('')
+          setFormData(prev => ({ ...prev, idCard: null }))
+          toast.error('圖片處理失敗，請嘗試選擇其他圖片')
+          e.target.value = ''
+          return
+        } finally {
+          setIsCompressing(false)
         }
         
       } catch (error) {

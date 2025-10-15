@@ -24,6 +24,34 @@ export default function TutorRegistrationPage() {
       </div>
 
       <div className="max-w-4xl mx-auto space-y-8">
+        {/* 表單填寫區域 */}
+        <Card className="bg-white border-blue-200 shadow-lg">
+          <CardHeader className="text-center pb-6">
+            <div className="flex items-center justify-center bg-black-100 rounded-full my-6">
+              <FileText className="w-8 h-8 text-black-600" />
+            </div>
+            <CardTitle className="text-2xl text-gray-900 mb-3">
+              方式ㄧ：詳細註冊表單
+            </CardTitle>
+            <CardDescription className="text-gray-600 text-base max-w-lg mx-auto">
+              請填寫以下表單以登錄成為教師。登錄完後會進行身份審核，審核時間大約1~2天，審核完畢後會收到email傳送教師編號。請記得您的教師編號，後續接案都需使用教師編號進行應徵。
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <TutorRegistrationForm />
+          </CardContent>
+        </Card>
+
+        {/* 分隔線 */}
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-300"></div>
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-4 bg-gray-50 text-gray-500 font-medium">或者</span>
+          </div>
+        </div>
+
         {/* 快速聯繫 CTA 區域 */}
         <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200 shadow-lg">
           <CardContent className="p-8">
@@ -33,7 +61,7 @@ export default function TutorRegistrationPage() {
               </div>
               
               <h2 className="text-2xl font-bold text-gray-900 mb-3">
-                方式一：即時LINE諮詢
+                方式二：即時LINE諮詢
               </h2>
               
               <p className="text-gray-600 mb-6 max-w-lg mx-auto">
@@ -85,33 +113,7 @@ export default function TutorRegistrationPage() {
           </CardContent>
         </Card>
 
-        {/* 分隔線 */}
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-300"></div>
-          </div>
-          <div className="relative flex justify-center text-sm">
-            <span className="px-4 bg-gray-50 text-gray-500 font-medium">或者</span>
-          </div>
-        </div>
-
-        {/* 表單填寫區域 */}
-        <Card className="bg-white border-blue-200 shadow-lg">
-          <CardHeader className="text-center pb-6">
-            <div className="flex items-center justify-center bg-black-100 rounded-full my-6">
-              <FileText className="w-8 h-8 text-black-600" />
-            </div>
-            <CardTitle className="text-2xl text-gray-900 mb-3">
-              方式二：詳細註冊表單
-            </CardTitle>
-            <CardDescription className="text-gray-600 text-base max-w-lg mx-auto">
-              請填寫以下表單以登錄成為教師。登錄完後會進行身份審核，審核時間大約1~2天，審核完畢後會收到email傳送教師編號。請記得您的教師編號，後續接案都需使用教師編號進行應徵。
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <TutorRegistrationForm />
-          </CardContent>
-        </Card>
+        
       </div>
     </div>
   )

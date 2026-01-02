@@ -17,7 +17,7 @@ function normalizeDelimiters(src: string) {
 
 export function MarkdownMessage({ children }: { children: string }) {
   return (
-    <div className="prose max-w-none prose-sm sm:prose-base break-words">
+    <div className="prose max-w-none prose-sm sm:prose-base break-words [&>h1]:mt-8 [&>h1]:mb-4 [&>h2]:mt-6 [&>h2]:mb-3 [&>h3]:mt-5 [&>h3]:mb-2">
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}

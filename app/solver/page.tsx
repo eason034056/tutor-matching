@@ -18,7 +18,9 @@ import {
   Clock,
   Menu,
   X,
-  Home
+  Home,
+  Edit2,
+  Check
 } from 'lucide-react';
 import 'katex/dist/katex.min.css';
 import type { ChatThread, Message } from '@/lib/types';
@@ -68,6 +70,11 @@ export default function SolverPage() {
   // 新增：聊天記錄載入狀態管理
   const [loadingThreadId, setLoadingThreadId] = useState<string | null>(null);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  
+  // 新增：編輯標題相關狀態
+  const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
+  const [updatingTitleId, setUpdatingTitleId] = useState<string | null>(null);
   
   // 新增：計時相關狀態
   const [requestStartTime, setRequestStartTime] = useState<number | null>(null);
@@ -285,6 +292,72 @@ export default function SolverPage() {
         setShowCropper(true);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  // 開始編輯標題
+  const startEditTitle = (threadId: string, currentTitle: string) => {
+    setEditingThreadId(threadId);
+    setEditingTitle(currentTitle);
+  };
+
+  // 取消編輯標題
+  const cancelEditTitle = () => {
+    setEditingThreadId(null);
+    setEditingTitle('');
+  };
+
+  // 儲存編輯的標題
+  const saveEditTitle = async (threadId: string) => {
+    if (!user || !editingTitle.trim()) {
+      alert('標題不能為空');
+      return;
+    }
+
+    if (editingTitle.trim().length > 50) {
+      alert('標題不能超過 50 個字');
+      return;
+    }
+
+    setUpdatingTitleId(threadId);
+
+    try {
+      const response = await fetch(`/api/solver/threads/${threadId}/update-title`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user.uid,
+          newTitle: editingTitle.trim()
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[標題更新成功]:', data);
+        
+        // 更新本地的 threads 列表
+        setThreads(prevThreads => 
+          prevThreads.map(thread => 
+            thread.id === threadId 
+              ? { ...thread, title: editingTitle.trim() }
+              : thread
+          )
+        );
+        
+        // 清除編輯狀態
+        setEditingThreadId(null);
+        setEditingTitle('');
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        alert('更新標題失敗：' + (errorData.error || '未知錯誤'));
+      }
+    } catch (error) {
+      console.error('Failed to update title:', error);
+      alert('更新標題失敗，請稍後再試');
+    } finally {
+      setUpdatingTitleId(null);
     }
   };
 
@@ -704,17 +777,20 @@ export default function SolverPage() {
                 const isLoading = loadingThreadId === thread.id;
                 const isCurrentThread = currentThreadId === thread.id;
                 const isDisabled = isLoadingMessages && !isLoading;
+                const isEditing = editingThreadId === thread.id;
+                const isUpdating = updatingTitleId === thread.id;
                 
                 return (
                   <div
                     key={thread.id}
-                    onClick={() => !isDisabled && loadThreadMessages(thread.id)}
                     className={`px-3 py-2 rounded-lg transition-all duration-200 mb-1 relative overflow-hidden ${
                       isCurrentThread
                         ? 'bg-green-50 border-l-4 border-green-500'
                         : isDisabled
                         ? 'opacity-50 cursor-not-allowed'
-                        : 'hover:bg-gray-50 cursor-pointer'
+                        : isEditing
+                        ? 'bg-green-50 border border-green-200'
+                        : 'hover:bg-gray-50'
                     } ${isLoading ? 'bg-green-100 shadow-sm' : ''}`}
                   >
                     {/* 載入覆蓋層 */}
@@ -728,9 +804,12 @@ export default function SolverPage() {
                     )}
                     
                     <div className="flex items-start space-x-2 w-full">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
-                        thread.hasImage ? 'bg-green-100' : 'bg-gray-100'
-                      } ${isLoading ? 'bg-green-200' : ''}`}>
+                      <div 
+                        className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
+                          thread.hasImage ? 'bg-green-100' : 'bg-gray-100'
+                        } ${isLoading ? 'bg-green-200' : ''} ${!isEditing ? 'cursor-pointer' : ''}`}
+                        onClick={() => !isDisabled && !isEditing && loadThreadMessages(thread.id)}
+                      >
                         {thread.hasImage ? (
                           <ImageIcon className={`w-4 h-4 transition-colors ${
                             isLoading ? 'text-green-700' : 'text-green-600'
@@ -741,24 +820,94 @@ export default function SolverPage() {
                           }`} />
                         )}
                       </div>
+                      
                       <div className="flex-1 min-w-0 overflow-hidden">
-                        <p className={`text-sm font-medium truncate transition-colors ${
-                          isLoading ? 'text-green-800' : 'text-gray-900'
-                        }`}>
-                          {thread.title}
-                        </p>
-                        <div className="flex items-center text-xs text-gray-500 mt-0.5 truncate">
-                          <Clock className="w-3 h-3 mr-1 flex-shrink-0" />
-                          <span className="truncate">{formatTime(thread.lastUpdated)}</span>
-                        </div>
+                        {isEditing ? (
+                          // 編輯模式 - 簡潔版
+                          <div className="flex items-center space-x-1">
+                            <Input
+                              type="text"
+                              value={editingTitle}
+                              onChange={(e) => setEditingTitle(e.target.value)}
+                              className="text-sm h-7 px-2 flex-1 border-2 border-gray-900 focus:border-gray-900 focus:ring-gray-900 focus-visible:ring-gray-900"
+                              placeholder="輸入新標題"
+                              maxLength={50}
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  saveEditTitle(thread.id);
+                                } else if (e.key === 'Escape') {
+                                  cancelEditTitle();
+                                }
+                              }}
+                              disabled={isUpdating}
+                            />
+                            <Button
+                              size="sm"
+                              className="h-7 w-7 p-0 bg-green-500 hover:bg-green-600 text-white flex-shrink-0"
+                              onClick={() => saveEditTitle(thread.id)}
+                              disabled={isUpdating || !editingTitle.trim()}
+                              title="儲存 (Enter)"
+                            >
+                              {isUpdating ? (
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Check className="w-3.5 h-3.5" />
+                              )}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0 hover:bg-gray-200 flex-shrink-0"
+                              onClick={cancelEditTitle}
+                              disabled={isUpdating}
+                              title="取消 (Esc)"
+                            >
+                              <X className="w-3.5 h-3.5 text-gray-500" />
+                            </Button>
+                          </div>
+                        ) : (
+                          // 一般顯示模式
+                          <div 
+                            className="cursor-pointer"
+                            onClick={() => !isDisabled && loadThreadMessages(thread.id)}
+                          >
+                            <p className={`text-sm font-medium truncate transition-colors ${
+                              isLoading ? 'text-green-800' : 'text-gray-900'
+                            }`}>
+                              {thread.title}
+                            </p>
+                            <div className="flex items-center text-xs text-gray-500 mt-0.5 truncate">
+                              <Clock className="w-3 h-3 mr-1 flex-shrink-0" />
+                              <span className="truncate">{formatTime(thread.lastUpdated)}</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                       
-                      {/* 載入指示器 - 改為flex佈局的一部分 */}
-                      {isLoading && (
-                        <div className="flex-shrink-0 ml-1">
+                      {/* 右側按鈕區域 */}
+                      <div className="flex-shrink-0 flex items-center space-x-1">
+                        {/* 載入指示器 */}
+                        {isLoading && (
                           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                        </div>
-                      )}
+                        )}
+                        
+                        {/* 編輯按鈕 */}
+                        {!isEditing && !isLoading && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 hover:bg-gray-200"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              startEditTitle(thread.id, thread.title);
+                            }}
+                            title="編輯標題"
+                          >
+                            <Edit2 className="w-3.5 h-3.5 text-gray-500" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -798,7 +947,7 @@ export default function SolverPage() {
             <div className="max-w-md w-full mobile-content-area flex flex-col justify-center">
               <div className="text-center mb-8">
                 {/* 桌機版才顯示 AI icon，手機版隱藏 */}
-                <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 overflow-hidden hidden md:flex">
+                <div className="w-16 h-16 rounded-2xl hidden md:flex items-center justify-center mx-auto mb-4 overflow-hidden">
                   <Image 
                     src="/teacher-icon-192x192.png" 
                     alt="AI助手" 

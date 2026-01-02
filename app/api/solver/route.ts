@@ -20,7 +20,7 @@ const openrouter = new OpenAI({
   },
 });
 
-// 格式化時間為 title 用
+// 格式化時間為 title 用（備用方案）
 function formatTimeForTitle(timestamp: number): string {
   const date = new Date(timestamp);
   const now = new Date();
@@ -55,6 +55,68 @@ function formatTimeForTitle(timestamp: number): string {
   }
 }
 
+// 使用 AI 生成聊天記錄標題（根據 AI 回答內容）
+async function generateThreadTitle(aiResponse: string, subjectType?: string | null): Promise<string> {
+  try {
+    // 限制訊息長度，避免太長的輸入（取開頭部分，通常包含題目摘要）
+    const truncatedResponse = aiResponse.length > 300 ? aiResponse.substring(0, 300) + '...' : aiResponse;
+    
+    // 設定 AI 提示詞
+    const prompt = `請根據以下 AI 老師的解題回答，生成一個簡短的對話標題（8-12字以內），用於聊天記錄列表顯示。
+要求：
+1. 標題要能概括題目的核心內容或主題
+2. 使用繁體中文
+3. 可以包含科目、題型、概念等關鍵字
+4. 要簡潔易懂，讓學生一看就知道是什麼題目
+5. 只輸出標題文字，不要有其他說明
+6. 不要包含「解題」、「分析」等動詞，直接描述內容即可
+
+AI 老師的回答：
+${truncatedResponse}
+
+${subjectType ? `科目類型：${subjectType === 'math' ? '數理科目' : '其他科目'}` : ''}
+
+標題：`;
+
+    // 使用 GPT-4.1-nano 快速生成標題
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4.1-nano',
+      messages: [
+        { role: 'system', content: '你是一個專門產生簡潔標題的助手。' },
+        { role: 'user', content: prompt }
+      ],
+      max_tokens: 50,
+      temperature: 0.7
+    });
+
+    const generatedTitle = completion.choices?.[0]?.message?.content?.trim();
+    
+    // 檢查生成的標題是否有效
+    if (generatedTitle && generatedTitle.length > 0 && generatedTitle.length <= 50) {
+      console.log('[AI 生成標題成功]:', generatedTitle);
+      return generatedTitle;
+    } else {
+      throw new Error('生成的標題格式不符合要求');
+    }
+  } catch (error) {
+    console.error('[ERROR] AI 生成標題失敗:', error);
+    
+    // 備用方案 1：從 AI 回答中提取關鍵詞（取第一行或前 20 個字）
+    const firstLine = aiResponse.split('\n')[0].trim();
+    const fallbackTitle = firstLine.substring(0, 20);
+    if (fallbackTitle.length > 0 && !fallbackTitle.includes('好的') && !fallbackTitle.includes('讓我')) {
+      console.log('[使用備用標題 - AI 回答摘要]:', fallbackTitle);
+      return fallbackTitle + (firstLine.length > 20 ? '...' : '');
+    }
+    
+    // 備用方案 2：使用科目類型 + 時間
+    const timeTitle = formatTimeForTitle(Date.now());
+    const subjectPrefix = subjectType === 'math' ? '數理題目' : subjectType === 'other' ? '解題討論' : '新對話';
+    console.log('[使用備用標題 - 時間]:', `${subjectPrefix} ${timeTitle}`);
+    return `${subjectPrefix} ${timeTitle}`;
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     // 解析前端傳來的資料
@@ -75,9 +137,13 @@ export async function POST(request: NextRequest) {
     // 如果沒有 threadId 或是新 thread，建立一個新的 thread
     if (isNewThread || !threadId) {
       const createdAt = Date.now();
+      
+      // 先使用臨時標題（稍後會根據 AI 回答更新）
+      const tempTitle = '生成標題中...';
+      
       const threadData: Omit<ChatThread, 'id'> = {
         userId,
-        title: formatTimeForTitle(createdAt),
+        title: tempTitle,
         hasImage: !!questionImageUrl,
         createdAt,
         lastUpdated: createdAt
@@ -154,6 +220,20 @@ export async function POST(request: NextRequest) {
       timestamp: Date.now()
     };
     await adminDb.collection('chat_messages').add(aiMessageData);
+
+    // 如果是新建立的 thread，根據 AI 的回答生成標題並更新
+    if (isNewThreadCreated && currentThreadId) {
+      try {
+        const generatedTitle = await generateThreadTitle(aiResponse, subjectType);
+        await adminDb.collection('chat_threads').doc(currentThreadId).update({
+          title: generatedTitle
+        });
+        console.log('[Thread 標題已更新]:', generatedTitle);
+      } catch (error) {
+        console.error('[ERROR] 更新 Thread 標題失敗:', error);
+        // 如果更新標題失敗，不影響主要流程，繼續執行
+      }
+    }
 
     // 回傳 AI 回覆、threadId、是否新 thread、完整 thread 訊息
     return NextResponse.json({
@@ -247,120 +327,83 @@ async function processMathSubject(
   }
 }
 
-// 處理其他科目（使用現有的 GPT-4.1-nano + DeepSeek 流程）
+// 處理其他科目（直接使用 GPT-4.1-nano 模型）
 async function processOtherSubject(
   message: string, 
   questionImageUrl: string | undefined, 
   historyMessages: { role: 'user' | 'assistant'; content: string }[]
 ): Promise<string> {
   try {
-    // 準備 system prompt
-    const systemPrompt = `你是一位由清大與交大團隊訓練的題目識別 AI，專門處理拍照上傳的國中與高中各科題目圖片，將其轉換為 Markdown 格式純文字，方便教師或學生閱讀與整理筆記。
+    // 準備 system prompt - 解題教學型 AI
+    const systemPrompt = `你是一位名叫「青椒老師」的 AI 全科家教老師，由清華與交大畢業生打造。你專門教國中與高中的各科目，包含國文、英文、生物、地理、公民、歷史等，擅長用親切且專業的方式解題與引導思考。你的語氣應溫暖、鼓勵、有耐心。
 
-      🎯 你的任務是：
-      將圖片中的題目內容，**不加一字刪減或改寫**，完整轉換為 Markdown 格式的文字輸出，包含所有可辨識的內容：題目敘述、公式、符號、圖表說明、選項、標題等。
+    🧑‍🏫 角色設定
+    - 你是「青椒老師」，專精各科目的 AI 家教
+    - 你擅長國文、英文、生物、地理、公民、歷史等科目的解題與教學
+    - 請永遠以溫暖親切的語氣與學生互動，耐心解釋直到學生懂
 
-      ---
+    📝 教學風格
+    - 使用清楚的步驟化教學：理解題意 → 分析重點 → 解題策略 → 詳細說明 → 總結答案
+    - 適當使用標題和條列來組織內容
+    - 可加入相關知識點和概念說明幫助理解
+    - 若學生看不懂，請改用其他方式再解釋一次（舉例、圖解、換句話說）
+    - 特別重視解題過程的邏輯性和完整性
 
-      📌 **請嚴格遵守以下格式規則：**
+    💡 回答格式
+    - 請用 markdown 格式回答
+    - **如果題目中有數學式或數學符號，請使用 LaTeX 格式：**
+      - 行內公式：用 \`$...$\`
+      - 區塊公式：用 \`$$...$$\` 獨佔一行
+    - 對於複雜的問題，請提供多角度的分析（如果有的話）
+    - 解題完成後，請提供相關的概念複習或延伸思考
 
-      1. **數學與理化公式：**
-        - 所有 LaTeX 符號與公式必須使用 \`$...$\`（行內）或 \`$$...$$\`（區塊）包裹
-        - 禁止裸露 LaTeX 指令（例如：\`\\frac{a}{b}\` → ❌，\`$\\frac{a}{b}$\` → ✅）
+    🎯 解題步驟建議
+    1. **理解題意**：先說明題目在問什麼
+    2. **分析重點**：找出題目的關鍵資訊和考點
+    3. **解題過程**：詳細說明解題步驟和思路
+    4. **答案說明**：給出答案並解釋為什麼
+    5. **延伸學習**（選用）：補充相關知識或易錯點
 
-      2. **標題與段落：**
-        - 若題目中有章節或大標題，使用 \`##\` 或 \`###\` 標示
-        - 段落之間請保留空行，保持可讀性
+    請開始教學與解題！記住，你不只是要識別題目，而是要**完整地解答題目並教會學生**。`;
 
-      3. **選項格式（如選擇題）：**
-        - 使用 \`- (A) 選項內容\` 的格式呈現
+    // 構建訊息陣列，包含 system prompt 和歷史對話
+    const messages: ChatCompletionMessageParam[] = [
+      { role: 'system', content: systemPrompt } as ChatCompletionMessageParam,
+      ...historyMessages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }) as ChatCompletionMessageParam)
+    ];
 
-      4. **圖形與圖表：**
-        - 若圖片中有圖形或表格，請使用「文字敘述」的方式轉述其結構與內容（如："圖中顯示一個等腰三角形 ABC，∠A 為 40°..."）
-
-      5. **只輸出題目內容，不要加入任何說明或標記你的身份**  
-        - 無需加入「轉換完成」、「以下是結果」等多餘說明
-
-      ---
-
-      📄 **範例輸出格式：**
-
-      \`\`\`markdown
-      題目：求解以下方程式  
-      $x^2 + 3x - 4 = 0$
-
-      - (A) $x = -4, 1$
-      - (B) $x = -2, 2$
-      - (C) $x = -1, 4$
-      - (D) $x = -1, -4$
-      \`\`\`
-
-      ---
-
-      ✅ 請使用 \`\`\`markdown 開頭與 \`\`\` 結尾包住整段輸出。  
-      ✅ 回傳內容請完全比照題目原始格式，不要省略題號、選項或標點。
-
-      📌 **科目可能包含：數學、物理、化學、生物、地理、公民、國文、英文等。你必須具備辨識這些科目的能力。**
-
-      請開始轉換。輸出僅包含純文字 Markdown 題目內容，其他說明一律禁止。
-      `;
-
-    // 如果有圖片，先用 GPT-4.1-nano 轉換為 LaTeX
-    let processedMessage = message;
+    // 如果有圖片，構建包含圖片的訊息；否則只傳文字
     if (questionImageUrl) {
-      try {
-        const imageToLatexCompletion = await openai.chat.completions.create({
-          model: 'gpt-4.1-nano',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            {
-              role: 'user',
-              content: [
-                { type: 'image_url', image_url: { url: questionImageUrl } }
-              ]
-            }
-          ]
-        });
-        const latexContent = imageToLatexCompletion.choices[0].message.content || '';
-        
-        // 記錄 GPT-4.1-nano 的圖片轉換結果
-        console.log('[GPT-4.1-nano 圖片轉換結果]:', {
-          圖片網址: questionImageUrl,
-          轉換結果: latexContent
-        });
-        
-        // 將用戶文字和轉換後的 LaTeX 組合
-        processedMessage = `${message}\n\n圖片中的題目：\n${latexContent}`;
-      } catch (e) {
-        console.error('[ERROR] 圖片轉 LaTeX 失敗:', e);
-        // 如果轉換失敗，使用原始訊息
-        processedMessage = message;
-      }
+      messages.push({
+        role: 'user',
+        content: [
+          { type: 'text', text: message },
+          { type: 'image_url', image_url: { url: questionImageUrl } }
+        ]
+      } as ChatCompletionMessageParam);
+    } else {
+      messages.push({ 
+        role: 'user', 
+        content: message 
+      } as ChatCompletionMessageParam);
     }
 
-    // 歷史訊息全部都用 content: string（不支援 vision 格式）
-    const visionHistoryMessages: { role: 'user' | 'assistant'; content: string }[] = historyMessages.map(msg => ({
-      role: msg.role as 'user' | 'assistant',
-      content: msg.content
-    }));
-
-    // 呼叫 deepseek 模型進行答題（使用處理後的純文字訊息）
-    const completion = await openrouter.chat.completions.create({
-      model: 'deepseek/deepseek-chat-v3-0324',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...visionHistoryMessages,
-        { role: 'user', content: processedMessage }
-      ]
+    // 直接呼叫 GPT-4.1-nano 模型進行解題
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4.1-nano',
+      messages: messages
     });
 
     if (!completion.choices?.[0]?.message?.content) {
-      throw new Error('No response content from DeepSeek model');
+      throw new Error('No response content from GPT-4.1-nano model');
     }
 
     return completion.choices[0].message.content;
   } catch (error: unknown) {
-    console.error('[ERROR] DeepSeek 模型回傳失敗:', error);
+    console.error('[ERROR] GPT-4.1-nano 模型回傳失敗:', error);
     console.error('[ERROR] 完整錯誤資訊:', {
       錯誤類型: error instanceof Error ? error.name : 'Unknown',
       錯誤訊息: error instanceof Error ? error.message : 'Unknown error',

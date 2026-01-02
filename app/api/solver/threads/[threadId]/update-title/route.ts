@@ -5,10 +5,10 @@ import { adminDb } from '@/lib/firebase/firebase-admin';
 // 更新 thread 的標題
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { threadId: string } }
+  { params }: { params: Promise<{ threadId: string }> }
 ) {
   try {
-    const { threadId } = params;
+    const { threadId } = await params;
     const body = await request.json();
     const { userId, newTitle } = body;
 

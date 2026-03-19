@@ -1,14 +1,25 @@
 "use client"
 
-import Link from 'next/link'
 import Image from 'next/image'
-import { useState, useEffect, useRef } from 'react'
+import Link from 'next/link'
+import { useEffect, useRef, useState } from 'react'
+import { ChevronRight, Menu, X } from 'lucide-react'
+
+const primaryMobileLinks = [
+  { href: '/case-upload', label: '填需求', description: '家長入口' },
+  { href: '/tutor-registration', label: '教師登錄', description: '老師入口' },
+]
+
+const secondaryMobileLinks = [
+  { href: '/tutors', label: '家教老師' },
+  { href: '/tutor-cases', label: '案件專區' },
+  { href: '/solver', label: 'AI解題' },
+]
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const headerRef = useRef<HTMLElement>(null)
 
-  // 點擊外部區域和按 ESC 鍵關閉選單
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (headerRef.current && !headerRef.current.contains(event.target as Node)) {
@@ -22,13 +33,11 @@ export default function Header() {
       }
     }
 
-    // 只在選單打開時添加事件監聽器
     if (isMenuOpen) {
       document.addEventListener('mousedown', handleClickOutside)
       document.addEventListener('keydown', handleEscKey)
     }
 
-    // 清理事件監聽器
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
       document.removeEventListener('keydown', handleEscKey)
@@ -36,127 +45,90 @@ export default function Header() {
   }, [isMenuOpen])
 
   return (
-    <header ref={headerRef} className="bg-white border-b border-neutral-100 py-6 relative">
-      <div className="container px-6 mx-auto max-w-6xl">
-        {/* 統一排列 - 品牌名稱靠左，選單/按鈕靠右 */}
-        <div className="flex justify-between items-center">
-          <Link href="/" className="flex items-center space-x-3 text-xl font-semibold text-gray-900 flex-shrink-0">
-            <Image 
-              src="/teacher-icon-512x512.png" 
-              alt="青椒老師家教中心" 
-              width={32}
-              height={32}
-              className="w-8 h-8"
-            />
-            <span>青椒老師家教中心</span>
+    <header ref={headerRef} className="sticky top-0 z-40 border-b border-brand-100/70 bg-[#fbfaf4]/90 backdrop-blur-xl">
+      <div className="container mx-auto max-w-6xl px-4 sm:px-6">
+        <div className="flex min-h-[76px] items-center justify-between gap-3">
+          <Link href="/" className="flex min-w-0 items-center gap-1 text-brand-900">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl">
+              <Image
+                src="/teacher-icon-512x512.png"
+                alt="青椒老師家教中心"
+                width={30}
+                height={30}
+                className="h-8 w-8"
+              />
+            </div>
+            <div className="min-w-0">
+              <div className="truncate text-base font-semibold md:text-lg">青椒老師家教中心</div>
+              <div className="hidden text-xs tracking-[0.18em] text-brand-500 sm:block">TUTOR MATCHING CONSULTING</div>
+            </div>
           </Link>
-          
-          {/* 桌面版選單 */}
-          <nav className="hidden md:block">
-            <ul className="flex items-center space-x-8">
-              <li><Link href="/tutors" className="text-neutral-600 hover:text-brand-700 transition-colors">家教老師</Link></li>
-              <li><Link href="/tutor-cases" className="text-neutral-600 hover:text-brand-700 transition-colors">案件專區</Link></li>
-              <li><Link href="/solver" className="text-neutral-600 hover:text-brand-700 transition-colors">AI解題</Link></li>
-              <li><Link href="/tutor-registration" className="text-neutral-600 hover:text-brand-700 transition-colors">教師登錄</Link></li>
-              <li>
-                <Link href="/case-upload" className="bg-brand-500 text-white px-6 py-2 rounded-full hover:bg-brand-600 transition-colors inline-block">
-                  找家教
-                </Link>
-              </li>
-            </ul>
+
+          <nav className="hidden items-center gap-7 md:flex">
+            <Link href="/tutors" className="text-sm font-medium text-neutral-600 transition-colors hover:text-brand-700">家教老師</Link>
+            <Link href="/tutor-cases" className="text-sm font-medium text-neutral-600 transition-colors hover:text-brand-700">案件專區</Link>
+            <Link href="/solver" className="text-sm font-medium text-neutral-600 transition-colors hover:text-brand-700">AI解題</Link>
+            <Link href="/tutor-registration" className="text-sm font-medium text-neutral-600 transition-colors hover:text-brand-700">教師登錄</Link>
+            <Link href="/case-upload" className="inline-flex min-h-11 items-center rounded-full bg-brand-500 px-5 text-sm font-semibold text-white shadow-[0_16px_32px_rgba(66,122,91,0.2)] transition-colors hover:bg-brand-600">
+              填需求
+            </Link>
           </nav>
 
-          {/* 漢堡選單按鈕 - 只在小螢幕顯示 */}
-          <button 
-            className="text-neutral-600 md:hidden p-2 flex-shrink-0 transition-transform duration-200"  
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-          >
-            <svg 
-              className={`w-6 h-6 transition-transform duration-200 ${isMenuOpen ? 'rotate-90' : 'rotate-0'}`}
-              fill="none" 
-              stroke="currentColor" 
-              viewBox="0 0 24 24"
+          <div className="flex items-center gap-2 md:hidden">
+            <Link href="/case-upload" className="inline-flex min-h-11 items-center rounded-full border border-brand-200 bg-white px-4 text-sm font-semibold text-brand-800 shadow-[0_10px_24px_rgba(66,122,91,0.08)] transition-colors hover:bg-brand-50">
+              填需求
+            </Link>
+            <button
+              type="button"
+              aria-expanded={isMenuOpen}
+              aria-label={isMenuOpen ? '關閉選單' : '開啟選單'}
+              onClick={() => setIsMenuOpen((value) => !value)}
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-brand-200 bg-white text-brand-800 shadow-[0_10px_24px_rgba(66,122,91,0.08)] transition-colors hover:bg-brand-50"
             >
-              {isMenuOpen ? (
-                <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  strokeWidth={2} 
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              ) : (
-                <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  strokeWidth={2} 
-                  d="M4 6h16M4 12h16M4 18h16"
-                />
-              )}
-            </svg>
-          </button>
+              {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          </div>
         </div>
 
-        {/* 手機版選單 */}
         <nav className="md:hidden">
-          <div className={`absolute top-full left-0 right-0 bg-white border-t border-neutral-100 shadow-lg z-50 transition-all duration-300 ease-in-out ${
-            isMenuOpen 
-              ? 'opacity-100 transform translate-y-0' 
-              : 'opacity-0 transform -translate-y-4 pointer-events-none'
-          }`}>
-            <div className={`container px-6 mx-auto py-6 transition-all duration-300 ${
-              isMenuOpen ? 'opacity-100 transform translate-y-0' : 'opacity-0 transform -translate-y-2'
-            }`}>
-              {/* 主要功能區 */}
-              <div className={`space-y-1 mb-6 transition-all duration-300 delay-75 ${
-                isMenuOpen ? 'opacity-100 transform translate-y-0' : 'opacity-0 transform -translate-y-2'
-              }`}>
-                <Link href="/case-upload" onClick={() => setIsMenuOpen(false)} className="flex items-center justify-between w-full bg-brand-500 text-white px-4 py-3 rounded-xl hover:bg-brand-600 transition-colors">
-                  <span className="font-medium">找家教</span>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </Link>
+          <div
+            className={`overflow-hidden border-t border-brand-100/70 transition-all duration-300 ${
+              isMenuOpen ? 'max-h-[32rem] opacity-100' : 'max-h-0 opacity-0'
+            }`}
+          >
+            <div className="space-y-5 px-1 py-5">
+              <div className="grid gap-3">
+                {primaryMobileLinks.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setIsMenuOpen(false)}
+                    className="flex items-center justify-between rounded-[1.35rem] border border-brand-100 bg-white px-4 py-4 shadow-[0_12px_30px_rgba(66,122,91,0.06)]"
+                  >
+                    <div>
+                      <div className="text-base font-semibold text-brand-900">{link.label}</div>
+                      <div className="mt-1 text-sm text-neutral-500">{link.description}</div>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-brand-500" />
+                  </Link>
+                ))}
               </div>
-              
-              {/* 瀏覽區域 */}
-              <div className={`space-y-1 mb-6 transition-all duration-300 delay-100 ${
-                isMenuOpen ? 'opacity-100 transform translate-y-0' : 'opacity-0 transform -translate-y-2'
-              }`}>
-                <div className="text-xs font-medium text-neutral-500 uppercase tracking-wide px-2 mb-2">瀏覽</div>
-                <Link href="/tutor-cases" onClick={() => setIsMenuOpen(false)} className="flex items-center justify-between w-full text-neutral-700 hover:text-brand-700 hover:bg-brand-50 px-4 py-3 rounded-lg transition-colors">
-                  <span>案件專區</span>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </Link>
-                <Link href="/tutors" onClick={() => setIsMenuOpen(false)} className="flex items-center justify-between w-full text-neutral-700 hover:text-brand-700 hover:bg-brand-50 px-4 py-3 rounded-lg transition-colors">
-                  <span>家教老師</span>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </Link>
-              </div>
-              
-              {/* 工具和註冊 */}
-              <div className={`space-y-1 transition-all duration-300 delay-150 ${
-                isMenuOpen ? 'opacity-100 transform translate-y-0' : 'opacity-0 transform -translate-y-2'
-              }`}>
-                <div className="text-xs font-medium text-neutral-500 uppercase tracking-wide px-2 mb-2">服務</div>
-                <Link href="/solver" onClick={() => setIsMenuOpen(false)} className="flex items-center justify-between w-full text-neutral-700 hover:text-brand-700 hover:bg-brand-50 px-4 py-3 rounded-lg transition-colors">
-                  <span>AI解題</span>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-brand-400 rounded-full"></div>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </Link>
-                <Link href="/tutor-registration" onClick={() => setIsMenuOpen(false)} className="flex items-center justify-between w-full text-neutral-700 hover:text-brand-700 hover:bg-brand-50 px-4 py-3 rounded-lg transition-colors">
-                  <span>教師登錄</span>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </Link>
+
+              <div className="rounded-[1.35rem] border border-brand-100 bg-white px-4 py-4 shadow-[0_12px_30px_rgba(66,122,91,0.06)]">
+                <div className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-brand-500">其他</div>
+                <div className="space-y-1">
+                  {secondaryMobileLinks.map((link) => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      onClick={() => setIsMenuOpen(false)}
+                      className="flex items-center justify-between rounded-xl px-3 py-3 text-sm font-medium text-neutral-700 transition-colors hover:bg-brand-50 hover:text-brand-700"
+                    >
+                      <span>{link.label}</span>
+                      <ChevronRight className="h-4 w-4" />
+                    </Link>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

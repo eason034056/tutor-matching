@@ -6,6 +6,9 @@ const path = require('node:path')
 const readHomepageSource = () =>
   fs.readFileSync(path.join(process.cwd(), 'app/page.tsx'), 'utf8')
 
+const readFooterSource = () =>
+  fs.readFileSync(path.join(process.cwd(), 'components/footer.tsx'), 'utf8')
+
 test('homepage includes the new consulting-focused parent journey', () => {
   const source = readHomepageSource()
 
@@ -22,4 +25,15 @@ test('desktop hero cards use a matched-height layout', () => {
   assert.match(source, /lg:items-stretch/)
   assert.match(source, /lg:h-full/)
   assert.match(source, /lg:grid-rows-\[auto_1fr\]/)
+})
+
+test('footer follows the new consulting-led homepage style', () => {
+  const source = readFooterSource()
+
+  assert.match(source, /專人把關‧優質師資‧安心配對/)
+  assert.match(source, /bg-\[#f7f3e8\]/)
+  assert.match(source, /家長需求登錄/)
+  assert.match(source, /教師申請入口/)
+  assert.doesNotMatch(source, /把首頁那套安心感，收在最後一屏。/)
+  assert.doesNotMatch(source, /footer 不再只是導覽列/)
 })

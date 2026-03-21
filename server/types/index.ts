@@ -34,25 +34,37 @@ export interface TutorCase {
     caseNumber: string;
     parentName: string;
     parentPhone: string;
-    parentEmail: string;
-    address: string;
-    idNumber: string;
+    parentEmail?: string;
+    address?: string;
+    city?: string;
+    district?: string;
+    roadName?: string;
+    landmark?: string;
+    onlineDetail?: string;
+    lessonMode?: 'in_person' | 'online';
+    idNumber?: string;
     studentGender: string;
-    lineId: string;
+    lineId?: string;
     department: string;
     grade: string;
     studentDescription: string;
     subject: string;
     location: string;
+    region: string;
     availableTime: string;
-    teacherRequirements: string;
-    hourlyFee: number;
-    message: string;
+    teacherRequirements?: string;
+    hourlyFee?: number;
+    budgetRange?: string;
+    message?: string;
     status: '急徵' | '已徵到' | '有人接洽';
     createdAt: string;
     pending: 'pending' | 'approved' | 'rejected';
-    idCardUrl: string;
-    region: string;
+    idCardUrl?: string;
+    documentStatus?: 'not_requested' | 'requested' | 'submitted';
+    documentRequestTokenHash?: string;
+    documentRequestExpiresAt?: string;
+    documentRequestedAt?: string;
+    documentSubmittedAt?: string;
 }
 
 export interface ApprovedCase {
@@ -63,11 +75,13 @@ export interface ApprovedCase {
     location: string;
     availableTime: string;
     studentDescription: string;
-    teacherRequirements: string;
-    hourlyFee: number;
+    teacherRequirements?: string;
+    hourlyFee?: number;
+    budgetRange?: string;
     status: '急徵' | '已徵到' | '有人接洽';
     approvedAt: string;
     region: string;
+    documentStatus?: 'not_requested' | 'requested' | 'submitted';
 }
 
 export interface Message {
@@ -104,7 +118,8 @@ export interface ChatHistory {
 export interface CaseNotificationData {
   caseNumber: string;
   subject: string;
-  hourlyFee: number;
+  hourlyFee?: number;
+  budgetRange?: string;
   location: string;
   availableTime: string;
   teacherRequirements?: string;

@@ -1,497 +1,446 @@
 "use client"
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { processImageComplete } from "@/lib/imageUtils";
-import { toast } from "sonner"
-import Image from 'next/image'
-import { CheckCircle, XCircle, AlertCircle, Loader2, FileText, Clock, ArrowRight, CreditCard } from 'lucide-react'
-import { sendWebhookNotification } from "@/webhook-config"
-import TermsDialog from "@/components/TermsDialog"
-import { Checkbox } from "@/components/ui/checkbox"
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import Link from 'next/link'
+import {
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  ChevronRight,
+  Clock3,
+  Loader2,
+  MapPin,
+  MessageCircle,
+  Phone,
+  ShieldCheck,
+  Sparkles,
+  UserRound,
+  XCircle,
+} from 'lucide-react'
+import { toast } from 'sonner'
+
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
+import TermsDialog from '@/components/TermsDialog'
+import { buildLocationSummary, isRoadNameValid } from '@/lib/address-utils'
+import { budgetRangeOptions, gradeOptions, schedulePresetOptions, subjectOptions } from '@/lib/case-form-options'
+import { cn } from '@/lib/utils'
+import { sendWebhookNotification } from '@/webhook-config'
+
+type SubmitStatus = 'idle' | 'success' | 'error'
+type StepKey = 'matching' | 'student' | 'contact'
+type LessonMode = 'in_person' | 'online'
+
+const steps: { key: StepKey; label: string; description: string }[] = [
+  { key: 'matching', label: '步驟 1', description: '填寫課程需求' },
+  { key: 'student', label: '步驟 2', description: '學生與老師條件' },
+  { key: 'contact', label: '步驟 3', description: '留下聯絡方式與確認送出' },
+]
+
+const onlineOption = '線上'
+
+const createInitialFormData = () => ({
+  lessonMode: 'in_person' as LessonMode,
+  subject: '',
+  subjectOther: '',
+  grade: '',
+  city: '',
+  district: '',
+  roadName: '',
+  landmark: '',
+  onlineDetail: '',
+  budgetRange: '',
+  selectedTimeSlots: [] as string[],
+  availableTimeNote: '',
+  studentGender: '',
+  department: '',
+  studentDescription: '',
+  teacherRequirements: '',
+  message: '',
+  parentName: '',
+  parentPhone: '',
+  parentEmail: '',
+  lineId: '',
+})
+
+const trustNotes = ['送出後顧問會先整理需求重點', '中心會根據需求安排家教老師']
+
+const formatAvailableTime = (selected: string[], note: string) => {
+  const parts = []
+  if (selected.length > 0) {
+    parts.push(selected.join('、'))
+  }
+  if (note.trim()) {
+    parts.push(note.trim())
+  }
+  return parts.join('；')
+}
+
+const StepBadge = ({ active, index, label }: { active: boolean; index: number; label: string }) => (
+  <div
+    className={cn(
+      'flex items-center gap-3 rounded-[1.4rem] border px-4 py-3 transition-all duration-300',
+      active
+        ? 'border-brand-300 bg-white shadow-[0_14px_36px_rgba(67,102,78,0.08)]'
+        : 'border-brand-100 bg-[#f4efe3]/80 text-neutral-500'
+    )}
+  >
+    <div
+      className={cn(
+        'flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold',
+        active ? 'bg-brand-500 text-white' : 'bg-white text-brand-500'
+      )}
+    >
+      {index + 1}
+    </div>
+    <div>
+      <div className="text-xs font-semibold tracking-[0.22em] text-brand-500">{label}</div>
+      <div className="text-sm font-medium text-brand-900">{steps[index].description}</div>
+    </div>
+  </div>
+)
+
+const ChipButton = ({
+  active,
+  children,
+  onClick,
+}: {
+  active: boolean
+  children: ReactNode
+  onClick: () => void
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={cn(
+      'rounded-full border px-4 py-2.5 text-sm font-medium transition-all duration-200',
+      active
+        ? 'border-brand-500 bg-brand-500 text-white shadow-[0_14px_30px_rgba(66,122,91,0.22)]'
+        : 'border-brand-200 bg-white text-brand-800 hover:border-brand-300 hover:bg-brand-50'
+    )}
+  >
+    {children}
+  </button>
+)
+
+const SummaryItem = ({ label, value }: { label: string; value: string }) => (
+  <div className="rounded-[1.2rem] border border-brand-100 bg-white/85 px-4 py-3">
+    <div className="text-xs font-semibold tracking-[0.18em] text-brand-500">{label}</div>
+    <div className="mt-2 text-sm leading-6 text-neutral-700">{value}</div>
+  </div>
+)
 
 export default function CaseUploadForm() {
-  const router = useRouter()
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle')
-  const [submitMessage, setSubmitMessage] = useState('')
-  const [preview, setPreview] = useState('')
-  // 追蹤用戶是否同意服務條款
+  const [formData, setFormData] = useState(createInitialFormData)
+  const [currentStep, setCurrentStep] = useState(0)
   const [hasAgreedToTerms, setHasAgreedToTerms] = useState(false)
-  // 檔案上傳錯誤狀態
-  const [fileError, setFileError] = useState('')
-  const [fileInfo, setFileInfo] = useState('')
-  // 壓縮進度狀態
-  const [isCompressing, setIsCompressing] = useState(false)
-  
-  const [formData, setFormData] = useState({
-    parentName: '',
-    parentPhone: '',
-    parentEmail: '',
-    address: '',
-    idNumber: '',
-    studentGender: '',
-    lineId: '',
-    department: '',
-    grade: '',
-    studentDescription: '',
-    subject: '',
-    location: '',
-    region: '',
-    availableTime: '',
-    teacherRequirements: '',
-    hourlyFee: '',
-    message: '',
-    pending: 'pending',
-    idCard: null as File | null,
-    idCardUrl: '',
-  })
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitStatus, setSubmitStatus] = useState<SubmitStatus>('idle')
+  const [submitMessage, setSubmitMessage] = useState('')
+  const [cityOptions, setCityOptions] = useState<string[]>([])
+  const [districtOptions, setDistrictOptions] = useState<string[]>([])
+  const [roadSuggestions, setRoadSuggestions] = useState<string[]>([])
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
-    setFormData(prevState => ({ ...prevState, [name]: value }))
-    // 重置提交狀態當用戶開始編輯
-    if (submitStatus !== 'idle') {
-      setSubmitStatus('idle')
-    }
-  }
-
-  const handleSelectChange = (name: string, value: string) => {
-    setFormData(prevState => ({ ...prevState, [name]: value }))
-    // 重置提交狀態當用戶開始編輯
-    if (submitStatus !== 'idle') {
-      setSubmitStatus('idle')
-    }
-  }
-
-  // 🔧 修復：處理身分證預覽 - 使用完整的圖片處理流程
-  const handleIdCardChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
+  useEffect(() => {
+    const loadCities = async () => {
       try {
-        const originalSizeInMB = (file.size / (1024 * 1024)).toFixed(1)
-        console.log(`檔案資訊: 名稱=${file.name}, 大小=${originalSizeInMB}MB, 類型=${file.type}`)
-
-        // 檢查檔案類型 - 支援所有圖片格式
-        if (!file.type.startsWith('image/')) {
-          // 設置UI錯誤訊息
-          setFileError(`不支援的檔案格式！您選擇的是：${file.type}，請選擇圖片格式`)
-          setFileInfo('')
-          setPreview('')
-          setFormData(prev => ({ ...prev, idCard: null }))
-          
-          toast.error('不支援的檔案格式！請選擇圖片檔案')
-          // 清空input的值
-          e.target.value = ''
-          return
-        }
-
-        // 清除之前的錯誤訊息
-        setFileError('')
-        
-        // 🔧 修復：使用新的 processImageComplete 函數進行完整處理
-        // 顯示處理進度
-        setIsCompressing(true)
-        setFileInfo(`🔄 正在處理圖片 (${originalSizeInMB}MB)...`)
-        
-        toast.info('📦 正在處理身分證圖片，請稍候...')
-        
-        try {
-          // 完整處理圖片（壓縮 + 浮水印 + 二次壓縮）
-          const processedFile = await processImageComplete(file, 5)
-          const finalSizeInMB = (processedFile.size / (1024 * 1024)).toFixed(1)
-          
-          console.log(`圖片處理完成: ${file.name} -> ${processedFile.name}, ${originalSizeInMB}MB -> ${finalSizeInMB}MB`)
-          
-          // 更新UI狀態
-          if (originalSizeInMB !== finalSizeInMB) {
-            setFileInfo(`✅ 處理完成！從 ${originalSizeInMB}MB 優化至 ${finalSizeInMB}MB`)
-            toast.success(`🎉 身分證處理成功！從 ${originalSizeInMB}MB 優化至 ${finalSizeInMB}MB`)
-          } else {
-            setFileInfo(`✅ 圖片處理完成！大小：${finalSizeInMB}MB`)
-            toast.success(`🎉 身分證處理完成！大小：${finalSizeInMB}MB`)
-          }
-          
-          // 顯示預覽並更新表單數據
-          const previewUrl = URL.createObjectURL(processedFile)
-          setPreview(previewUrl)
-          setFormData(prev => ({ ...prev, idCard: processedFile }))
-          
-          // 重置提交狀態
-          if (submitStatus !== 'idle') {
-            setSubmitStatus('idle')
-          }
-          
-        } catch (processingError) {
-          console.error('圖片處理失敗:', processingError)
-          setFileError('圖片處理失敗！請嘗試選擇其他圖片或確認檔案是否有效')
-          setFileInfo('')
-          setPreview('')
-          setFormData(prev => ({ ...prev, idCard: null }))
-          toast.error('圖片處理失敗，請嘗試選擇其他圖片')
-          e.target.value = ''
-          return
-        } finally {
-          setIsCompressing(false)
-        }
-        
+        const response = await fetch('/api/address?mode=cities')
+        const result = await response.json()
+        setCityOptions(result.cities || [])
       } catch (error) {
-        console.error('預覽圖片失敗:', error)
-        
-        // 設置UI錯誤訊息
-        setFileError('圖片處理失敗！請確認檔案是否為有效的圖片格式，或嘗試選擇其他圖片')
-        setFileInfo('')
-        setPreview('')
-        setFormData(prev => ({ ...prev, idCard: null }))
-        
-        toast.error('預覽圖片失敗，請確認檔案是否為有效的圖片格式')
-        // 清空input的值
-        e.target.value = ''
-      } finally {
-        setIsCompressing(false)
+        console.error('載入縣市失敗:', error)
       }
     }
-  }
 
-  // 上傳圖片到 API - 改善錯誤處理
-  const uploadImage = async (file: File, folder: string, subfolder: string): Promise<string> => {
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('folder', folder)
-    formData.append('subfolder', subfolder)
+    loadCities()
+  }, [])
 
-    try {
-      const response = await fetch('/api/upload-image', {
-        method: 'POST',
-        body: formData,
-      })
+  useEffect(() => {
+    if (formData.lessonMode === 'online' || !formData.city) {
+      setDistrictOptions([])
+      return
+    }
 
-      if (!response.ok) {
-        // 檢查回應的Content-Type是否為JSON
-        const contentType = response.headers.get('content-type')
-        if (contentType && contentType.includes('application/json')) {
-          const error = await response.json()
-          throw new Error(error.error || error.details || `圖片上傳失敗 (${response.status})`)
-        } else {
-          // 如果不是JSON，讀取為純文字
-          const errorText = await response.text()
-          console.error('伺服器回傳非JSON格式錯誤:', errorText)
-          
-          // 根據HTTP狀態碼提供更友善的錯誤訊息
-          if (response.status === 413) {
-            throw new Error('圖片檔案太大，請選擇小於5MB的圖片')
-          } else if (response.status === 415) {
-            throw new Error('不支援的圖片格式，請選擇JPG、PNG或WebP格式')
-          } else if (response.status >= 500) {
-            throw new Error('伺服器暫時無法處理請求，請稍後再試')
-          } else {
-            throw new Error(`圖片上傳失敗 (錯誤代碼: ${response.status})`)
-          }
+    const loadDistricts = async () => {
+      try {
+        const response = await fetch(`/api/address?mode=districts&city=${encodeURIComponent(formData.city)}`)
+        const result = await response.json()
+        setDistrictOptions(result.districts || [])
+      } catch (error) {
+        console.error('載入行政區失敗:', error)
+      }
+    }
+
+    loadDistricts()
+  }, [formData.city, formData.lessonMode])
+
+  useEffect(() => {
+    if (formData.lessonMode === 'online' || !formData.city || !formData.district) {
+      setRoadSuggestions([])
+      return
+    }
+
+    const controller = new AbortController()
+    const timer = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({
+          mode: 'roads',
+          city: formData.city,
+          district: formData.district,
+          q: formData.roadName,
+        })
+        const response = await fetch(`/api/address?${params.toString()}`, { signal: controller.signal })
+        const result = await response.json()
+        setRoadSuggestions(result.roads || [])
+      } catch (error) {
+        if ((error as Error).name !== 'AbortError') {
+          console.error('載入路名建議失敗:', error)
         }
       }
+    }, 180)
 
-      // 檢查成功回應是否為JSON格式
-      const contentType = response.headers.get('content-type')
-      if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('伺服器回應格式錯誤')
-      }
+    return () => {
+      controller.abort()
+      clearTimeout(timer)
+    }
+  }, [formData.city, formData.district, formData.lessonMode, formData.roadName])
 
-      const result = await response.json()
-      if (!result.url) {
-        throw new Error('伺服器未回傳圖片網址')
-      }
-      
-      return result.url
-    } catch (error) {
-      console.error('圖片上傳詳細錯誤:', error)
-      throw error
+  const finalSubject = useMemo(() => {
+    return formData.subject === '其他' ? formData.subjectOther.trim() : formData.subject.trim()
+  }, [formData.subject, formData.subjectOther])
+
+  const locationSummary = useMemo(
+    () =>
+      buildLocationSummary({
+        city: formData.lessonMode === 'online' ? '' : formData.city,
+        district: formData.lessonMode === 'online' ? '' : formData.district,
+        roadName: formData.lessonMode === 'online' ? '' : formData.roadName,
+        landmark: formData.landmark,
+        lessonMode: formData.lessonMode,
+        onlineDetail: formData.onlineDetail,
+      }),
+    [formData.city, formData.district, formData.landmark, formData.lessonMode, formData.onlineDetail, formData.roadName]
+  )
+
+  const availableTimeSummary = useMemo(
+    () => formatAvailableTime(formData.selectedTimeSlots, formData.availableTimeNote),
+    [formData.availableTimeNote, formData.selectedTimeSlots]
+  )
+
+  const setField = <K extends keyof typeof formData>(key: K, value: (typeof formData)[K]) => {
+    setFormData((prev) => ({ ...prev, [key]: value }))
+    if (submitStatus !== 'idle') {
+      setSubmitStatus('idle')
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    // 檢查是否同意服務條款
-    if (!hasAgreedToTerms) {
-      toast.error('請先閱讀並同意服務條款')
-      return
-    }
+  const toggleTimeSlot = (slot: string) => {
+    setField(
+      'selectedTimeSlots',
+      formData.selectedTimeSlots.includes(slot)
+        ? formData.selectedTimeSlots.filter((item) => item !== slot)
+        : [...formData.selectedTimeSlots, slot]
+    )
+  }
 
-    // 表單驗證
-    const validationErrors = []
+  const validateStep = (stepIndex: number) => {
+    const errors: string[] = []
 
-    // 檢查必填欄位
-    if (!formData.parentName.trim()) validationErrors.push('請填寫家長姓名')
-    if (!formData.parentPhone.trim()) validationErrors.push('請填寫聯絡電話')
-    if (!formData.address.trim()) validationErrors.push('請填寫聯絡地址')
-    if (!formData.idNumber.trim()) validationErrors.push('請填寫身分證字號')
-    if (!formData.studentGender) validationErrors.push('請選擇學生性別')
-    if (!formData.department.trim()) validationErrors.push('請填寫就讀學校')
-    if (!formData.grade) validationErrors.push('請選擇年級')
-    if (!formData.studentDescription.trim()) validationErrors.push('請填寫學生狀況描述')
-    if (!formData.region) validationErrors.push('請選擇地區')
-    if (!formData.subject.trim()) validationErrors.push('請填寫需求科目')
-    if (!formData.location.trim()) validationErrors.push('請填寫上課地點')
-    if (!formData.availableTime.trim()) validationErrors.push('請填寫可上課時段')
-    if (!formData.hourlyFee.trim() || Number(formData.hourlyFee) <= 0) validationErrors.push('請填寫有效的期望時薪')
-    if (!formData.idCard) validationErrors.push('請上傳身分證照片')
+    if (stepIndex === 0) {
+      if (!finalSubject) errors.push('請先選擇需求科目')
+      if (!formData.grade) errors.push('請先選擇年級')
+      if (!formData.budgetRange) errors.push('請先選擇預算區間')
+      if (!availableTimeSummary) errors.push('請至少選一個可上課時段或補充說明')
 
-    // 檢查電話號碼格式
-    const phoneRegex = /^[0-9-+\s()]*$/
-    if (formData.parentPhone && !phoneRegex.test(formData.parentPhone)) {
-      validationErrors.push('電話號碼格式不正確，只能包含數字和橫線')
-    }
-    if (formData.parentPhone && formData.parentPhone.length < 10) {
-      validationErrors.push('手機號碼需要10位數字，例如：0912345678 或 02-12345678')
-    }
-
-    // 檢查email格式
-    if (formData.parentEmail) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      if (!emailRegex.test(formData.parentEmail)) {
-        validationErrors.push('電子信箱格式不正確')
+      if (formData.lessonMode === 'online') {
+        if (!formData.onlineDetail.trim()) errors.push('請填寫線上上課方式或平台')
+      } else {
+        if (!formData.city) errors.push('請先選擇縣市')
+        if (!formData.district) errors.push('請先選擇行政區')
+        if (!formData.roadName.trim()) {
+          errors.push('請填寫路名或路段')
+        } else if (!isRoadNameValid(formData.roadName)) {
+          errors.push('請至少填到路名層級，例如光復路二段')
+        }
       }
     }
 
-    // 檢查身分證字號格式（台灣身分證字號格式）
-    const idRegex = /^[A-Z][12]\d{8}$/
-    if (formData.idNumber && !idRegex.test(formData.idNumber.toUpperCase())) {
-      validationErrors.push('身分證字號格式不正確（例如：A123456789）')
+    if (stepIndex === 1) {
+      if (!formData.studentGender) errors.push('請選擇學生性別')
+      if (!formData.department.trim()) errors.push('請填寫就讀學校')
+      if (!formData.studentDescription.trim()) errors.push('請描述學生目前狀況')
     }
 
-    // 如果有驗證錯誤，顯示第一個錯誤並停止提交
-    if (validationErrors.length > 0) {
-      toast.error(validationErrors[0])
+    if (stepIndex === 2) {
+      if (!formData.parentName.trim()) errors.push('請填寫家長姓名')
+      if (!formData.parentPhone.trim()) errors.push('請填寫聯絡電話')
+      const phoneDigits = formData.parentPhone.replace(/\D/g, '')
+      if (formData.parentPhone.trim() && phoneDigits.length < 9) {
+        errors.push('請填寫可聯繫的電話號碼')
+      }
+      if (formData.parentEmail.trim()) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        if (!emailRegex.test(formData.parentEmail.trim())) {
+          errors.push('電子信箱格式不正確')
+        }
+      }
+      if (!hasAgreedToTerms) errors.push('送出前請先同意服務條款')
+    }
+
+    return errors
+  }
+
+  const goNext = () => {
+    const errors = validateStep(currentStep)
+    if (errors.length > 0) {
+      toast.error(errors[0])
       return
     }
-    
+    setCurrentStep((step) => Math.min(step + 1, steps.length - 1))
+  }
+
+  const goPrev = () => setCurrentStep((step) => Math.max(step - 1, 0))
+
+  const resetForm = () => {
+    setFormData(createInitialFormData())
+    setCurrentStep(0)
+    setHasAgreedToTerms(false)
+    setRoadSuggestions([])
+  }
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const errors = validateStep(2)
+    if (errors.length > 0) {
+      toast.error(errors[0])
+      return
+    }
+
     setIsSubmitting(true)
     setSubmitStatus('idle')
-    
-    try {
-      let idCardUrl = ''
-      
-      // 上傳身分證照片
-      if (formData.idCard) {
-        console.log('開始上傳身分證照片...')
-        idCardUrl = await uploadImage(formData.idCard, 'cases', 'id-cards')
-        console.log('身分證照片上傳完成:', idCardUrl)
-      }
 
-      const caseNumber = 'C' + Math.random().toString(36).substring(2, 8).toUpperCase()
-      
+    try {
+      const caseNumber = `C${Math.random().toString(36).substring(2, 8).toUpperCase()}`
       const caseData = {
-        parentName: formData.parentName,
-        parentPhone: formData.parentPhone,
-        parentEmail: formData.parentEmail,
-        address: formData.address,
-        idNumber: formData.idNumber,
-        studentGender: formData.studentGender,
-        lineId: formData.lineId,
-        department: formData.department,
-        grade: formData.grade,
-        studentDescription: formData.studentDescription,
-        subject: formData.subject,
-        location: formData.location,
-        region: formData.region,
-        availableTime: formData.availableTime,
-        teacherRequirements: formData.teacherRequirements,
-        hourlyFee: Number(formData.hourlyFee),
-        message: formData.message,
-        idCardUrl,
         caseNumber,
+        parentName: formData.parentName.trim(),
+        parentPhone: formData.parentPhone.trim(),
+        parentEmail: formData.parentEmail.trim(),
+        lineId: formData.lineId.trim(),
+        studentGender: formData.studentGender,
+        department: formData.department.trim(),
+        grade: formData.grade,
+        studentDescription: formData.studentDescription.trim(),
+        subject: finalSubject,
+        location: locationSummary,
+        city: formData.lessonMode === 'online' ? '' : formData.city,
+        district: formData.lessonMode === 'online' ? '' : formData.district,
+        roadName: formData.lessonMode === 'online' ? '' : formData.roadName.trim(),
+        landmark: formData.landmark.trim(),
+        onlineDetail: formData.lessonMode === 'online' ? formData.onlineDetail.trim() : '',
+        lessonMode: formData.lessonMode,
+        region: formData.lessonMode === 'online' ? onlineOption : formData.city,
+        availableTime: availableTimeSummary,
+        teacherRequirements: formData.teacherRequirements.trim(),
+        budgetRange: formData.budgetRange,
+        message: formData.message.trim(),
         status: '急徵',
         pending: 'pending',
+        documentStatus: 'not_requested',
         createdAt: new Date().toISOString(),
       }
 
-      // 使用 API 路由提交資料 - 改善錯誤處理
       const response = await fetch('/api/cases/upload', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(caseData),
       })
 
-      let result;
-      try {
-        // 檢查回應的Content-Type是否為JSON
-        const contentType = response.headers.get('content-type')
-        if (contentType && contentType.includes('application/json')) {
-          result = await response.json()
-          console.log('API Response:', result)
-        } else {
-          // 如果不是JSON，讀取為純文字並拋出錯誤
-          const errorText = await response.text()
-          console.error('伺服器回傳非JSON格式:', errorText)
-          throw new Error('伺服器回應格式錯誤，請稍後再試')
-        }
-      } catch (jsonError) {
-        console.error('JSON解析錯誤:', jsonError)
-        throw new Error('伺服器回應解析失敗，請稍後再試')
-      }
-
+      const result = await response.json()
       if (!response.ok) {
-        const errorMessage = result?.error || result?.details || `提交失敗 (錯誤代碼: ${response.status})`
-        throw new Error(errorMessage)
+        throw new Error(result.error || result.details || '提交失敗，請稍後再試')
       }
 
-      // 成功狀態
       setSubmitStatus('success')
-      setSubmitMessage(`案件已成功提交！審核時間約需1-2天，請耐心等候。`)
-      
-      // 觸發 n8n webhook 發送管理員通知
+      setSubmitMessage('已收到需求，我們將盡快安排家教老師與您聯繫。')
       await sendWebhookNotification('new_case', caseData)
-      
-      // 清空表單資料
-      setFormData({
-        parentName: '',
-        parentPhone: '',
-        parentEmail: '',
-        address: '',
-        idNumber: '',
-        studentGender: '',
-        lineId: '',
-        department: '',
-        grade: '',
-        studentDescription: '',
-        subject: '',
-        location: '',
-        region: '',
-        availableTime: '',
-        teacherRequirements: '',
-        hourlyFee: '',
-        message: '',
-        pending: 'pending',
-        idCard: null,
-        idCardUrl: '',
-      })
-      setPreview('')
-      setHasAgreedToTerms(false) // 重置條款同意狀態
-
+      resetForm()
     } catch (error) {
-      console.error('送出需求時發生錯誤:', error)
+      console.error('送出需求失敗:', error)
       setSubmitStatus('error')
-      setSubmitMessage(error instanceof Error ? error.message : '提交失敗，請重試')
+      setSubmitMessage(error instanceof Error ? error.message : '提交失敗，請稍後再試')
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  // 清理預覽 URL
-  useEffect(() => {
-    return () => {
-      if (preview) {
-        URL.revokeObjectURL(preview)
-      }
-    }
-  }, [preview])
-
-  // 如果提交成功，顯示成功頁面
   if (submitStatus === 'success') {
     return (
-      <div className="min-h-[600px] flex items-center justify-center p-4">
-        <div className="max-w-md mx-auto text-center">
-          <div className="animate-bounce mb-6">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-4">
-              <CheckCircle className="w-12 h-12 text-green-600" />
-            </div>
+      <div className="rounded-[2rem] border border-brand-100 bg-white/95 p-6 shadow-[0_24px_80px_rgba(67,102,78,0.08)] md:p-8">
+        <div className="mx-auto max-w-2xl text-center">
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-brand-100 text-brand-700">
+            <CheckCircle2 className="h-10 w-10" />
           </div>
-          
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            提交成功！
-          </h2>
-          
-          <div className="bg-green-50 border border-green-200 rounded-xl p-6 mb-6">
-            <div className="flex items-start space-x-3">
-              <FileText className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-              <div className="text-left">
-                <p className="text-green-800 font-medium mb-2">您的需求已成功送出</p>
-                <p className="text-green-700 text-sm leading-relaxed">
-                  {submitMessage}
-                </p>
-              </div>
-            </div>
+          <p className="mt-6 text-sm font-semibold tracking-[0.3em] text-brand-500">CASE RECEIVED</p>
+          <h2 className="mt-3 font-display text-3xl text-brand-900 md:text-4xl">已收到需求</h2>
+          <p className="mt-4 text-base leading-8 text-neutral-600">{submitMessage || '顧問將盡快與您聯繫，先和您確認學習狀況、排課與預算，再安排後續媒合。'}</p>
+
+          <div className="mt-8 grid gap-4 text-left md:grid-cols-2">
+            <SummaryItem label="接下來" value="我們將盡快安排家教老師與您聯繫試教" />
+            <SummaryItem label="LINE 協助" value="有任何問題都可以直接用LINE跟我們聯繫" />
           </div>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
-            <div className="flex items-center justify-center space-x-2 text-blue-700">
-              <Clock className="w-4 h-4" />
-              <span className="text-sm font-medium">預計審核時間：1-2 個工作天</span>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <Button 
-              onClick={() => router.push('/case-upload')}
-              className="w-full bg-brand-500 hover:bg-brand-600 text-white"
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <a
+              href="https://line.me/ti/p/~home-tutor-tw"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex"
             >
-              <ArrowRight className="w-4 h-4 mr-2" />
-              返回首頁
-            </Button>
-            
-            <Button 
-              onClick={() => setSubmitStatus('idle')}
-              variant="outline"
-              className="w-full"
-            >
-              繼續提交新案件
-            </Button>
+              <Button size="lg" className="min-h-12 rounded-full bg-brand-500 px-6 text-base text-white hover:bg-brand-600">
+                <MessageCircle className="h-4 w-4" />
+                前往 LINE 聯繫我們
+              </Button>
+            </a>
+            <Link href="/" className="inline-flex">
+              <Button type="button" variant="outline" size="lg" className="min-h-12 rounded-full border-brand-300 bg-white text-brand-800 hover:bg-brand-50">
+                回首頁
+              </Button>
+            </Link>
           </div>
         </div>
       </div>
     )
   }
 
-  // 如果提交失敗，顯示錯誤狀態
   if (submitStatus === 'error') {
     return (
-      <div className="min-h-[600px] flex items-center justify-center p-4">
-        <div className="max-w-md mx-auto text-center">
-          <div className="animate-pulse mb-6">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-red-100 rounded-full mb-4">
-              <XCircle className="w-12 h-12 text-red-600" />
-            </div>
+      <div className="rounded-[2rem] border border-red-200 bg-white/95 p-6 shadow-[0_24px_80px_rgba(120,54,54,0.08)] md:p-8">
+        <div className="mx-auto max-w-2xl text-center">
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-red-100 text-red-600">
+            <XCircle className="h-10 w-10" />
           </div>
-          
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            提交失敗
-          </h2>
-          
-          <div className="bg-red-50 border border-red-200 rounded-xl p-6 mb-6">
-            <div className="flex items-start space-x-3">
-              <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
-              <div className="text-left">
-                <p className="text-red-800 font-medium mb-2">提交過程中發生錯誤</p>
-                <p className="text-red-700 text-sm leading-relaxed">
-                  {submitMessage}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <Button 
-              onClick={() => setSubmitStatus('idle')}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              <ArrowRight className="w-4 h-4 mr-2" />
-              重新填寫表單
+          <h2 className="mt-6 font-display text-3xl text-brand-900 md:text-4xl">送出時發生問題</h2>
+          <p className="mt-4 text-base leading-8 text-neutral-600">{submitMessage || '資料暫時沒有送出成功，請再次確認資料或稍後重試。'}</p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <Button type="button" size="lg" className="min-h-12 rounded-full bg-brand-500 px-6 text-base text-white hover:bg-brand-600" onClick={() => setSubmitStatus('idle')}>
+              回到表單
             </Button>
-            
-            <Button 
-              variant="outline" 
-              onClick={() => router.push('/case-upload')}
-              className="w-full"
+            <a
+              href="https://line.me/ti/p/~home-tutor-tw"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex"
             >
-              返回首頁
-            </Button>
+              <Button type="button" variant="outline" size="lg" className="min-h-12 rounded-full border-brand-300 bg-white text-brand-800 hover:bg-brand-50">
+                <MessageCircle className="h-4 w-4" />
+                改用 LINE 諮詢
+              </Button>
+            </a>
           </div>
         </div>
       </div>
@@ -500,424 +449,443 @@ export default function CaseUploadForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold">基本資料</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="parentName">家長姓名</Label>
-            <Input
-              id="parentName"
-              name="parentName"
-              value={formData.parentName}
-              onChange={handleChange}
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="parentPhone">聯絡電話</Label>
-            <Input
-              id="parentPhone"
-              name="parentPhone"
-              type="tel"
-              value={formData.parentPhone}
-              onChange={handleChange}
-              placeholder="例如：0912345678 或 02-12345678"
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="parentEmail">電子信箱</Label>
-            <Input
-              id="parentEmail"
-              name="parentEmail"
-              type="email"
-              value={formData.parentEmail}
-              onChange={handleChange}
-              placeholder="例如：your.name@email.com"
-            />
-          </div>
-          <div>
-            <Label htmlFor="address">聯絡地址</Label>
-            <Input
-              id="address"
-              name="address"
-              value={formData.address}
-              onChange={handleChange}
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="idNumber">身分證字號</Label>
-            <Input
-              id="idNumber"
-              name="idNumber"
-              value={formData.idNumber}
-              onChange={handleChange}
-              placeholder="例如：A123456789"
-              maxLength={10}
-              required
-            />
-          </div>
-          <div>
-            <Label>學生性別</Label>
-            <Select onValueChange={(value) => handleSelectChange('studentGender', value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="請選擇性別" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="male">男</SelectItem>
-                <SelectItem value="female">女</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="lineId">LINE ID</Label>
-            <Input
-              id="lineId"
-              name="lineId"
-              value={formData.lineId}
-              onChange={handleChange}
-            />
-          </div>
-          <div>
-            <Label htmlFor="department">就讀學校</Label>
-            <Input
-              id="department"
-              name="department"
-              value={formData.department}
-              onChange={handleChange}
-              required
-            />
-          </div>
-          <div>
-            <Label>年級</Label>
-            <Select onValueChange={(value) => handleSelectChange('grade', value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="請選擇年級" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="小一">小一</SelectItem>
-                <SelectItem value="小二">小二</SelectItem>
-                <SelectItem value="小三">小三</SelectItem>
-                <SelectItem value="小四">小四</SelectItem>
-                <SelectItem value="小五">小五</SelectItem>
-                <SelectItem value="小六">小六</SelectItem>
-                <SelectItem value="國一">國一</SelectItem>
-                <SelectItem value="國二">國二</SelectItem>
-                <SelectItem value="國三">國三</SelectItem>
-                <SelectItem value="高一">高一</SelectItem>
-                <SelectItem value="高二">高二</SelectItem>
-                <SelectItem value="高三">高三</SelectItem>
-                <SelectItem value="大一">大一</SelectItem>
-                <SelectItem value="大二">大二</SelectItem>
-                <SelectItem value="大三">大三</SelectItem>
-                <SelectItem value="大四">大四</SelectItem>
-                <SelectItem value="成人">成人</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <div>
-          <Label htmlFor="studentDescription">學生狀況描述</Label>
-          <Textarea
-            id="studentDescription"
-            name="studentDescription"
-            value={formData.studentDescription}
-            onChange={handleChange}
-            placeholder="請描述學生的學習狀況、程度等，以方便家教老師根據學生程度調整教學方式"
-            required
-          />
-        </div>
+      <div className="grid gap-3 md:grid-cols-3">
+        {steps.map((step, index) => (
+          <StepBadge key={step.key} active={index === currentStep} index={index} label={step.label} />
+        ))}
       </div>
 
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold">家教需求</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <Label>地區</Label>
-            <Select 
-              onValueChange={(value) => handleSelectChange('region', value)}
-              required
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="請選擇地區" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="線上">線上</SelectItem>
-                <SelectItem value="基隆">基隆</SelectItem>
-                <SelectItem value="台北">台北</SelectItem>
-                <SelectItem value="新北">新北</SelectItem>
-                <SelectItem value="桃園">桃園</SelectItem>
-                <SelectItem value="新竹">新竹</SelectItem>
-                <SelectItem value="苗栗">苗栗</SelectItem>
-                  <SelectItem value="台中">台中</SelectItem>
-                  <SelectItem value="彰化">彰化</SelectItem>
-                  <SelectItem value="南投">南投</SelectItem>
-                  <SelectItem value="雲林">雲林</SelectItem>
-                  <SelectItem value="嘉義">嘉義</SelectItem>
-                  <SelectItem value="台南">台南</SelectItem>
-                  <SelectItem value="高雄">高雄</SelectItem>
-                  <SelectItem value="屏東">屏東</SelectItem>
-                  <SelectItem value="宜蘭">宜蘭</SelectItem>
-                  <SelectItem value="花蓮">花蓮</SelectItem>
-                  <SelectItem value="台東">台東</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="subject">需求科目</Label>
-            <Input
-              id="subject"
-              name="subject"
-              value={formData.subject}
-              onChange={handleChange}
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="location">上課地點</Label>
-            <Input
-              id="location"
-              name="location"
-              value={formData.location}
-              onChange={handleChange}
-              placeholder="請輸入大概位置即可"
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="availableTime">可上課時段</Label>
-            <Input
-              id="availableTime"
-              name="availableTime"
-              value={formData.availableTime}
-              onChange={handleChange}
-              placeholder="例：週一至週五晚上、週末下午"
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="hourlyFee">期望時薪</Label>
-            <Input
-              id="hourlyFee"
-              name="hourlyFee"
-              type="number"
-              step="1"
-              min="0"
-              value={formData.hourlyFee}
-              onChange={handleChange}
-              required
-            />
-          </div>
-        </div>
-
-        <div>
-          <Label htmlFor="teacherRequirements">教師條件要求</Label>
-          <Textarea
-            id="teacherRequirements"
-            name="teacherRequirements"
-            value={formData.teacherRequirements}
-            onChange={handleChange}
-            placeholder="請說明對教師的特殊要求（例如：性別、教學經驗等）"
-          />
-        </div>
-
-        <div>
-          <Label htmlFor="message">補充說明</Label>
-          <Textarea
-            id="message"
-            name="message"
-            value={formData.message}
-            onChange={handleChange}
-            placeholder="其他補充說明事項"
-          />
-        </div>
-      </div>
-
-      <div className="space-y-6">
-        <div className="flex items-center space-x-3 mb-6">
-          <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-            <FileText className="w-5 h-5 text-emerald-600" />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">身分證件上傳</h2>
-            <p className="text-sm text-gray-500">請上傳清晰的身分證照片，系統會自動加上浮水印保護</p>
-          </div>
-        </div>
-
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6">
-          <div className="flex items-center space-x-3 mb-4">
-            <CreditCard className="w-6 h-6 text-emerald-600" />
-            <h3 className="text-lg font-medium text-emerald-900">身分證照片</h3>
-          </div>
-          
-          {/* 簡化的上傳說明 */}
-          <div className="bg-white rounded-lg p-4 mb-4 border border-emerald-100">
-            <div className="text-sm text-emerald-800 space-y-2">
-              <div className="flex items-center space-x-2">
-                <CheckCircle className="w-4 h-4 text-emerald-600" />
-                <span>支援所有圖片格式 (JPG、PNG、WebP、GIF、TIFF 等)</span>
+      {currentStep === 0 && (
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_20rem] lg:items-start">
+          <div className="rounded-[2rem] border border-brand-100 bg-white/95 p-5 shadow-[0_24px_70px_rgba(67,102,78,0.08)] md:p-6">
+            <div className="mb-5 flex items-start gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-100 text-brand-700">
+                <Sparkles className="h-5 w-5" />
               </div>
-              <div className="flex items-center space-x-2">
-                <CheckCircle className="w-4 h-4 text-emerald-600" />
-                <span>系統自動壓縮大檔案至 5MB 以下</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <CheckCircle className="w-4 h-4 text-emerald-600" />
-                <span>自動加入浮水印保護並上傳</span>
-              </div>
-              <div className="bg-emerald-50/30 p-3 rounded-lg border border-emerald-100 mt-3">
-                <p className="text-xs text-emerald-700">
-                  <strong>📋 上傳說明：</strong>
-                  高中以下學生請上傳家長身分證，大學以上學生請上傳本人身分證
-                </p>
+              <div>
+                <p className="text-sm font-semibold tracking-[0.24em] text-brand-500">MATCHING BRIEF</p>
+                <h2 className="mt-2 font-display text-2xl text-brand-900 md:text-3xl">填寫課程需求</h2>
+                <p className="mt-2 text-sm leading-7 text-neutral-600">請填寫上課方式、科目、年級、預算區間、可上課時段，謝謝您！</p>
               </div>
             </div>
-          </div>
 
-          <div className="relative">
-            <div className="relative">
-              <Input
-                id="idCard"
-                type="file"
-                accept="image/*"
-                onChange={handleIdCardChange}
-                required
-                disabled={isCompressing}
-                className={`w-full h-32 border-2 border-dashed rounded-lg transition-all duration-200 opacity-0 absolute inset-0 cursor-pointer ${
-                  isCompressing ? 'cursor-not-allowed' : 'cursor-pointer'
-                }`}
-              />
-              <div className={`w-full h-32 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-center transition-all duration-200 ${
-                isCompressing 
-                  ? 'border-gray-300 bg-gray-50 cursor-not-allowed' 
-                  : 'border-emerald-300 hover:border-emerald-400 bg-emerald-50/50 cursor-pointer hover:bg-emerald-50/80'
-              }`}>
-                {!isCompressing ? (
-                  <>
-                    <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mb-3">
-                      <CreditCard className="w-6 h-6 text-emerald-600" />
-                    </div>
-                    <p className="text-sm font-medium text-emerald-700 mb-1">點擊或拖拽上傳身分證照片</p>
-                    <p className="text-xs text-emerald-600">支援所有圖片格式</p>
-                  </>
-                ) : (
-                  <>
-                    <Loader2 className="w-8 h-8 text-gray-400 animate-spin mb-2" />
-                    <p className="text-sm text-gray-500">正在處理圖片...</p>
-                  </>
+            <div className="space-y-6">
+              <div>
+                <Label className="text-sm font-semibold text-brand-900">上課方式</Label>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <ChipButton active={formData.lessonMode === 'in_person'} onClick={() => setField('lessonMode', 'in_person')}>
+                    實體上課
+                  </ChipButton>
+                  <ChipButton active={formData.lessonMode === 'online'} onClick={() => {
+                    setField('lessonMode', 'online')
+                    setField('city', '')
+                    setField('district', '')
+                    setField('roadName', '')
+                  }}>
+                    線上上課
+                  </ChipButton>
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-sm font-semibold text-brand-900">需求科目</Label>
+                <div className="mt-3 flex flex-wrap gap-2.5">
+                  {subjectOptions.map((subject) => (
+                    <ChipButton key={subject} active={formData.subject === subject} onClick={() => setField('subject', subject)}>
+                      {subject}
+                    </ChipButton>
+                  ))}
+                  <ChipButton active={formData.subject === '其他'} onClick={() => setField('subject', '其他')}>
+                    其他
+                  </ChipButton>
+                </div>
+                {formData.subject === '其他' && (
+                  <Input
+                    className="mt-3 h-12 rounded-2xl border-brand-200 bg-[#fffdf8] px-4"
+                    value={formData.subjectOther}
+                    onChange={(event) => setField('subjectOther', event.target.value)}
+                    placeholder="請輸入需求科目"
+                  />
                 )}
               </div>
-            </div>
-          </div>
 
-          {/* 狀態反饋 */}
-          {fileError && (
-            <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4">
-              <div className="flex items-start space-x-3">
-                <XCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+              <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <h4 className="text-sm font-medium text-red-800">上傳失敗</h4>
-                  <p className="text-sm text-red-600 mt-1">{fileError}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {fileInfo && !fileError && (
-            <div className="mt-4 bg-emerald-100 border border-emerald-300 rounded-lg p-4">
-              <div className="flex items-start space-x-3">
-                <div className="flex-shrink-0 mt-0.5">
-                  {isCompressing ? (
-                    <Loader2 className="h-5 w-5 text-emerald-600 animate-spin" />
-                  ) : (
-                    <CheckCircle className="h-5 w-5 text-emerald-600" />
-                  )}
+                  <Label className="text-sm font-semibold text-brand-900">年級</Label>
+                  <Select value={formData.grade} onValueChange={(value) => setField('grade', value)}>
+                    <SelectTrigger className="mt-3 h-12 rounded-2xl border-brand-200 bg-[#fffdf8] px-4 text-base">
+                      <SelectValue placeholder="請選擇年級" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {gradeOptions.map((grade) => (
+                        <SelectItem key={grade} value={grade}>
+                          {grade}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-emerald-800">
-                    {fileInfo}
-                  </p>
-                  <p className="text-xs text-emerald-600 mt-1">
-                    {isCompressing 
-                      ? '系統正在優化圖片品質與大小...' 
-                      : '身分證上傳成功！請繼續填寫表單其他資料。'
-                    }
-                  </p>
+                  <Label className="text-sm font-semibold text-brand-900">預算區間</Label>
+                  <Select value={formData.budgetRange} onValueChange={(value) => setField('budgetRange', value)}>
+                    <SelectTrigger className="mt-3 h-12 rounded-2xl border-brand-200 bg-[#fffdf8] px-4 text-base">
+                      <SelectValue placeholder="請選擇預算區間" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {budgetRangeOptions.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
-            </div>
-          )}
 
-          {/* 預覽圖片 */}
-          {preview && (
-            <div className="mt-4">
-              <p className="text-sm font-medium text-emerald-800 mb-2">預覽（已加浮水印保護）</p>
-              <div className="relative overflow-hidden rounded-lg border border-emerald-200">
-                <Image
-                  src={preview} 
-                  alt="身分證預覽" 
-                  width={400}
-                  height={240}
-                  className="w-full h-auto"
+              {formData.lessonMode === 'online' ? (
+                <div>
+                  <Label htmlFor="onlineDetail" className="text-sm font-semibold text-brand-900">線上上課平台或方式</Label>
+                  <Input
+                    id="onlineDetail"
+                    className="mt-3 h-12 rounded-2xl border-brand-200 bg-[#fffdf8] px-4"
+                    value={formData.onlineDetail}
+                    onChange={(event) => setField('onlineDetail', event.target.value)}
+                    placeholder="例如：Google Meet、Zoom、視訊授課"
+                  />
+                </div>
+              ) : (
+                <div className="rounded-[1.6rem] border border-brand-100 bg-[#f8f5ea] p-4 md:p-5">
+                  <div className="mb-4 flex items-start gap-3">
+                    <MapPin className="mt-1 h-4 w-4 text-brand-600" />
+                    <div>
+                      <h3 className="text-base font-semibold text-brand-900">上課地址</h3>
+                      <p className="mt-1 text-sm leading-6 text-neutral-600">不用填門牌，但請填到路名，例如「新竹市東區光復路二段」。</p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <Label className="text-sm font-semibold text-brand-900">縣市</Label>
+                      <Select
+                        value={formData.city}
+                        onValueChange={(value) => {
+                          setField('city', value)
+                          setField('district', '')
+                          setField('roadName', '')
+                        }}
+                      >
+                        <SelectTrigger className="mt-3 h-12 rounded-2xl border-brand-200 bg-white px-4 text-base">
+                          <SelectValue placeholder="請選擇縣市" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {cityOptions.map((city) => (
+                            <SelectItem key={city} value={city}>
+                              {city}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-semibold text-brand-900">行政區</Label>
+                      <Select value={formData.district} onValueChange={(value) => setField('district', value)} disabled={!formData.city}>
+                        <SelectTrigger className="mt-3 h-12 rounded-2xl border-brand-200 bg-white px-4 text-base">
+                          <SelectValue placeholder={formData.city ? '請選擇行政區' : '先選縣市'} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {districtOptions.map((district) => (
+                            <SelectItem key={district} value={district}>
+                              {district}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_0.9fr]">
+                    <div>
+                      <Label htmlFor="roadName" className="text-sm font-semibold text-brand-900">路名 / 路段</Label>
+                      <Input
+                        id="roadName"
+                        list="road-suggestions"
+                        className="mt-3 h-12 rounded-2xl border-brand-200 bg-white px-4"
+                        value={formData.roadName}
+                        onChange={(event) => setField('roadName', event.target.value)}
+                        placeholder="例如：光復路二段"
+                      />
+                      <datalist id="road-suggestions">
+                        {roadSuggestions.map((road) => (
+                          <option key={road} value={road} />
+                        ))}
+                      </datalist>
+                    </div>
+                    <div>
+                      <Label htmlFor="landmark" className="text-sm font-semibold text-brand-900">補充地標（選填）</Label>
+                      <Input
+                        id="landmark"
+                        className="mt-3 h-12 rounded-2xl border-brand-200 bg-white px-4"
+                        value={formData.landmark}
+                        onChange={(event) => setField('landmark', event.target.value)}
+                        placeholder="例如：近清大正門"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <Label className="text-sm font-semibold text-brand-900">可上課時段(可複選)</Label>
+                <div className="mt-3 flex flex-wrap gap-2.5">
+                  {schedulePresetOptions.map((slot) => (
+                    <ChipButton key={slot} active={formData.selectedTimeSlots.includes(slot)} onClick={() => toggleTimeSlot(slot)}>
+                      {slot}
+                    </ChipButton>
+                  ))}
+                </div>
+                <Textarea
+                  className="mt-3 min-h-[110px] rounded-[1.4rem] border-brand-200 bg-[#fffdf8] px-4 py-3"
+                  value={formData.availableTimeNote}
+                  onChange={(event) => setField('availableTimeNote', event.target.value)}
+                  placeholder="也可以補充更細的時間，例如：週三 19:00 後、週日 14:00-17:00"
                 />
               </div>
             </div>
-          )}
-        </div>
-      </div>
+          </div>
 
-      {/* 服務條款同意區域 */}
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold">服務條款</h2>
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-          <div className="flex items-start space-x-3">
-            <div className="pt-1">
-              <Checkbox
-                id="terms-agreement"
-                checked={hasAgreedToTerms}
-                onCheckedChange={(checked) => setHasAgreedToTerms(!!checked)}
+          <div className="space-y-4">
+            <div className="rounded-[1.8rem] border border-brand-100 bg-white/90 p-5 shadow-[0_18px_50px_rgba(67,102,78,0.06)]">
+              <div className="flex items-center gap-3 text-sm font-semibold text-brand-700">
+                <ShieldCheck className="h-4 w-4" />
+                送出前你會先看到摘要
+              </div>
+              <div className="mt-4 space-y-3 text-sm leading-7 text-neutral-700">
+                {trustNotes.map((note) => (
+                  <div key={note} className="flex gap-3">
+                    <CheckCircle2 className="mt-1 h-4 w-4 flex-none text-brand-600" />
+                    <span>{note}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-[1.8rem] bg-brand-900 p-5 text-white shadow-[0_24px_70px_rgba(31,58,45,0.22)]">
+              <p className="text-sm font-semibold tracking-[0.22em] text-brand-200">CURRENT BRIEF</p>
+              <div className="mt-4 space-y-3 text-sm leading-7 text-brand-50">
+                <div>科目：{finalSubject || '尚未選擇'}</div>
+                <div>地點：{locationSummary || '尚未填寫'}</div>
+                <div>預算：{formData.budgetRange || '尚未選擇'}</div>
+                <div>時段：{availableTimeSummary || '尚未填寫'}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {currentStep === 1 && (
+        <div className="rounded-[2rem] border border-brand-100 bg-white/95 p-5 shadow-[0_24px_70px_rgba(67,102,78,0.08)] md:p-6">
+          <div className="mb-6 flex items-start gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-100 text-brand-700">
+              <UserRound className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold tracking-[0.24em] text-brand-500">STUDENT CONTEXT</p>
+              <h2 className="mt-2 font-display text-2xl text-brand-900 md:text-3xl">孩子目前的學習狀況</h2>
+              <p className="mt-2 text-sm leading-7 text-neutral-600">我們可以更了解孩子的學習情況、教學需求，以及您對老師的期待，幫助我們為孩子媒合最合適的老師。</p>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <Label className="text-sm font-semibold text-brand-900">學生性別</Label>
+              <Select value={formData.studentGender} onValueChange={(value) => setField('studentGender', value)}>
+                <SelectTrigger className="mt-3 h-12 rounded-2xl border-brand-200 bg-[#fffdf8] px-4 text-base">
+                  <SelectValue placeholder="請選擇學生性別" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="male">男</SelectItem>
+                  <SelectItem value="female">女</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="department" className="text-sm font-semibold text-brand-900">就讀學校</Label>
+              <Input
+                id="department"
+                className="mt-3 h-12 rounded-2xl border-brand-200 bg-[#fffdf8] px-4"
+                value={formData.department}
+                onChange={(event) => setField('department', event.target.value)}
+                placeholder="例如：建功高中、竹北國中"
               />
             </div>
-            <div className="flex-1">
-              <Label htmlFor="terms-agreement" className="text-sm font-medium cursor-pointer">
-                我已閱讀並同意
-              </Label>
-              <div className="mt-2">
-                <TermsDialog onAgree={() => setHasAgreedToTerms(true)}>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="text-blue-600 border-blue-300 hover:bg-blue-50"
-                  >
-                    <FileText className="w-4 h-4 mr-2" />
-                    查看服務條款
-                  </Button>
-                </TermsDialog>
+          </div>
+
+          <div className="mt-4">
+            <Label htmlFor="studentDescription" className="text-sm font-semibold text-brand-900">學生狀況描述</Label>
+            <Textarea
+              id="studentDescription"
+              className="mt-3 min-h-[150px] rounded-[1.4rem] border-brand-200 bg-[#fffdf8] px-4 py-3"
+              value={formData.studentDescription}
+              onChange={(event) => setField('studentDescription', event.target.value)}
+              placeholder="例如：目前高二，數學遇到三角函數與指對數卡關，希望先穩住校內成績，再往學測方向準備。"
+            />
+          </div>
+
+          <div className="mt-4">
+            <Label htmlFor="teacherRequirements" className="text-sm font-semibold text-brand-900">希望的老師條件</Label>
+            <Textarea
+              id="teacherRequirements"
+              className="mt-3 min-h-[120px] rounded-[1.4rem] border-brand-200 bg-[#fffdf8] px-4 py-3"
+              value={formData.teacherRequirements}
+              onChange={(event) => setField('teacherRequirements', event.target.value)}
+              placeholder="例如：希望有高中家教經驗、擅長帶基礎補強，溝通溫和但節奏明確。"
+            />
+          </div>
+
+          <div className="mt-4">
+            <Label htmlFor="message" className="text-sm font-semibold text-brand-900">補充說明（選填）</Label>
+            <Textarea
+              id="message"
+              className="mt-3 min-h-[120px] rounded-[1.4rem] border-brand-200 bg-[#fffdf8] px-4 py-3"
+              value={formData.message}
+              onChange={(event) => setField('message', event.target.value)}
+              placeholder="還有任何補充需求，都可以先寫在這裡。"
+            />
+          </div>
+        </div>
+      )}
+
+      {currentStep === 2 && (
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.05fr)_20rem] lg:items-start">
+          <div className="rounded-[2rem] border border-brand-100 bg-white/95 p-5 shadow-[0_24px_70px_rgba(67,102,78,0.08)] md:p-6">
+            <div className="mb-6 flex items-start gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-100 text-brand-700">
+                <Phone className="h-5 w-5" />
               </div>
-              <p className="text-xs text-amber-700 mt-2">
-                ⚠️ 提交前請先閱讀並同意我們的服務條款
-              </p>
+              <div>
+                <p className="text-sm font-semibold tracking-[0.24em] text-brand-500">CONTACT</p>
+                <h2 className="mt-2 font-display text-2xl text-brand-900 md:text-3xl">留下聯絡方式與最後確認</h2>
+                <p className="mt-2 text-sm leading-7 text-neutral-600">電話必填，LINE 與 Email 可選填。證件與身分字號會在顧問確認需求後，提供專屬補件連結。</p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Label htmlFor="parentName" className="text-sm font-semibold text-brand-900">家長姓名</Label>
+                <Input
+                  id="parentName"
+                  className="mt-3 h-12 rounded-2xl border-brand-200 bg-[#fffdf8] px-4"
+                  value={formData.parentName}
+                  onChange={(event) => setField('parentName', event.target.value)}
+                  placeholder="請填寫家長姓名"
+                />
+              </div>
+              <div>
+                <Label htmlFor="parentPhone" className="text-sm font-semibold text-brand-900">聯絡電話</Label>
+                <Input
+                  id="parentPhone"
+                  className="mt-3 h-12 rounded-2xl border-brand-200 bg-[#fffdf8] px-4"
+                  value={formData.parentPhone}
+                  onChange={(event) => setField('parentPhone', event.target.value)}
+                  placeholder="例如：0912345678 或 02-12345678"
+                />
+              </div>
+              <div>
+                <Label htmlFor="lineId" className="text-sm font-semibold text-brand-900">LINE ID（選填）</Label>
+                <Input
+                  id="lineId"
+                  className="mt-3 h-12 rounded-2xl border-brand-200 bg-[#fffdf8] px-4"
+                  value={formData.lineId}
+                  onChange={(event) => setField('lineId', event.target.value)}
+                  placeholder="若希望顧問用 LINE 聯繫，可先留下"
+                />
+              </div>
+              <div>
+                <Label htmlFor="parentEmail" className="text-sm font-semibold text-brand-900">電子信箱（選填）</Label>
+                <Input
+                  id="parentEmail"
+                  type="email"
+                  className="mt-3 h-12 rounded-2xl border-brand-200 bg-[#fffdf8] px-4"
+                  value={formData.parentEmail}
+                  onChange={(event) => setField('parentEmail', event.target.value)}
+                  placeholder="your.name@email.com"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-[1.6rem] border border-brand-100 bg-[#f8f5ea] p-4">
+              <div className="flex items-start gap-3">
+                <Checkbox id="terms-agreement" checked={hasAgreedToTerms} onCheckedChange={(checked) => setHasAgreedToTerms(Boolean(checked))} />
+                <div className="flex-1">
+                  <Label htmlFor="terms-agreement" className="text-sm font-medium cursor-pointer text-brand-900">
+                    我已閱讀並同意服務條款
+                  </Label>
+                  <p className="mt-2 text-xs leading-6 text-neutral-600">證件照片與身分證字號不會在此頁收集，補件連結會在顧問確認需求後提供。</p>
+                  <div className="mt-3 flex flex-wrap gap-3">
+                    <TermsDialog onAgree={() => setHasAgreedToTerms(true)}>
+                      <Button type="button" variant="outline" size="sm" className="rounded-full border-brand-300 bg-white text-brand-800 hover:bg-brand-50">
+                        查看服務條款
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </TermsDialog>
+                    <Link href="https://line.me/ti/p/~home-tutor-tw" target="_blank" className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-brand-700 transition-colors hover:bg-brand-50">
+                      <MessageCircle className="h-4 w-4" />
+                      先用 LINE 詢問顧問
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="rounded-[1.8rem] border border-brand-100 bg-white/90 p-5 shadow-[0_18px_50px_rgba(67,102,78,0.06)]">
+              <div className="flex items-center gap-3 text-sm font-semibold text-brand-700">
+                <Clock3 className="h-4 w-4" />
+                送出前摘要
+              </div>
+              <div className="mt-4 grid gap-3">
+                <SummaryItem label="科目" value={finalSubject || '尚未填寫'} />
+                <SummaryItem label="地址 / 上課方式" value={locationSummary || '尚未填寫'} />
+                <SummaryItem label="預算" value={formData.budgetRange || '尚未選擇'} />
+                <SummaryItem label="時段" value={availableTimeSummary || '尚未填寫'} />
+                <SummaryItem label="學生狀況" value={formData.studentDescription || '尚未填寫'} />
+              </div>
+            </div>
+
+            <div className="rounded-[1.8rem] bg-brand-900 p-5 text-white shadow-[0_24px_70px_rgba(31,58,45,0.22)]">
+              <p className="text-sm font-semibold tracking-[0.22em] text-brand-100">FOLLOW-UP</p>
+              <p className="mt-4 text-sm leading-7 text-brand-50">補件連結會在需求確認後提供，家長只需要透過專屬連結補上身分證字號與證件照片即可。</p>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
-      <Button type="submit" disabled={isSubmitting || !hasAgreedToTerms}>
-        {isSubmitting ? (
-          <div className="flex items-center justify-center">
-            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-            提交中...
-          </div>
-        ) : hasAgreedToTerms ? (
-          '送出需求'
+      <div className="flex flex-col gap-3 border-t border-brand-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+        <Button type="button" variant="ghost" className="justify-start rounded-full px-0 text-brand-700 hover:bg-transparent hover:text-brand-900" onClick={goPrev} disabled={currentStep === 0 || isSubmitting}>
+          <ArrowLeft className="h-4 w-4" />
+          上一步
+        </Button>
+
+        {currentStep < steps.length - 1 ? (
+          <Button type="button" size="lg" className="min-h-12 rounded-full bg-brand-500 px-6 text-base text-white hover:bg-brand-600" onClick={goNext}>
+            下一步
+            <ArrowRight className="h-4 w-4" />
+          </Button>
         ) : (
-          '請先同意服務條款'
+          <Button type="submit" size="lg" className="min-h-12 rounded-full bg-brand-500 px-6 text-base text-white hover:bg-brand-600" disabled={isSubmitting}>
+            {isSubmitting ? (
+              <span className="inline-flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                送出中...
+              </span>
+            ) : (
+              '送出需求'
+            )}
+          </Button>
         )}
-      </Button>
+      </div>
     </form>
   )
 }
-

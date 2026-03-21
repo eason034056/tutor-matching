@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import {
   ArrowLeft,
@@ -144,6 +144,8 @@ export default function CaseUploadForm() {
   const [cityOptions, setCityOptions] = useState<string[]>([])
   const [districtOptions, setDistrictOptions] = useState<string[]>([])
   const [roadSuggestions, setRoadSuggestions] = useState<string[]>([])
+  const formTopRef = useRef<HTMLElement | null>(null)
+  const pendingScrollRef = useRef(false)
 
   useEffect(() => {
     const loadCities = async () => {
@@ -158,6 +160,17 @@ export default function CaseUploadForm() {
 
     loadCities()
   }, [])
+
+  useEffect(() => {
+    if (!pendingScrollRef.current) {
+      return
+    }
+
+    pendingScrollRef.current = false
+    window.requestAnimationFrame(() => {
+      formTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }, [currentStep, submitStatus])
 
   useEffect(() => {
     if (formData.lessonMode === 'online' || !formData.city) {
@@ -247,6 +260,18 @@ export default function CaseUploadForm() {
     )
   }
 
+  const queueScrollToTop = () => {
+    pendingScrollRef.current = true
+  }
+
+  const setFormContainerRef = (node: HTMLFormElement | null) => {
+    formTopRef.current = node
+  }
+
+  const setPanelRef = (node: HTMLDivElement | null) => {
+    formTopRef.current = node
+  }
+
   const validateStep = (stepIndex: number) => {
     const errors: string[] = []
 
@@ -300,10 +325,14 @@ export default function CaseUploadForm() {
       toast.error(errors[0])
       return
     }
+    queueScrollToTop()
     setCurrentStep((step) => Math.min(step + 1, steps.length - 1))
   }
 
-  const goPrev = () => setCurrentStep((step) => Math.max(step - 1, 0))
+  const goPrev = () => {
+    queueScrollToTop()
+    setCurrentStep((step) => Math.max(step - 1, 0))
+  }
 
   const resetForm = () => {
     setFormData(createInitialFormData())
@@ -365,12 +394,14 @@ export default function CaseUploadForm() {
         throw new Error(result.error || result.details || '提交失敗，請稍後再試')
       }
 
+      queueScrollToTop()
       setSubmitStatus('success')
       setSubmitMessage('已收到需求，我們將盡快安排家教老師與您聯繫。')
       await sendWebhookNotification('new_case', caseData)
       resetForm()
     } catch (error) {
       console.error('送出需求失敗:', error)
+      queueScrollToTop()
       setSubmitStatus('error')
       setSubmitMessage(error instanceof Error ? error.message : '提交失敗，請稍後再試')
     } finally {
@@ -380,7 +411,7 @@ export default function CaseUploadForm() {
 
   if (submitStatus === 'success') {
     return (
-      <div className="rounded-[2rem] border border-brand-100 bg-white/95 p-6 shadow-[0_24px_80px_rgba(67,102,78,0.08)] md:p-8">
+      <div ref={setPanelRef} className="scroll-mt-28 rounded-[2rem] border border-brand-100 bg-white/95 p-6 shadow-[0_24px_80px_rgba(67,102,78,0.08)] md:scroll-mt-32 md:p-8">
         <div className="mx-auto max-w-2xl text-center">
           <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-brand-100 text-brand-700">
             <CheckCircle2 className="h-10 w-10" />
@@ -419,7 +450,7 @@ export default function CaseUploadForm() {
 
   if (submitStatus === 'error') {
     return (
-      <div className="rounded-[2rem] border border-red-200 bg-white/95 p-6 shadow-[0_24px_80px_rgba(120,54,54,0.08)] md:p-8">
+      <div ref={setPanelRef} className="scroll-mt-28 rounded-[2rem] border border-red-200 bg-white/95 p-6 shadow-[0_24px_80px_rgba(120,54,54,0.08)] md:scroll-mt-32 md:p-8">
         <div className="mx-auto max-w-2xl text-center">
           <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-red-100 text-red-600">
             <XCircle className="h-10 w-10" />
@@ -448,7 +479,7 @@ export default function CaseUploadForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form ref={setFormContainerRef} onSubmit={handleSubmit} className="space-y-6 scroll-mt-28 md:scroll-mt-32">
       <div className="grid gap-3 md:grid-cols-3">
         {steps.map((step, index) => (
           <StepBadge key={step.key} active={index === currentStep} index={index} label={step.label} />

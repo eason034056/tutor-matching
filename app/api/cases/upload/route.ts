@@ -17,6 +17,7 @@ export async function POST(request: Request) {
       ...data,
       id: uniqueId,
       pending: 'pending', 
+      documentStatus: data.documentStatus || 'not_requested',
       createdAt: new Date().toISOString(),
     })
 

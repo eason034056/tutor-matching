@@ -111,6 +111,7 @@ export const sendNewCaseEmailNotification = async (caseData: CaseNotificationDat
           caseNumber: caseData.caseNumber,
           subject: caseData.subject,
           hourlyFee: caseData.hourlyFee,
+          budgetRange: caseData.budgetRange,
           location: caseData.location,
           availableTime: caseData.availableTime,
           teacherRequirements: caseData.teacherRequirements || '',

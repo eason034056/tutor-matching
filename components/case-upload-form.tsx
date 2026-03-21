@@ -166,6 +166,7 @@ export default function CaseUploadForm() {
   const [districtOptions, setDistrictOptions] = useState<string[]>([])
   const [roadSuggestions, setRoadSuggestions] = useState<string[]>([])
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldName, string>>>({})
+  const [fieldErrorStep, setFieldErrorStep] = useState<number | null>(null)
   const formTopRef = useRef<HTMLElement | null>(null)
   const pendingScrollRef = useRef(false)
   const fieldRefs = useRef<Partial<Record<FieldName, HTMLDivElement | null>>>({})
@@ -267,7 +268,8 @@ export default function CaseUploadForm() {
     [formData.availableTimeNote, formData.selectedTimeSlots]
   )
 
-  const hasFieldError = (field: FieldName) => Boolean(fieldErrors[field])
+  const hasFieldError = (field: FieldName) =>
+    fieldErrorStep === currentStep && Boolean(fieldErrors[field])
 
   const getFieldLabelClassName = (field: FieldName, baseClassName = 'text-sm font-semibold') =>
     cn(baseClassName, hasFieldError(field) ? 'text-red-700' : 'text-brand-900')
@@ -288,6 +290,7 @@ export default function CaseUploadForm() {
   const clearFieldErrors = (...fields: FieldName[]) => {
     if (fields.length === 0) {
       setFieldErrors({})
+      setFieldErrorStep(null)
       return
     }
 
@@ -317,7 +320,7 @@ export default function CaseUploadForm() {
     })
   }
 
-  const applyValidationErrors = (errors: ValidationError[]) => {
+  const applyValidationErrors = (errors: ValidationError[], stepIndex: number) => {
     const nextErrors: Partial<Record<FieldName, string>> = {}
 
     errors.forEach(({ field, message }) => {
@@ -327,6 +330,7 @@ export default function CaseUploadForm() {
     })
 
     setFieldErrors(nextErrors)
+    setFieldErrorStep(stepIndex)
 
     if (errors[0]) {
       toast.error(errors[0].message)
@@ -468,7 +472,7 @@ export default function CaseUploadForm() {
   const goNext = () => {
     const errors = validateStep(currentStep)
     if (errors.length > 0) {
-      applyValidationErrors(errors)
+      applyValidationErrors(errors, currentStep)
       return
     }
     clearFieldErrors()
@@ -488,13 +492,14 @@ export default function CaseUploadForm() {
     setHasAgreedToTerms(false)
     setRoadSuggestions([])
     setFieldErrors({})
+    setFieldErrorStep(null)
   }
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const errors = validateStep(2)
     if (errors.length > 0) {
-      applyValidationErrors(errors)
+      applyValidationErrors(errors, 2)
       return
     }
 

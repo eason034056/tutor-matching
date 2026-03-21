@@ -40,6 +40,7 @@ test('case upload form highlights invalid required fields and scrolls to the fir
   const source = readSource('components/case-upload-form.tsx')
 
   assert.match(source, /fieldErrors/)
+  assert.match(source, /fieldErrorStep/)
   assert.match(source, /border-red-300/)
   assert.match(source, /scrollToField/)
   assert.match(source, /aria-invalid/)

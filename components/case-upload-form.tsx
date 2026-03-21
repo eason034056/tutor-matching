@@ -170,6 +170,7 @@ export default function CaseUploadForm() {
   const formTopRef = useRef<HTMLElement | null>(null)
   const pendingScrollRef = useRef(false)
   const fieldRefs = useRef<Partial<Record<FieldName, HTMLDivElement | null>>>({})
+  const previousStepRef = useRef(currentStep)
 
   useEffect(() => {
     const loadCities = async () => {
@@ -195,6 +196,15 @@ export default function CaseUploadForm() {
       formTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     })
   }, [currentStep, submitStatus])
+
+  useEffect(() => {
+    if (previousStepRef.current !== currentStep) {
+      // Ensure errors from another step never leak into the newly-entered step.
+      setFieldErrors({})
+      setFieldErrorStep(null)
+      previousStepRef.current = currentStep
+    }
+  }, [currentStep])
 
   useEffect(() => {
     if (formData.lessonMode === 'online' || !formData.city) {
@@ -497,6 +507,12 @@ export default function CaseUploadForm() {
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+
+    if (currentStep < steps.length - 1) {
+      goNext()
+      return
+    }
+
     const errors = validateStep(2)
     if (errors.length > 0) {
       applyValidationErrors(errors, 2)

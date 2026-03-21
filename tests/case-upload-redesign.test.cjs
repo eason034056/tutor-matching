@@ -36,6 +36,15 @@ test('case upload form scrolls back to the step header when moving between pages
   assert.match(source, /behavior:\s*'smooth'/)
 })
 
+test('case upload form highlights invalid required fields and scrolls to the first error', () => {
+  const source = readSource('components/case-upload-form.tsx')
+
+  assert.match(source, /fieldErrors/)
+  assert.match(source, /border-red-300/)
+  assert.match(source, /scrollToField/)
+  assert.match(source, /aria-invalid/)
+})
+
 test('case upload success state promises consultant follow-up instead of immediate document collection', () => {
   const source = readSource('components/case-upload-form.tsx')
 

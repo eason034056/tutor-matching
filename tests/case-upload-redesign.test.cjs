@@ -29,6 +29,26 @@ test('case upload form uses mobile-first steps and the new address and budget fi
   assert.doesNotMatch(source, /id="idCard"/)
 })
 
+test('case upload form scrolls back to the step header when moving between pages', () => {
+  const source = readSource('components/case-upload-form.tsx')
+
+  assert.match(source, /scrollIntoView/)
+  assert.match(source, /behavior:\s*'smooth'/)
+})
+
+test('case upload form highlights invalid required fields and scrolls to the first error', () => {
+  const source = readSource('components/case-upload-form.tsx')
+
+  assert.match(source, /fieldErrors/)
+  assert.match(source, /fieldErrorStep/)
+  assert.match(source, /previousStepRef/)
+  assert.match(source, /contactSubmitIntentRef/)
+  assert.match(source, /border-red-300/)
+  assert.match(source, /scrollToField/)
+  assert.match(source, /aria-invalid/)
+  assert.match(source, /currentStep < steps\.length - 1/)
+})
+
 test('case upload success state promises consultant follow-up instead of immediate document collection', () => {
   const source = readSource('components/case-upload-form.tsx')
 

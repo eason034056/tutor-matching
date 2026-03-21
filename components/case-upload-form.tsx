@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import {
   ArrowLeft,
@@ -34,6 +34,27 @@ import { sendWebhookNotification } from '@/webhook-config'
 type SubmitStatus = 'idle' | 'success' | 'error'
 type StepKey = 'matching' | 'student' | 'contact'
 type LessonMode = 'in_person' | 'online'
+type FieldName =
+  | 'subject'
+  | 'grade'
+  | 'budgetRange'
+  | 'onlineDetail'
+  | 'city'
+  | 'district'
+  | 'roadName'
+  | 'selectedTimeSlots'
+  | 'studentGender'
+  | 'department'
+  | 'studentDescription'
+  | 'parentName'
+  | 'parentPhone'
+  | 'parentEmail'
+  | 'terms'
+
+type ValidationError = {
+  field: FieldName
+  message: string
+}
 
 const steps: { key: StepKey; label: string; description: string }[] = [
   { key: 'matching', label: '步驟 1', description: '填寫課程需求' },
@@ -144,6 +165,13 @@ export default function CaseUploadForm() {
   const [cityOptions, setCityOptions] = useState<string[]>([])
   const [districtOptions, setDistrictOptions] = useState<string[]>([])
   const [roadSuggestions, setRoadSuggestions] = useState<string[]>([])
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldName, string>>>({})
+  const [fieldErrorStep, setFieldErrorStep] = useState<number | null>(null)
+  const formTopRef = useRef<HTMLElement | null>(null)
+  const pendingScrollRef = useRef(false)
+  const fieldRefs = useRef<Partial<Record<FieldName, HTMLDivElement | null>>>({})
+  const previousStepRef = useRef(currentStep)
+  const contactSubmitIntentRef = useRef(false)
 
   useEffect(() => {
     const loadCities = async () => {
@@ -158,6 +186,26 @@ export default function CaseUploadForm() {
 
     loadCities()
   }, [])
+
+  useEffect(() => {
+    if (!pendingScrollRef.current) {
+      return
+    }
+
+    pendingScrollRef.current = false
+    window.requestAnimationFrame(() => {
+      formTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }, [currentStep, submitStatus])
+
+  useEffect(() => {
+    if (previousStepRef.current !== currentStep) {
+      // Ensure errors from another step never leak into the newly-entered step.
+      setFieldErrors({})
+      setFieldErrorStep(null)
+      previousStepRef.current = currentStep
+    }
+  }, [currentStep])
 
   useEffect(() => {
     if (formData.lessonMode === 'online' || !formData.city) {
@@ -231,14 +279,133 @@ export default function CaseUploadForm() {
     [formData.availableTimeNote, formData.selectedTimeSlots]
   )
 
+  const hasFieldError = (field: FieldName) =>
+    fieldErrorStep === currentStep && Boolean(fieldErrors[field])
+
+  const getFieldLabelClassName = (field: FieldName, baseClassName = 'text-sm font-semibold') =>
+    cn(baseClassName, hasFieldError(field) ? 'text-red-700' : 'text-brand-900')
+
+  const getFieldInputClassName = (field: FieldName, baseClassName: string) =>
+    cn(
+      baseClassName,
+      hasFieldError(field) &&
+        'border-red-300 bg-red-50/80 text-red-900 placeholder:text-red-400 focus-visible:ring-red-200'
+    )
+
+  const getFieldGroupClassName = (field: FieldName, baseClassName = '') =>
+    cn(baseClassName, hasFieldError(field) && 'rounded-[1.4rem] border border-red-200 bg-red-50/40 p-4')
+
+  const renderFieldError = (field: FieldName) =>
+    fieldErrors[field] ? <p className="mt-2 text-sm font-medium text-red-600">{fieldErrors[field]}</p> : null
+
+  const clearFieldErrors = (...fields: FieldName[]) => {
+    if (fields.length === 0) {
+      setFieldErrors({})
+      setFieldErrorStep(null)
+      return
+    }
+
+    setFieldErrors((prev) => {
+      const next = { ...prev }
+      let hasChanged = false
+
+      fields.forEach((field) => {
+        if (next[field]) {
+          delete next[field]
+          hasChanged = true
+        }
+      })
+
+      return hasChanged ? next : prev
+    })
+  }
+
+  const scrollToField = (field: FieldName) => {
+    const node = fieldRefs.current[field]
+    if (!node) {
+      return
+    }
+
+    window.requestAnimationFrame(() => {
+      node.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+  }
+
+  const applyValidationErrors = (errors: ValidationError[], stepIndex: number) => {
+    const nextErrors: Partial<Record<FieldName, string>> = {}
+
+    errors.forEach(({ field, message }) => {
+      if (!nextErrors[field]) {
+        nextErrors[field] = message
+      }
+    })
+
+    setFieldErrors(nextErrors)
+    setFieldErrorStep(stepIndex)
+
+    if (errors[0]) {
+      toast.error(errors[0].message)
+      scrollToField(errors[0].field)
+    }
+  }
+
   const setField = <K extends keyof typeof formData>(key: K, value: (typeof formData)[K]) => {
     setFormData((prev) => ({ ...prev, [key]: value }))
     if (submitStatus !== 'idle') {
       setSubmitStatus('idle')
     }
+
+    switch (key) {
+      case 'subject':
+      case 'subjectOther':
+        clearFieldErrors('subject')
+        break
+      case 'grade':
+        clearFieldErrors('grade')
+        break
+      case 'budgetRange':
+        clearFieldErrors('budgetRange')
+        break
+      case 'onlineDetail':
+        clearFieldErrors('onlineDetail')
+        break
+      case 'city':
+        clearFieldErrors('city')
+        break
+      case 'district':
+        clearFieldErrors('district')
+        break
+      case 'roadName':
+        clearFieldErrors('roadName')
+        break
+      case 'availableTimeNote':
+        clearFieldErrors('selectedTimeSlots')
+        break
+      case 'studentGender':
+        clearFieldErrors('studentGender')
+        break
+      case 'department':
+        clearFieldErrors('department')
+        break
+      case 'studentDescription':
+        clearFieldErrors('studentDescription')
+        break
+      case 'parentName':
+        clearFieldErrors('parentName')
+        break
+      case 'parentPhone':
+        clearFieldErrors('parentPhone')
+        break
+      case 'parentEmail':
+        clearFieldErrors('parentEmail')
+        break
+      default:
+        break
+    }
   }
 
   const toggleTimeSlot = (slot: string) => {
+    clearFieldErrors('selectedTimeSlots')
     setField(
       'selectedTimeSlots',
       formData.selectedTimeSlots.includes(slot)
@@ -247,81 +414,137 @@ export default function CaseUploadForm() {
     )
   }
 
+  const queueScrollToTop = () => {
+    pendingScrollRef.current = true
+  }
+
+  const setFormContainerRef = (node: HTMLFormElement | null) => {
+    formTopRef.current = node
+  }
+
+  const setPanelRef = (node: HTMLDivElement | null) => {
+    formTopRef.current = node
+  }
+
+  const setFieldRef = (field: FieldName) => (node: HTMLDivElement | null) => {
+    fieldRefs.current[field] = node
+  }
+
+  const markContactSubmitIntent = () => {
+    contactSubmitIntentRef.current = true
+  }
+
+  const handleFormKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
+    if (currentStep !== steps.length - 1) {
+      return
+    }
+    if (event.key === 'Enter' && !(event.target instanceof HTMLTextAreaElement)) {
+      contactSubmitIntentRef.current = true
+    }
+  }
+
   const validateStep = (stepIndex: number) => {
-    const errors: string[] = []
+    const errors: ValidationError[] = []
+    const pushError = (field: FieldName, message: string) => {
+      errors.push({ field, message })
+    }
 
     if (stepIndex === 0) {
-      if (!finalSubject) errors.push('請先選擇需求科目')
-      if (!formData.grade) errors.push('請先選擇年級')
-      if (!formData.budgetRange) errors.push('請先選擇預算區間')
-      if (!availableTimeSummary) errors.push('請至少選一個可上課時段或補充說明')
+      if (!finalSubject) pushError('subject', '請先選擇需求科目')
+      if (!formData.grade) pushError('grade', '請先選擇年級')
+      if (!formData.budgetRange) pushError('budgetRange', '請先選擇預算區間')
+      if (!availableTimeSummary) pushError('selectedTimeSlots', '請至少選一個可上課時段或補充說明')
 
       if (formData.lessonMode === 'online') {
-        if (!formData.onlineDetail.trim()) errors.push('請填寫線上上課方式或平台')
+        if (!formData.onlineDetail.trim()) pushError('onlineDetail', '請填寫線上上課方式或平台')
       } else {
-        if (!formData.city) errors.push('請先選擇縣市')
-        if (!formData.district) errors.push('請先選擇行政區')
+        if (!formData.city) pushError('city', '請先選擇縣市')
+        if (!formData.district) pushError('district', '請先選擇行政區')
         if (!formData.roadName.trim()) {
-          errors.push('請填寫路名或路段')
+          pushError('roadName', '請填寫路名或路段')
         } else if (!isRoadNameValid(formData.roadName)) {
-          errors.push('請至少填到路名層級，例如光復路二段')
+          pushError('roadName', '請至少填到路名層級，例如光復路二段')
         }
       }
     }
 
     if (stepIndex === 1) {
-      if (!formData.studentGender) errors.push('請選擇學生性別')
-      if (!formData.department.trim()) errors.push('請填寫就讀學校')
-      if (!formData.studentDescription.trim()) errors.push('請描述學生目前狀況')
+      if (!formData.studentGender) pushError('studentGender', '請選擇學生性別')
+      if (!formData.department.trim()) pushError('department', '請填寫就讀學校')
+      if (!formData.studentDescription.trim()) pushError('studentDescription', '請描述學生目前狀況')
     }
 
     if (stepIndex === 2) {
-      if (!formData.parentName.trim()) errors.push('請填寫家長姓名')
-      if (!formData.parentPhone.trim()) errors.push('請填寫聯絡電話')
+      if (!formData.parentName.trim()) pushError('parentName', '請填寫家長姓名')
+      if (!formData.parentPhone.trim()) pushError('parentPhone', '請填寫聯絡電話')
       const phoneDigits = formData.parentPhone.replace(/\D/g, '')
       if (formData.parentPhone.trim() && phoneDigits.length < 9) {
-        errors.push('請填寫可聯繫的電話號碼')
+        pushError('parentPhone', '請填寫可聯繫的電話號碼')
       }
       if (formData.parentEmail.trim()) {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
         if (!emailRegex.test(formData.parentEmail.trim())) {
-          errors.push('電子信箱格式不正確')
+          pushError('parentEmail', '電子信箱格式不正確')
         }
       }
-      if (!hasAgreedToTerms) errors.push('送出前請先同意服務條款')
+      if (!hasAgreedToTerms) pushError('terms', '送出前請先同意服務條款')
     }
 
     return errors
   }
 
   const goNext = () => {
+    contactSubmitIntentRef.current = false
     const errors = validateStep(currentStep)
     if (errors.length > 0) {
-      toast.error(errors[0])
+      applyValidationErrors(errors, currentStep)
       return
     }
+    clearFieldErrors()
+    queueScrollToTop()
     setCurrentStep((step) => Math.min(step + 1, steps.length - 1))
   }
 
-  const goPrev = () => setCurrentStep((step) => Math.max(step - 1, 0))
+  const goPrev = () => {
+    contactSubmitIntentRef.current = false
+    clearFieldErrors()
+    queueScrollToTop()
+    setCurrentStep((step) => Math.max(step - 1, 0))
+  }
 
   const resetForm = () => {
+    contactSubmitIntentRef.current = false
     setFormData(createInitialFormData())
     setCurrentStep(0)
     setHasAgreedToTerms(false)
     setRoadSuggestions([])
+    setFieldErrors({})
+    setFieldErrorStep(null)
   }
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+
+    if (currentStep < steps.length - 1) {
+      contactSubmitIntentRef.current = false
+      goNext()
+      return
+    }
+
+    if (!contactSubmitIntentRef.current) {
+      return
+    }
+    contactSubmitIntentRef.current = false
+
     const errors = validateStep(2)
     if (errors.length > 0) {
-      toast.error(errors[0])
+      applyValidationErrors(errors, 2)
       return
     }
 
     setIsSubmitting(true)
     setSubmitStatus('idle')
+    clearFieldErrors()
 
     try {
       const caseNumber = `C${Math.random().toString(36).substring(2, 8).toUpperCase()}`
@@ -365,12 +588,14 @@ export default function CaseUploadForm() {
         throw new Error(result.error || result.details || '提交失敗，請稍後再試')
       }
 
+      queueScrollToTop()
       setSubmitStatus('success')
       setSubmitMessage('已收到需求，我們將盡快安排家教老師與您聯繫。')
       await sendWebhookNotification('new_case', caseData)
       resetForm()
     } catch (error) {
       console.error('送出需求失敗:', error)
+      queueScrollToTop()
       setSubmitStatus('error')
       setSubmitMessage(error instanceof Error ? error.message : '提交失敗，請稍後再試')
     } finally {
@@ -380,7 +605,7 @@ export default function CaseUploadForm() {
 
   if (submitStatus === 'success') {
     return (
-      <div className="rounded-[2rem] border border-brand-100 bg-white/95 p-6 shadow-[0_24px_80px_rgba(67,102,78,0.08)] md:p-8">
+      <div ref={setPanelRef} className="scroll-mt-28 rounded-[2rem] border border-brand-100 bg-white/95 p-6 shadow-[0_24px_80px_rgba(67,102,78,0.08)] md:scroll-mt-32 md:p-8">
         <div className="mx-auto max-w-2xl text-center">
           <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-brand-100 text-brand-700">
             <CheckCircle2 className="h-10 w-10" />
@@ -419,7 +644,7 @@ export default function CaseUploadForm() {
 
   if (submitStatus === 'error') {
     return (
-      <div className="rounded-[2rem] border border-red-200 bg-white/95 p-6 shadow-[0_24px_80px_rgba(120,54,54,0.08)] md:p-8">
+      <div ref={setPanelRef} className="scroll-mt-28 rounded-[2rem] border border-red-200 bg-white/95 p-6 shadow-[0_24px_80px_rgba(120,54,54,0.08)] md:scroll-mt-32 md:p-8">
         <div className="mx-auto max-w-2xl text-center">
           <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-red-100 text-red-600">
             <XCircle className="h-10 w-10" />
@@ -448,7 +673,12 @@ export default function CaseUploadForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form
+      ref={setFormContainerRef}
+      onSubmit={handleSubmit}
+      onKeyDown={handleFormKeyDown}
+      className="space-y-6 scroll-mt-28 md:scroll-mt-32"
+    >
       <div className="grid gap-3 md:grid-cols-3">
         {steps.map((step, index) => (
           <StepBadge key={step.key} active={index === currentStep} index={index} label={step.label} />
@@ -473,10 +703,14 @@ export default function CaseUploadForm() {
               <div>
                 <Label className="text-sm font-semibold text-brand-900">上課方式</Label>
                 <div className="mt-3 flex flex-wrap gap-3">
-                  <ChipButton active={formData.lessonMode === 'in_person'} onClick={() => setField('lessonMode', 'in_person')}>
+                  <ChipButton active={formData.lessonMode === 'in_person'} onClick={() => {
+                    clearFieldErrors('onlineDetail')
+                    setField('lessonMode', 'in_person')
+                  }}>
                     實體上課
                   </ChipButton>
                   <ChipButton active={formData.lessonMode === 'online'} onClick={() => {
+                    clearFieldErrors('city', 'district', 'roadName')
                     setField('lessonMode', 'online')
                     setField('city', '')
                     setField('district', '')
@@ -487,8 +721,8 @@ export default function CaseUploadForm() {
                 </div>
               </div>
 
-              <div>
-                <Label className="text-sm font-semibold text-brand-900">需求科目</Label>
+              <div ref={setFieldRef('subject')} className={getFieldGroupClassName('subject')}>
+                <Label className={getFieldLabelClassName('subject')}>需求科目</Label>
                 <div className="mt-3 flex flex-wrap gap-2.5">
                   {subjectOptions.map((subject) => (
                     <ChipButton key={subject} active={formData.subject === subject} onClick={() => setField('subject', subject)}>
@@ -501,19 +735,24 @@ export default function CaseUploadForm() {
                 </div>
                 {formData.subject === '其他' && (
                   <Input
-                    className="mt-3 h-12 rounded-2xl border-brand-200 bg-[#fffdf8] px-4"
+                    aria-invalid={hasFieldError('subject')}
+                    className={getFieldInputClassName('subject', 'mt-3 h-12 rounded-2xl border-brand-200 bg-[#fffdf8] px-4')}
                     value={formData.subjectOther}
                     onChange={(event) => setField('subjectOther', event.target.value)}
                     placeholder="請輸入需求科目"
                   />
                 )}
+                {renderFieldError('subject')}
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <Label className="text-sm font-semibold text-brand-900">年級</Label>
+                <div ref={setFieldRef('grade')}>
+                  <Label className={getFieldLabelClassName('grade')}>年級</Label>
                   <Select value={formData.grade} onValueChange={(value) => setField('grade', value)}>
-                    <SelectTrigger className="mt-3 h-12 rounded-2xl border-brand-200 bg-[#fffdf8] px-4 text-base">
+                    <SelectTrigger
+                      aria-invalid={hasFieldError('grade')}
+                      className={getFieldInputClassName('grade', 'mt-3 h-12 rounded-2xl border-brand-200 bg-[#fffdf8] px-4 text-base')}
+                    >
                       <SelectValue placeholder="請選擇年級" />
                     </SelectTrigger>
                     <SelectContent>
@@ -524,11 +763,15 @@ export default function CaseUploadForm() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {renderFieldError('grade')}
                 </div>
-                <div>
-                  <Label className="text-sm font-semibold text-brand-900">預算區間</Label>
+                <div ref={setFieldRef('budgetRange')}>
+                  <Label className={getFieldLabelClassName('budgetRange')}>預算區間</Label>
                   <Select value={formData.budgetRange} onValueChange={(value) => setField('budgetRange', value)}>
-                    <SelectTrigger className="mt-3 h-12 rounded-2xl border-brand-200 bg-[#fffdf8] px-4 text-base">
+                    <SelectTrigger
+                      aria-invalid={hasFieldError('budgetRange')}
+                      className={getFieldInputClassName('budgetRange', 'mt-3 h-12 rounded-2xl border-brand-200 bg-[#fffdf8] px-4 text-base')}
+                    >
                       <SelectValue placeholder="請選擇預算區間" />
                     </SelectTrigger>
                     <SelectContent>
@@ -539,19 +782,22 @@ export default function CaseUploadForm() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {renderFieldError('budgetRange')}
                 </div>
               </div>
 
               {formData.lessonMode === 'online' ? (
-                <div>
-                  <Label htmlFor="onlineDetail" className="text-sm font-semibold text-brand-900">線上上課平台或方式</Label>
+                <div ref={setFieldRef('onlineDetail')}>
+                  <Label htmlFor="onlineDetail" className={getFieldLabelClassName('onlineDetail')}>線上上課平台或方式</Label>
                   <Input
                     id="onlineDetail"
-                    className="mt-3 h-12 rounded-2xl border-brand-200 bg-[#fffdf8] px-4"
+                    aria-invalid={hasFieldError('onlineDetail')}
+                    className={getFieldInputClassName('onlineDetail', 'mt-3 h-12 rounded-2xl border-brand-200 bg-[#fffdf8] px-4')}
                     value={formData.onlineDetail}
                     onChange={(event) => setField('onlineDetail', event.target.value)}
                     placeholder="例如：Google Meet、Zoom、視訊授課"
                   />
+                  {renderFieldError('onlineDetail')}
                 </div>
               ) : (
                 <div className="rounded-[1.6rem] border border-brand-100 bg-[#f8f5ea] p-4 md:p-5">
@@ -564,17 +810,21 @@ export default function CaseUploadForm() {
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-2">
-                    <div>
-                      <Label className="text-sm font-semibold text-brand-900">縣市</Label>
+                    <div ref={setFieldRef('city')}>
+                      <Label className={getFieldLabelClassName('city')}>縣市</Label>
                       <Select
                         value={formData.city}
                         onValueChange={(value) => {
+                          clearFieldErrors('city', 'district', 'roadName')
                           setField('city', value)
                           setField('district', '')
                           setField('roadName', '')
                         }}
                       >
-                        <SelectTrigger className="mt-3 h-12 rounded-2xl border-brand-200 bg-white px-4 text-base">
+                        <SelectTrigger
+                          aria-invalid={hasFieldError('city')}
+                          className={getFieldInputClassName('city', 'mt-3 h-12 rounded-2xl border-brand-200 bg-white px-4 text-base')}
+                        >
                           <SelectValue placeholder="請選擇縣市" />
                         </SelectTrigger>
                         <SelectContent>
@@ -585,11 +835,15 @@ export default function CaseUploadForm() {
                           ))}
                         </SelectContent>
                       </Select>
+                      {renderFieldError('city')}
                     </div>
-                    <div>
-                      <Label className="text-sm font-semibold text-brand-900">行政區</Label>
+                    <div ref={setFieldRef('district')}>
+                      <Label className={getFieldLabelClassName('district')}>行政區</Label>
                       <Select value={formData.district} onValueChange={(value) => setField('district', value)} disabled={!formData.city}>
-                        <SelectTrigger className="mt-3 h-12 rounded-2xl border-brand-200 bg-white px-4 text-base">
+                        <SelectTrigger
+                          aria-invalid={hasFieldError('district')}
+                          className={getFieldInputClassName('district', 'mt-3 h-12 rounded-2xl border-brand-200 bg-white px-4 text-base')}
+                        >
                           <SelectValue placeholder={formData.city ? '請選擇行政區' : '先選縣市'} />
                         </SelectTrigger>
                         <SelectContent>
@@ -600,16 +854,18 @@ export default function CaseUploadForm() {
                           ))}
                         </SelectContent>
                       </Select>
+                      {renderFieldError('district')}
                     </div>
                   </div>
 
                   <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_0.9fr]">
-                    <div>
-                      <Label htmlFor="roadName" className="text-sm font-semibold text-brand-900">路名 / 路段</Label>
+                    <div ref={setFieldRef('roadName')}>
+                      <Label htmlFor="roadName" className={getFieldLabelClassName('roadName')}>路名 / 路段</Label>
                       <Input
                         id="roadName"
                         list="road-suggestions"
-                        className="mt-3 h-12 rounded-2xl border-brand-200 bg-white px-4"
+                        aria-invalid={hasFieldError('roadName')}
+                        className={getFieldInputClassName('roadName', 'mt-3 h-12 rounded-2xl border-brand-200 bg-white px-4')}
                         value={formData.roadName}
                         onChange={(event) => setField('roadName', event.target.value)}
                         placeholder="例如：光復路二段"
@@ -619,6 +875,7 @@ export default function CaseUploadForm() {
                           <option key={road} value={road} />
                         ))}
                       </datalist>
+                      {renderFieldError('roadName')}
                     </div>
                     <div>
                       <Label htmlFor="landmark" className="text-sm font-semibold text-brand-900">補充地標（選填）</Label>
@@ -634,8 +891,8 @@ export default function CaseUploadForm() {
                 </div>
               )}
 
-              <div>
-                <Label className="text-sm font-semibold text-brand-900">可上課時段(可複選)</Label>
+              <div ref={setFieldRef('selectedTimeSlots')} className={getFieldGroupClassName('selectedTimeSlots')}>
+                <Label className={getFieldLabelClassName('selectedTimeSlots')}>可上課時段(可複選)</Label>
                 <div className="mt-3 flex flex-wrap gap-2.5">
                   {schedulePresetOptions.map((slot) => (
                     <ChipButton key={slot} active={formData.selectedTimeSlots.includes(slot)} onClick={() => toggleTimeSlot(slot)}>
@@ -644,11 +901,13 @@ export default function CaseUploadForm() {
                   ))}
                 </div>
                 <Textarea
-                  className="mt-3 min-h-[110px] rounded-[1.4rem] border-brand-200 bg-[#fffdf8] px-4 py-3"
+                  aria-invalid={hasFieldError('selectedTimeSlots')}
+                  className={getFieldInputClassName('selectedTimeSlots', 'mt-3 min-h-[110px] rounded-[1.4rem] border-brand-200 bg-[#fffdf8] px-4 py-3')}
                   value={formData.availableTimeNote}
                   onChange={(event) => setField('availableTimeNote', event.target.value)}
                   placeholder="也可以補充更細的時間，例如：週三 19:00 後、週日 14:00-17:00"
                 />
+                {renderFieldError('selectedTimeSlots')}
               </div>
             </div>
           </div>
@@ -696,10 +955,13 @@ export default function CaseUploadForm() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <Label className="text-sm font-semibold text-brand-900">學生性別</Label>
+            <div ref={setFieldRef('studentGender')}>
+              <Label className={getFieldLabelClassName('studentGender')}>學生性別</Label>
               <Select value={formData.studentGender} onValueChange={(value) => setField('studentGender', value)}>
-                <SelectTrigger className="mt-3 h-12 rounded-2xl border-brand-200 bg-[#fffdf8] px-4 text-base">
+                <SelectTrigger
+                  aria-invalid={hasFieldError('studentGender')}
+                  className={getFieldInputClassName('studentGender', 'mt-3 h-12 rounded-2xl border-brand-200 bg-[#fffdf8] px-4 text-base')}
+                >
                   <SelectValue placeholder="請選擇學生性別" />
                 </SelectTrigger>
                 <SelectContent>
@@ -707,29 +969,34 @@ export default function CaseUploadForm() {
                   <SelectItem value="female">女</SelectItem>
                 </SelectContent>
               </Select>
+              {renderFieldError('studentGender')}
             </div>
 
-            <div>
-              <Label htmlFor="department" className="text-sm font-semibold text-brand-900">就讀學校</Label>
+            <div ref={setFieldRef('department')}>
+              <Label htmlFor="department" className={getFieldLabelClassName('department')}>就讀學校</Label>
               <Input
                 id="department"
-                className="mt-3 h-12 rounded-2xl border-brand-200 bg-[#fffdf8] px-4"
+                aria-invalid={hasFieldError('department')}
+                className={getFieldInputClassName('department', 'mt-3 h-12 rounded-2xl border-brand-200 bg-[#fffdf8] px-4')}
                 value={formData.department}
                 onChange={(event) => setField('department', event.target.value)}
                 placeholder="例如：建功高中、竹北國中"
               />
+              {renderFieldError('department')}
             </div>
           </div>
 
-          <div className="mt-4">
-            <Label htmlFor="studentDescription" className="text-sm font-semibold text-brand-900">學生狀況描述</Label>
+          <div ref={setFieldRef('studentDescription')} className="mt-4">
+            <Label htmlFor="studentDescription" className={getFieldLabelClassName('studentDescription')}>學生狀況描述</Label>
             <Textarea
               id="studentDescription"
-              className="mt-3 min-h-[150px] rounded-[1.4rem] border-brand-200 bg-[#fffdf8] px-4 py-3"
+              aria-invalid={hasFieldError('studentDescription')}
+              className={getFieldInputClassName('studentDescription', 'mt-3 min-h-[150px] rounded-[1.4rem] border-brand-200 bg-[#fffdf8] px-4 py-3')}
               value={formData.studentDescription}
               onChange={(event) => setField('studentDescription', event.target.value)}
               placeholder="例如：目前高二，數學遇到三角函數與指對數卡關，希望先穩住校內成績，再往學測方向準備。"
             />
+            {renderFieldError('studentDescription')}
           </div>
 
           <div className="mt-4">
@@ -771,25 +1038,29 @@ export default function CaseUploadForm() {
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <Label htmlFor="parentName" className="text-sm font-semibold text-brand-900">家長姓名</Label>
+              <div ref={setFieldRef('parentName')}>
+                <Label htmlFor="parentName" className={getFieldLabelClassName('parentName')}>家長姓名</Label>
                 <Input
                   id="parentName"
-                  className="mt-3 h-12 rounded-2xl border-brand-200 bg-[#fffdf8] px-4"
+                  aria-invalid={hasFieldError('parentName')}
+                  className={getFieldInputClassName('parentName', 'mt-3 h-12 rounded-2xl border-brand-200 bg-[#fffdf8] px-4')}
                   value={formData.parentName}
                   onChange={(event) => setField('parentName', event.target.value)}
                   placeholder="請填寫家長姓名"
                 />
+                {renderFieldError('parentName')}
               </div>
-              <div>
-                <Label htmlFor="parentPhone" className="text-sm font-semibold text-brand-900">聯絡電話</Label>
+              <div ref={setFieldRef('parentPhone')}>
+                <Label htmlFor="parentPhone" className={getFieldLabelClassName('parentPhone')}>聯絡電話</Label>
                 <Input
                   id="parentPhone"
-                  className="mt-3 h-12 rounded-2xl border-brand-200 bg-[#fffdf8] px-4"
+                  aria-invalid={hasFieldError('parentPhone')}
+                  className={getFieldInputClassName('parentPhone', 'mt-3 h-12 rounded-2xl border-brand-200 bg-[#fffdf8] px-4')}
                   value={formData.parentPhone}
                   onChange={(event) => setField('parentPhone', event.target.value)}
                   placeholder="例如：0912345678 或 02-12345678"
                 />
+                {renderFieldError('parentPhone')}
               </div>
               <div>
                 <Label htmlFor="lineId" className="text-sm font-semibold text-brand-900">LINE ID（選填）</Label>
@@ -801,24 +1072,43 @@ export default function CaseUploadForm() {
                   placeholder="若希望顧問用 LINE 聯繫，可先留下"
                 />
               </div>
-              <div>
-                <Label htmlFor="parentEmail" className="text-sm font-semibold text-brand-900">電子信箱（選填）</Label>
+              <div ref={setFieldRef('parentEmail')}>
+                <Label htmlFor="parentEmail" className={getFieldLabelClassName('parentEmail')}>電子信箱（選填）</Label>
                 <Input
                   id="parentEmail"
                   type="email"
-                  className="mt-3 h-12 rounded-2xl border-brand-200 bg-[#fffdf8] px-4"
+                  aria-invalid={hasFieldError('parentEmail')}
+                  className={getFieldInputClassName('parentEmail', 'mt-3 h-12 rounded-2xl border-brand-200 bg-[#fffdf8] px-4')}
                   value={formData.parentEmail}
                   onChange={(event) => setField('parentEmail', event.target.value)}
                   placeholder="your.name@email.com"
                 />
+                {renderFieldError('parentEmail')}
               </div>
             </div>
 
-            <div className="mt-6 rounded-[1.6rem] border border-brand-100 bg-[#f8f5ea] p-4">
+            <div
+              ref={setFieldRef('terms')}
+              className={cn(
+                'mt-6 rounded-[1.6rem] border border-brand-100 bg-[#f8f5ea] p-4',
+                hasFieldError('terms') && 'border-red-200 bg-red-50/50'
+              )}
+            >
               <div className="flex items-start gap-3">
-                <Checkbox id="terms-agreement" checked={hasAgreedToTerms} onCheckedChange={(checked) => setHasAgreedToTerms(Boolean(checked))} />
+                <Checkbox
+                  id="terms-agreement"
+                  aria-invalid={hasFieldError('terms')}
+                  className={cn(hasFieldError('terms') && 'border-red-300 data-[state=checked]:border-red-500')}
+                  checked={hasAgreedToTerms}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      clearFieldErrors('terms')
+                    }
+                    setHasAgreedToTerms(Boolean(checked))
+                  }}
+                />
                 <div className="flex-1">
-                  <Label htmlFor="terms-agreement" className="text-sm font-medium cursor-pointer text-brand-900">
+                  <Label htmlFor="terms-agreement" className={cn('cursor-pointer text-sm font-medium', hasFieldError('terms') ? 'text-red-700' : 'text-brand-900')}>
                     我已閱讀並同意服務條款
                   </Label>
                   <p className="mt-2 text-xs leading-6 text-neutral-600">證件照片與身分證字號不會在此頁收集，補件連結會在顧問確認需求後提供。</p>
@@ -834,6 +1124,7 @@ export default function CaseUploadForm() {
                       先用 LINE 詢問顧問
                     </Link>
                   </div>
+                  {renderFieldError('terms')}
                 </div>
               </div>
             </div>
@@ -874,7 +1165,13 @@ export default function CaseUploadForm() {
             <ArrowRight className="h-4 w-4" />
           </Button>
         ) : (
-          <Button type="submit" size="lg" className="min-h-12 rounded-full bg-brand-500 px-6 text-base text-white hover:bg-brand-600" disabled={isSubmitting}>
+          <Button
+            type="submit"
+            size="lg"
+            className="min-h-12 rounded-full bg-brand-500 px-6 text-base text-white hover:bg-brand-600"
+            onClick={markContactSubmitIntent}
+            disabled={isSubmitting}
+          >
             {isSubmitting ? (
               <span className="inline-flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />

@@ -42,6 +42,7 @@ test('case upload form highlights invalid required fields and scrolls to the fir
   assert.match(source, /fieldErrors/)
   assert.match(source, /fieldErrorStep/)
   assert.match(source, /previousStepRef/)
+  assert.match(source, /contactSubmitIntentRef/)
   assert.match(source, /border-red-300/)
   assert.match(source, /scrollToField/)
   assert.match(source, /aria-invalid/)

@@ -171,6 +171,7 @@ export default function CaseUploadForm() {
   const pendingScrollRef = useRef(false)
   const fieldRefs = useRef<Partial<Record<FieldName, HTMLDivElement | null>>>({})
   const previousStepRef = useRef(currentStep)
+  const contactSubmitIntentRef = useRef(false)
 
   useEffect(() => {
     const loadCities = async () => {
@@ -429,6 +430,19 @@ export default function CaseUploadForm() {
     fieldRefs.current[field] = node
   }
 
+  const markContactSubmitIntent = () => {
+    contactSubmitIntentRef.current = true
+  }
+
+  const handleFormKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
+    if (currentStep !== steps.length - 1) {
+      return
+    }
+    if (event.key === 'Enter' && !(event.target instanceof HTMLTextAreaElement)) {
+      contactSubmitIntentRef.current = true
+    }
+  }
+
   const validateStep = (stepIndex: number) => {
     const errors: ValidationError[] = []
     const pushError = (field: FieldName, message: string) => {
@@ -480,6 +494,7 @@ export default function CaseUploadForm() {
   }
 
   const goNext = () => {
+    contactSubmitIntentRef.current = false
     const errors = validateStep(currentStep)
     if (errors.length > 0) {
       applyValidationErrors(errors, currentStep)
@@ -491,12 +506,14 @@ export default function CaseUploadForm() {
   }
 
   const goPrev = () => {
+    contactSubmitIntentRef.current = false
     clearFieldErrors()
     queueScrollToTop()
     setCurrentStep((step) => Math.max(step - 1, 0))
   }
 
   const resetForm = () => {
+    contactSubmitIntentRef.current = false
     setFormData(createInitialFormData())
     setCurrentStep(0)
     setHasAgreedToTerms(false)
@@ -509,9 +526,15 @@ export default function CaseUploadForm() {
     event.preventDefault()
 
     if (currentStep < steps.length - 1) {
+      contactSubmitIntentRef.current = false
       goNext()
       return
     }
+
+    if (!contactSubmitIntentRef.current) {
+      return
+    }
+    contactSubmitIntentRef.current = false
 
     const errors = validateStep(2)
     if (errors.length > 0) {
@@ -650,7 +673,12 @@ export default function CaseUploadForm() {
   }
 
   return (
-    <form ref={setFormContainerRef} onSubmit={handleSubmit} className="space-y-6 scroll-mt-28 md:scroll-mt-32">
+    <form
+      ref={setFormContainerRef}
+      onSubmit={handleSubmit}
+      onKeyDown={handleFormKeyDown}
+      className="space-y-6 scroll-mt-28 md:scroll-mt-32"
+    >
       <div className="grid gap-3 md:grid-cols-3">
         {steps.map((step, index) => (
           <StepBadge key={step.key} active={index === currentStep} index={index} label={step.label} />
@@ -1137,7 +1165,13 @@ export default function CaseUploadForm() {
             <ArrowRight className="h-4 w-4" />
           </Button>
         ) : (
-          <Button type="submit" size="lg" className="min-h-12 rounded-full bg-brand-500 px-6 text-base text-white hover:bg-brand-600" disabled={isSubmitting}>
+          <Button
+            type="submit"
+            size="lg"
+            className="min-h-12 rounded-full bg-brand-500 px-6 text-base text-white hover:bg-brand-600"
+            onClick={markContactSubmitIntent}
+            disabled={isSubmitting}
+          >
             {isSubmitting ? (
               <span className="inline-flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />

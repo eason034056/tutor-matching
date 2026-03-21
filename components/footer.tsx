@@ -1,96 +1,99 @@
 import Link from 'next/link'
+import { ArrowRight, ChevronRight } from 'lucide-react'
+
+import { Button } from '@/components/ui/button'
+
+const parentLinks = [
+  { href: '/case-upload', label: '家長需求登錄' },
+  { href: '/process', label: '媒合流程說明' },
+  { href: '/pricing', label: '費用參考' },
+]
+
+const platformLinks = [
+  { href: '/tutor-registration', label: '教師登錄' },
+  { href: '/tutor-cases', label: '案件專區' },
+  { href: '/terms', label: '服務條款' },
+]
 
 export default function Footer() {
   return (
-    <footer className="bg-white border-t border-gray-200 py-16">
-      <div className="container px-6 mx-auto max-w-6xl">
-        <div className="grid md:grid-cols-4 gap-8 mb-12">
-          {/* Brand */}
-          <div className="md:col-span-2">
-            <h3 className="text-xl font-semibold text-neutral-900 mb-4">
-              青椒老師家教中心
-            </h3>
-            <p className="text-neutral-600 mb-6 max-w-md">
-              由清華大學、交通大學畢業生創建的家教平台，致力於為每個孩子找到最適合的學習夥伴。
-            </p>
-            <div className="flex space-x-4">
-              <Link href="/case-upload" className="bg-brand-500 text-white px-6 py-3 rounded-full hover:bg-brand-600 transition-colors">
-                立即諮詢
-              </Link>
-              <Link href="/solver" className="border border-brand-300 text-brand-700 px-6 py-3 rounded-full hover:bg-brand-50 transition-colors">
-                AI解題
-              </Link>
+    <footer className="border-t border-neutral-200/90 bg-[#f7f3e8] px-4 py-8 text-neutral-900 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl">
+        <div className="grid gap-8 md:grid-cols-[minmax(0,1.2fr)_repeat(2,minmax(0,0.8fr))] md:items-start md:gap-10">
+          <div>
+            <h2 className="max-w-xl font-display text-2xl leading-tight text-brand-900 md:text-[2rem]">
+              專人把關‧優質師資‧安心配對
+            </h2>
+
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <Button
+                asChild
+                size="lg"
+                className="min-h-11 rounded-full bg-brand-500 px-5 text-sm font-semibold text-white hover:bg-brand-600"
+              >
+                <Link href="/case-upload">
+                  家長需求登錄
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button
+                asChild
+                size="lg"
+                variant="outline"
+                className="min-h-11 rounded-full border-brand-300 bg-white/80 px-5 text-sm font-semibold text-brand-800 hover:bg-brand-50"
+              >
+                <Link href="/tutor-registration">
+                  教師申請入口
+                  <ChevronRight className="h-4 w-4" />
+                </Link>
+              </Button>
             </div>
           </div>
-          
-          {/* Links */}
-          <div>
-            <h4 className="text-lg font-medium text-neutral-900 mb-4">服務</h4>
-            <ul className="space-y-3">
-              <li>
-                <Link href="/tutor-cases" className="text-neutral-600 hover:text-brand-700 transition-colors">
-                  案件專區
-                </Link>
-              </li>
-              <li>
-                <Link href="/tutors" className="text-neutral-600 hover:text-brand-700 transition-colors">
-                  家教老師
-                </Link>
-              </li>
-              <li>
-                <Link href="/solver" className="text-neutral-600 hover:text-brand-700 transition-colors">
-                  AI解題機器人
-                </Link>
-              </li>
-              <li>
-                <Link href="/case-upload" className="text-neutral-600 hover:text-brand-700 transition-colors">
-                  家教諮詢
-                </Link>
-              </li>
+
+          <nav className="md:border-l md:border-neutral-200/80 md:pl-8">
+            <div className="text-xs font-semibold tracking-[0.22em] text-brand-500">家長常用</div>
+            <ul className="mt-3 space-y-2.5">
+              {parentLinks.map((item) => (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    className="group flex items-center justify-between gap-3 text-sm text-neutral-700 transition-colors hover:text-brand-800"
+                  >
+                    <span>{item.label}</span>
+                    <ChevronRight className="h-4 w-4 text-brand-500 transition-transform duration-300 group-hover:translate-x-0.5" />
+                  </Link>
+                </li>
+              ))}
             </ul>
-          </div>
-          
-          {/* Support */}
-          <div>
-            <h4 className="text-lg font-medium text-neutral-900 mb-4">支援</h4>
-            <ul className="space-y-3">
-              <li>
-                <Link href="/tutor-registration" className="text-neutral-600 hover:text-brand-700 transition-colors">
-                  教師登錄
-                </Link>
-              </li>
-              <li>
-                <Link href="/process" className="text-neutral-600 hover:text-brand-700 transition-colors">
-                  接案流程
-                </Link>
-              </li>
-              <li>
-                <Link href="/notice" className="text-neutral-600 hover:text-brand-700 transition-colors">
-                  注意事項
-                </Link>
-              </li>
-              <li>
-                <Link href="/pricing" className="text-neutral-600 hover:text-brand-700 transition-colors">
-                  費用參考
-                </Link>
-              </li>
-              <li>
-                <Link href="/terms" className="text-neutral-600 hover:text-brand-700 transition-colors">
-                  服務條款
-                </Link>
-              </li>
+          </nav>
+
+          <nav className="md:border-l md:border-neutral-200/80 md:pl-8">
+            <div className="text-xs font-semibold tracking-[0.22em] text-brand-500">老師與平台</div>
+            <ul className="mt-3 space-y-2.5">
+              {platformLinks.map((item) => (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    className="group flex items-center justify-between gap-3 text-sm text-neutral-700 transition-colors hover:text-brand-800"
+                  >
+                    <span>{item.label}</span>
+                    <ChevronRight className="h-4 w-4 text-brand-500 transition-transform duration-300 group-hover:translate-x-0.5" />
+                  </Link>
+                </li>
+              ))}
             </ul>
-          </div>
+          </nav>
         </div>
-        
-        {/* Bottom */}
-        <div className="flex flex-col md:flex-row justify-center items-center pt-8 border-t border-neutral-200">
-          <p className="text-neutral-600 text-sm">
-            © 2025 青椒老師家教中心. All rights reserved.
-          </p>
+
+        <div className="mt-10 flex flex-col gap-2 border-t border-neutral-200/80 pt-6 text-sm text-neutral-600 md:flex-row md:items-center md:justify-between">
+          <p>© 2026 青椒老師家教中心. All rights reserved.</p>
+          <div className="flex flex-wrap gap-4">
+            <Link href="/notice" className="transition-colors hover:text-brand-700">
+              注意事項
+            </Link>
+          </div>
         </div>
       </div>
     </footer>
   )
 }
-

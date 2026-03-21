@@ -1,95 +1,165 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { onAuthStateChanged, User, signOut } from 'firebase/auth'
-import LoginForm from '@/components/auth/LoginForm'
-import { auth, db, storage } from '@/server/config/firebase'
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { toast } from "sonner"
-import { Tutor, TutorCase, CaseNotificationData } from '@/server/types'
-import { collection, query, where, getDocs, doc, updateDoc, deleteDoc, addDoc, getDoc} from 'firebase/firestore'
-import { ref } from 'firebase/storage'
-import { deleteObject } from 'firebase/storage'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import Image from 'next/image'
+import { onAuthStateChanged, signOut, type User } from 'firebase/auth'
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore'
+import { deleteObject, ref } from 'firebase/storage'
+import {
+  Copy,
+  LayoutDashboard,
+  Link2,
+  Loader2,
+  LogOut,
+  Search,
+  UserRound,
+} from 'lucide-react'
+import { toast } from 'sonner'
+
+import LoginForm from '@/components/auth/LoginForm'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { buildCaseNotificationData, normalizeCase, type CaseDocumentStatus } from '@/lib/case-utils'
+import { auth, db, storage } from '@/server/config/firebase'
+import type { CaseNotificationData, Tutor, TutorCase } from '@/server/types'
 import { sendNewCaseEmailNotification } from '@/webhook-config'
+
+type PendingTutor = Tutor & { docId: string }
+type PendingCase = TutorCase & { docId: string }
+
+type SearchResults = {
+  tutor: PendingTutor | null
+  case: PendingCase | null
+}
+
+const documentStatusStyles: Record<CaseDocumentStatus, string> = {
+  not_requested: 'bg-neutral-100 text-neutral-700',
+  requested: 'bg-amber-100 text-amber-800',
+  submitted: 'bg-emerald-100 text-emerald-800',
+}
+
+const statusStyles: Record<'急徵' | '有人接洽' | '已徵到', string> = {
+  急徵: 'bg-red-500 text-white hover:bg-red-500',
+  有人接洽: 'bg-amber-500 text-white hover:bg-amber-500',
+  已徵到: 'bg-emerald-600 text-white hover:bg-emerald-600',
+}
+
+function MetricCard({ label, value, hint }: { label: string; value: string; hint: string }) {
+  return (
+    <div className="rounded-[1.5rem] border border-brand-100 bg-white/90 px-4 py-4 shadow-[0_16px_40px_rgba(67,102,78,0.06)]">
+      <div className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-500">{label}</div>
+      <div className="mt-2 text-2xl font-semibold text-brand-900">{value}</div>
+      <div className="mt-1 text-sm text-neutral-500">{hint}</div>
+    </div>
+  )
+}
+
+function DashboardSection({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
+  return (
+    <Card className="overflow-hidden rounded-[2rem] border-brand-100 bg-white/95 shadow-[0_26px_90px_rgba(67,102,78,0.08)]">
+      <CardHeader className="border-b border-brand-100 bg-[#fffdf8] pb-5">
+        <CardTitle className="font-display text-2xl text-brand-900">{title}</CardTitle>
+        <p className="mt-2 text-sm leading-7 text-neutral-600">{subtitle}</p>
+      </CardHeader>
+      <CardContent className="p-5 md:p-6">{children}</CardContent>
+    </Card>
+  )
+}
+
+function DocumentStatusBadge({ status }: { status: CaseDocumentStatus }) {
+  const normalized = normalizeCase({ documentStatus: status })
+  return <Badge className={documentStatusStyles[status]}>{normalized.documentStatusLabel}</Badge>
+}
+
+function CopyableLinkButton({ label, onClick, disabled }: { label: string; onClick: () => void; disabled?: boolean }) {
+  return (
+    <Button type="button" variant="outline" size="sm" onClick={onClick} disabled={disabled} className="rounded-full border-brand-300 bg-white text-brand-800 hover:bg-brand-50">
+      <Copy className="h-4 w-4" />
+      {label}
+    </Button>
+  )
+}
 
 export default function AdminPage() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
-  const [pendingTutors, setPendingTutors] = useState<(Tutor & { docId: string })[]>([])
-  const [pendingCases, setPendingCases] = useState<(TutorCase & { docId: string })[]>([])
-  const [lastActivity, setLastActivity] = useState(Date.now())
-  const [inactiveTime, setInactiveTime] = useState(0)
-
-  // 搜尋相關的狀態
+  const [pendingTutors, setPendingTutors] = useState<PendingTutor[]>([])
+  const [pendingCases, setPendingCases] = useState<PendingCase[]>([])
   const [tutorCode, setTutorCode] = useState('')
   const [caseNumber, setCaseNumber] = useState('')
-  const [searchResults, setSearchResults] = useState<{
-    tutor: (Tutor & { docId: string }) | null
-    case: (TutorCase & { docId: string }) | null
-  }>({ tutor: null, case: null })
+  const [searchResults, setSearchResults] = useState<SearchResults>({ tutor: null, case: null })
   const [searching, setSearching] = useState(false)
-  
-  // 案件狀態更新相關
   const [selectedStatus, setSelectedStatus] = useState<'急徵' | '已徵到' | '有人接洽' | ''>('')
   const [updatingStatus, setUpdatingStatus] = useState(false)
+  const [generatingLinkId, setGeneratingLinkId] = useState<string | null>(null)
 
+  const followUpCount = useMemo(
+    () => pendingCases.filter((caseItem) => normalizeCase(caseItem).documentStatus !== 'submitted').length,
+    [pendingCases]
+  )
 
   const fetchPendingData = async () => {
     try {
-      // 確保用戶已登入
       const currentUser = auth.currentUser
-      if (!currentUser) {
-        console.error('請先登入');
-        return;
-      }
+      if (!currentUser) return
 
-      console.log('開始載入待審核資料...')
+      const tutorsQuery = query(collection(db, 'tutors'), where('status', '==', 'pending'))
+      const casesQuery = query(collection(db, 'cases'), where('pending', '==', 'pending'))
 
-      // 使用 Firestore 查詢
-      const tutorsQuery = query(collection(db, 'tutors'), where('status', '==', 'pending'));
-      const casesQuery = query(collection(db, 'cases'), where('pending', '==', 'pending'));
-      
-      const [tutorsSnapshot, casesSnapshot] = await Promise.all([
-        getDocs(tutorsQuery),
-        getDocs(casesQuery)
-      ]);
+      const [tutorsSnapshot, casesSnapshot] = await Promise.all([getDocs(tutorsQuery), getDocs(casesQuery)])
 
-      const tutors = tutorsSnapshot.docs.map(doc => {
-        const data = doc.data()
-        return {
-          ...data,
-          docId: doc.id, // Firestore 文檔 ID
-          id: data.id || doc.id // 保留原始 ID，如果沒有則使用文檔 ID
-        }
-      }) as (Tutor & { docId: string })[];
+      setPendingTutors(
+        tutorsSnapshot.docs.map((item) => ({
+          ...(item.data() as Tutor),
+          docId: item.id,
+          id: (item.data() as Tutor).id || item.id,
+        }))
+      )
 
-      const cases = casesSnapshot.docs.map(doc => {
-        const data = doc.data()
-        console.log('案件資料:', { docId: doc.id, customId: data.id, caseNumber: data.caseNumber })
-        return {
-          ...data,
-          docId: doc.id, // Firestore 文檔 ID  
-          id: data.id || doc.id // 保留原始 ID，如果沒有則使用文檔 ID
-        }
-      }) as (TutorCase & { docId: string })[];
-
-      console.log('載入完成:', { tutors: tutors.length, cases: cases.length })
-      setPendingTutors(tutors);
-      setPendingCases(cases);
+      setPendingCases(
+        casesSnapshot.docs.map((item) => ({
+          ...(item.data() as TutorCase),
+          docId: item.id,
+          id: (item.data() as TutorCase).id || item.id,
+        }))
+      )
     } catch (error) {
-      console.error('Fetch error:', error);
-      toast.error('載入失敗：' + (error instanceof Error ? error.message : '未知錯誤'));
+      console.error('載入待審核資料失敗:', error)
+      toast.error('載入待審核資料失敗')
     }
-  };
+  }
 
-  // 搜尋功能
+  const getApprovedTutorEmails = async () => {
+    try {
+      const snapshot = await getDocs(collection(db, 'approvedTutors'))
+      return snapshot.docs
+        .map((item) => item.data())
+        .filter((item) => Boolean(item.email) && item.receiveNewCaseNotifications === true)
+        .map((item) => item.email as string)
+    } catch (error) {
+      console.error('獲取教師 email 失敗:', error)
+      return []
+    }
+  }
+
+  const sendNewCaseNotification = async (caseData: CaseNotificationData) => {
+    try {
+      const emailList = await getApprovedTutorEmails()
+      const result = await sendNewCaseEmailNotification(caseData, emailList)
+      if (result.success) {
+        toast.success(`已通知 ${emailList.length} 位教師`) 
+      }
+    } catch (error) {
+      console.error('發送新案件通知失敗:', error)
+      toast.error('案件已通過，但郵件通知未成功發送')
+    }
+  }
+
   const handleSearch = async () => {
     if (!tutorCode && !caseNumber) {
       toast.info('請輸入教師編號或案件編號')
@@ -98,389 +168,135 @@ export default function AdminPage() {
 
     setSearching(true)
     try {
-      let tutorResult = null
-      let caseResult = null
+      let tutorResult: PendingTutor | null = null
+      let caseResult: PendingCase | null = null
 
-      // 搜尋教師
       if (tutorCode) {
-        const tutorsQuery = query(
-          collection(db, 'tutors'),
-          where('tutorCode', '==', tutorCode)
-        );
-        const tutorsSnapshot = await getDocs(tutorsQuery);
-        
-        if (!tutorsSnapshot.empty) {
-          const tutorDoc = tutorsSnapshot.docs[0];
+        const tutorSnapshot = await getDocs(query(collection(db, 'tutors'), where('tutorCode', '==', tutorCode)))
+        if (!tutorSnapshot.empty) {
+          const tutorDoc = tutorSnapshot.docs[0]
           tutorResult = {
-            ...tutorDoc.data(),
+            ...(tutorDoc.data() as Tutor),
             docId: tutorDoc.id,
-            id: tutorDoc.data().id || tutorDoc.id
-          } as (Tutor & { docId: string });
+            id: (tutorDoc.data() as Tutor).id || tutorDoc.id,
+          }
         }
       }
 
-      // 搜尋案件
       if (caseNumber) {
-        const casesQuery = query(
-          collection(db, 'cases'),
-          where('caseNumber', '==', caseNumber)
-        );
-        const casesSnapshot = await getDocs(casesQuery);
-        
-        if (!casesSnapshot.empty) {
-          const caseDoc = casesSnapshot.docs[0];
+        const caseSnapshot = await getDocs(query(collection(db, 'cases'), where('caseNumber', '==', caseNumber)))
+        if (!caseSnapshot.empty) {
+          const caseDoc = caseSnapshot.docs[0]
           caseResult = {
-            ...caseDoc.data(),
+            ...(caseDoc.data() as TutorCase),
             docId: caseDoc.id,
-            id: caseDoc.data().id || caseDoc.id
-          } as (TutorCase & { docId: string });
+            id: (caseDoc.data() as TutorCase).id || caseDoc.id,
+          }
         }
       }
 
-      setSearchResults({ 
-        tutor: tutorResult, 
-        case: caseResult 
-      });
-
+      setSearchResults({ tutor: tutorResult, case: caseResult })
       if (!tutorResult && !caseResult) {
-        toast.error('找不到符合的資料');
-      } else {
-        toast.success('搜尋完成！');
+        toast.error('找不到符合的資料')
       }
-
     } catch (error) {
-      console.error('搜尋失敗:', error);
-      toast.error('搜尋失敗：' + (error instanceof Error ? error.message : '未知錯誤'));
+      console.error('搜尋失敗:', error)
+      toast.error('搜尋失敗')
     } finally {
-      setSearching(false);
+      setSearching(false)
     }
-  };
+  }
 
-  // 清除搜尋
   const clearSearch = () => {
-    setTutorCode('');
-    setCaseNumber('');
-    setSearchResults({ tutor: null, case: null });
-    setSelectedStatus('');
-  };
-  
-  // 處理案件狀態更新
-  const handleCaseStatusUpdate = async (caseDocId: string, newStatus: '急徵' | '已徵到' | '有人接洽') => {
-    if (updatingStatus) return;
-    setUpdatingStatus(true);
-    
+    setTutorCode('')
+    setCaseNumber('')
+    setSearchResults({ tutor: null, case: null })
+    setSelectedStatus('')
+  }
+
+  const updateLocalCase = (docId: string, patch: Partial<PendingCase>) => {
+    setPendingCases((prev) => prev.map((item) => (item.docId === docId ? { ...item, ...patch } : item)))
+    setSearchResults((prev) => ({
+      ...prev,
+      case: prev.case?.docId === docId ? { ...prev.case, ...patch } : prev.case,
+    }))
+  }
+
+  const handleGenerateDocumentLink = async (docId: string) => {
+    setGeneratingLinkId(docId)
     try {
-      console.log('開始更新案件狀態，案件 docId:', caseDocId, '新狀態:', newStatus);
-      
-      if (!caseDocId) {
-        throw new Error('案件ID無效');
+      const response = await fetch(`/api/cases/${docId}/document-link`, { method: 'POST' })
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result.error || '無法建立補件連結')
       }
-      
-      // 1. 從搜尋結果獲取案件的id來查找 approvedCases
-      const searchedCase = searchResults.case;
-      if (!searchedCase || !searchedCase.id) {
-        throw new Error('無法找到案件識別碼');
-      }
-      
-      // 2. 更新原始 cases 集合中的案件狀態
-      const originalCaseRef = doc(db, 'cases', caseDocId);
-      const originalCaseSnapshot = await getDoc(originalCaseRef);
-      
+
+      const fullLink = `${window.location.origin}${result.path}`
+      await navigator.clipboard.writeText(fullLink)
+      updateLocalCase(docId, {
+        documentStatus: 'requested',
+        documentRequestedAt: new Date().toISOString(),
+        documentRequestExpiresAt: result.expiresAt,
+      })
+      toast.success('已建立並複製補件連結')
+    } catch (error) {
+      console.error('建立補件連結失敗:', error)
+      toast.error(error instanceof Error ? error.message : '建立補件連結失敗')
+    } finally {
+      setGeneratingLinkId(null)
+    }
+  }
+
+  const handleCaseStatusUpdate = async (caseDocId: string, newStatus: '急徵' | '已徵到' | '有人接洽') => {
+    if (updatingStatus) return
+    setUpdatingStatus(true)
+
+    try {
+      const originalCaseRef = doc(db, 'cases', caseDocId)
+      const originalCaseSnapshot = await getDoc(originalCaseRef)
       if (originalCaseSnapshot.exists()) {
         await updateDoc(originalCaseRef, {
           status: newStatus,
-          statusUpdatedAt: new Date().toISOString()
-        });
-        console.log('已更新 cases 集合中的狀態');
+          statusUpdatedAt: new Date().toISOString(),
+        })
       }
-      
-      // 3. 更新 approvedCases 集合中對應的案件狀態（用 caseNumber 查找）
-      if (searchedCase.caseNumber) {
-        const approvedCasesQuery = query(
-          collection(db, 'approvedCases'),
-          where('caseNumber', '==', searchedCase.caseNumber)
-        );
-        const approvedCasesSnapshot = await getDocs(approvedCasesQuery);
-        
+
+      const searchedCase = searchResults.case
+      if (searchedCase?.caseNumber) {
+        const approvedCasesSnapshot = await getDocs(
+          query(collection(db, 'approvedCases'), where('caseNumber', '==', searchedCase.caseNumber))
+        )
         if (!approvedCasesSnapshot.empty) {
-          const approvedCaseDoc = approvedCasesSnapshot.docs[0];
-          await updateDoc(approvedCaseDoc.ref, {
+          await updateDoc(approvedCasesSnapshot.docs[0].ref, {
             status: newStatus,
-            statusUpdatedAt: new Date().toISOString()
-          });
-          console.log('已更新 approvedCases 集合中的狀態，案件編號:', searchedCase.caseNumber);
-        } else {
-          console.warn('在 approvedCases 中找不到案件編號:', searchedCase.caseNumber);
+            statusUpdatedAt: new Date().toISOString(),
+          })
         }
-      } else {
-        console.error('案件缺少 caseNumber，無法更新 approvedCases');
       }
-      
-      // 4. 更新搜尋結果中顯示的狀態
-      if (searchResults.case) {
-        setSearchResults({
-          ...searchResults,
-          case: {
-            ...searchResults.case,
-            status: newStatus
-          }
-        });
-      }
-      
-      toast.success(`案件狀態已更新為「${newStatus}」`);
-      setSelectedStatus(''); // 重置選擇
-      
+
+      updateLocalCase(caseDocId, { status: newStatus })
+      toast.success(`案件狀態已更新為「${newStatus}」`)
+      setSelectedStatus('')
     } catch (error) {
-      console.error('更新案件狀態失敗:', error);
-      toast.error(`狀態更新失敗：${error instanceof Error ? error.message : '未知錯誤'}`);
+      console.error('更新案件狀態失敗:', error)
+      toast.error('更新案件狀態失敗')
     } finally {
-      setUpdatingStatus(false);
-    }
-  };
-
-  // 獲取狀態 Badge 的樣式
-  const getStatusBadgeStyle = (status: string) => {
-    switch (status) {
-      case '急徵':
-        return { 
-          variant: 'destructive' as const,
-          className: 'bg-red-500 hover:bg-red-600 text-white',
-          icon: '🚨'
-        };
-      case '有人接洽':
-        return { 
-          variant: 'secondary' as const,
-          className: 'bg-yellow-500 hover:bg-yellow-600 text-white',
-          icon: '💬'
-        };
-      case '已徵到':
-        return { 
-          variant: 'default' as const,
-          className: 'bg-green-500 hover:bg-green-600 text-white',
-          icon: '✅'
-        };
-      default:
-        return { 
-          variant: 'outline' as const,
-          className: 'bg-gray-100 text-gray-600',
-          icon: '❓'
-        };
-    }
-  };
-
-  // 獲取所有已審核且願意接收通知的教師email列表
-  const getApprovedTutorEmails = async () => {
-    try {
-      console.log('開始獲取已審核教師的email列表...')
-      
-      // 查詢所有已審核的教師
-      const approvedTutorsQuery = query(
-        collection(db, 'approvedTutors')
-      );
-      const approvedTutorsSnapshot = await getDocs(approvedTutorsQuery);
-      
-      // 提取email並過濾條件：
-      // 1. 有效的email格式
-      // 2. 願意接收新案件通知
-      const emailList = approvedTutorsSnapshot.docs
-        .map(doc => {
-          const data = doc.data();
-          return {
-            email: data.email,
-            receiveNotifications: data.receiveNewCaseNotifications
-          };
-        })
-        .filter(({ email, receiveNotifications }) => {
-          // 過濾掉空值、undefined、無效的email格式，以及不願意接收通知的教師
-          return email && 
-                 typeof email === 'string' && 
-                 email.includes('@') && 
-                 email.includes('.') &&
-                 receiveNotifications === true; // 只有同意接收通知的教師
-        })
-        .map(({ email }) => email); // 只回傳email字串
-
-      console.log(`找到 ${emailList.length} 個願意接收通知的有效教師email:`, emailList);
-      return emailList;
-    } catch (error) {
-      console.error('獲取教師email列表失敗:', error);
-      return [];
-    }
-  };
-
-  // 發送新案件郵件通知
-  const sendNewCaseNotification = async (caseData: CaseNotificationData) => {
-    try {
-      console.log('準備發送新案件郵件通知...');
-      
-      // 獲取教師email列表
-      const emailList = await getApprovedTutorEmails();
-      
-      // 使用webhook配置文件中的專用函數發送通知
-      const result = await sendNewCaseEmailNotification(caseData, emailList);
-      
-      if (result.success) {
-        toast.success(`郵件通知已發送給 ${emailList.length} 位教師`);
-      } else {
-        // 如果是因為沒有email或webhook未啟用，不顯示錯誤
-        if (result.message === '沒有有效的教師email') {
-          console.log('沒有找到有效的教師email，跳過郵件通知');
-        } else if (result.message === 'Webhook功能未啟用') {
-          console.log('Webhook功能未啟用，跳過郵件通知');
-        } else {
-          toast.error('郵件通知發送失敗，但案件已成功審核');
-        }
-      }
-    } catch (error) {
-      console.error('發送郵件通知失敗:', error);
-      // 不要因為郵件發送失敗而影響案件審核流程
-      toast.error('郵件通知發送失敗，但案件已成功審核');
-    }
-  };
-
-  // 監聽使用者登入狀態
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        try {
-          // 檢查是否為管理員
-          const adminRef = collection(db, 'admins');
-          const q = query(adminRef, where('email', '==', user.email));
-          const querySnapshot = await getDocs(q);
-          
-          if (querySnapshot.empty) {
-            // 如果不是管理員，強制登出
-            await signOut(auth);
-            toast.error('您沒有管理員權限');
-            setUser(null);
-          } else {
-            setUser(user);
-            fetchPendingData();
-          }
-        } catch (error) {
-          console.error('檢查管理員權限時發生錯誤:', error);
-          toast.error('檢查權限時發生錯誤');
-          await signOut(auth);
-          setUser(null);
-        }
-      } else {
-        setUser(null);
-      }
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  // 自動登出計時器
-  useEffect(() => {
-    const currentUser = auth.currentUser
-    if (!currentUser) return
-
-    const updateLastActivity = () => {
-      setLastActivity(Date.now())
-    }
-
-    // 監聽使用者活動
-    window.addEventListener('mousemove', updateLastActivity)
-    window.addEventListener('keydown', updateLastActivity)
-    window.addEventListener('click', updateLastActivity)
-
-    // 每秒更新閒置時間
-    const updateInterval = setInterval(() => {
-      const now = Date.now()
-      const inactive = now - lastActivity
-      setInactiveTime(inactive)
-      
-      if (inactive > 10 * 60 * 1000) { // 10分鐘
-        handleLogout()
-        toast.info('因閒置過久，系統已自動登出')
-      }
-    }, 1000)
-
-    return () => {
-      window.removeEventListener('mousemove', updateLastActivity)
-      window.removeEventListener('keydown', updateLastActivity)
-      window.removeEventListener('click', updateLastActivity)
-      clearInterval(updateInterval)
-    }
-  }, [user, lastActivity])
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth)
-      toast.success('已登出')
-    } catch (error) {
-      console.error('登出失敗: ', error)
-      toast.error('登出失敗')
+      setUpdatingStatus(false)
     }
   }
 
-  if (loading) {
-    return (
-      <div className="container mx-auto py-8 flex justify-center items-center min-h-screen">
-        <p>載入中...</p>
-      </div>
-    )
-  }
-
-  if (!user) {
-    return (
-      <div className="container mx-auto py-8">
-        <div className="max-w-md mx-auto">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-2xl text-center">管理員登入</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <LoginForm />
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    )
-  }
-
-  // 處理教師審核
   const handleTutorApprove = async (docId: string) => {
     if (processing) return
     setProcessing(true)
-    
     try {
-      console.log('開始審核教師，文檔 ID:', docId)
-      
-      if (!docId) {
-        throw new Error('教師ID無效')
-      }
+      const tutorRef = doc(db, 'tutors', docId)
+      const tutorSnapshot = await getDoc(tutorRef)
+      if (!tutorSnapshot.exists()) throw new Error('找不到教師資料')
 
-      // 直接使用文檔 ID 獲取教師
-      const tutorRef = doc(db, 'tutors', docId);
-      const tutorSnapshot = await getDoc(tutorRef);
-      
-      if (!tutorSnapshot.exists()) {
-        throw new Error('找不到該教師')
-      }
-      
-      const tutorData = tutorSnapshot.data();
-      console.log('找到教師資料:', tutorData)
-
-      // Validate required fields
-      const requiredFields = ['experience', 'expertise', 'major', 'name', 'school', 'subjects'];
-      const missingFields = requiredFields.filter(field => !tutorData[field]);
-      
-      if (missingFields.length > 0) {
-        throw new Error(`教師資料不完整，缺少: ${missingFields.join(', ')}`);
-      }
-
-      await updateDoc(tutorRef, {
-        status: 'approved',
-        isActive: true,
-        approvedAt: new Date().toISOString()
-      });
-
-      // Store approved tutor info in approvedTutors collection
+      const tutorData = tutorSnapshot.data() as Tutor
+      await updateDoc(tutorRef, { status: 'approved', approvedAt: new Date().toISOString() })
       await addDoc(collection(db, 'approvedTutors'), {
-        tutorId: docId,
+        tutorId: tutorData.id,
         experience: tutorData.experience,
         subjects: tutorData.subjects,
         expertise: tutorData.expertise,
@@ -489,806 +305,513 @@ export default function AdminPage() {
         email: tutorData.email,
         school: tutorData.school,
         approvedAt: new Date().toISOString(),
-        receiveNewCaseNotifications: tutorData.receiveNewCaseNotifications || false // 確保包含通知設定
-      });
-      
-      toast.success('審核通過')
+        receiveNewCaseNotifications: tutorData.receiveNewCaseNotifications,
+      })
+      toast.success('教師已通過審核')
       await fetchPendingData()
     } catch (error) {
-      console.error('Error approving tutor:', error);
-      toast.error(error instanceof Error ? error.message : '審核失敗')
+      console.error('審核教師失敗:', error)
+      toast.error(error instanceof Error ? error.message : '審核教師失敗')
     } finally {
       setProcessing(false)
     }
   }
 
-  // 處理家教拒絕
+  const getStoragePath = (url: string) => {
+    try {
+      if (url.startsWith('gs://')) {
+        return url.replace(/^gs:\/\/[^/]+\//, '')
+      }
+      const urlObj = new URL(url)
+      const pathMatch = urlObj.pathname.match(/\/v0\/b\/[^/]+\/o\/(.+)/)
+      return pathMatch ? decodeURIComponent(pathMatch[1]) : null
+    } catch (error) {
+      console.error('解析檔案路徑失敗:', error)
+      return null
+    }
+  }
+
+  const deleteStorageAsset = async (url?: string) => {
+    if (!url) return
+    const storagePath = getStoragePath(url)
+    if (!storagePath) return
+    await deleteObject(ref(storage, storagePath))
+  }
+
   const handleTutorReject = async (docId: string) => {
     if (processing) return
     setProcessing(true)
-    
     try {
-      console.log('開始拒絕教師，文檔 ID:', docId)
-      
-      if (!docId) {
-        throw new Error('教師ID無效')
-      }
+      const tutorRef = doc(db, 'tutors', docId)
+      const tutorSnapshot = await getDoc(tutorRef)
+      if (!tutorSnapshot.exists()) throw new Error('找不到教師資料')
 
-      // 直接使用文檔 ID 獲取教師
-      const tutorRef = doc(db, 'tutors', docId);
-      const tutorSnapshot = await getDoc(tutorRef);
-      
-      if (!tutorSnapshot.exists()) {
-        throw new Error('找不到該教師')
-      }
-      
-      const tutorData = tutorSnapshot.data();
-      console.log('找到教師資料:', tutorData)
-
-      // Delete ID card images from storage
-      if (tutorData.idCardUrl) {
-        try {
-          console.log('刪除身分證照片:', tutorData.idCardUrl)
-          const getStoragePath = (url: string) => {
-            try {
-              if (url.startsWith('gs://')) {
-                return url.replace(/^gs:\/\/[^\/]+\//, '')
-              }
-              const urlObj = new URL(url)
-              const pathMatch = urlObj.pathname.match(/\/v0\/b\/[^\/]+\/o\/(.+)/)
-              return pathMatch ? decodeURIComponent(pathMatch[1]) : null
-            } catch (error) {
-              console.error('解析 URL 失敗:', error)
-              return null
-            }
-          }
-          const storagePath = getStoragePath(tutorData.idCardUrl)
-          if (storagePath) {
-            const idCardRef = ref(storage, storagePath);
-            await deleteObject(idCardRef);
-            console.log('身分證照片已刪除')
-          }
-        } catch (error) {
-          console.error('Error deleting ID card:', error);
-        }
-      }
-
-      // Delete student ID photo if exists  
-      if (tutorData.studentIdCardUrl) {
-        try {
-          console.log('刪除學生證照片:', tutorData.studentIdCardUrl)
-          const getStoragePath = (url: string) => {
-            try {
-              if (url.startsWith('gs://')) {
-                return url.replace(/^gs:\/\/[^\/]+\//, '')
-              }
-              const urlObj = new URL(url)
-              const pathMatch = urlObj.pathname.match(/\/v0\/b\/[^\/]+\/o\/(.+)/)
-              return pathMatch ? decodeURIComponent(pathMatch[1]) : null
-            } catch (error) {
-              console.error('解析 URL 失敗:', error)
-              return null
-            }
-          }
-          const storagePath = getStoragePath(tutorData.studentIdCardUrl)
-          if (storagePath) {
-            const studentIdRef = ref(storage, storagePath);
-            await deleteObject(studentIdRef);
-            console.log('學生證照片已刪除')
-          }
-        } catch (error) {
-          console.error('Error deleting student ID:', error);
-        }
-      }
-      
+      const tutorData = tutorSnapshot.data() as Tutor
+      await Promise.all([deleteStorageAsset(tutorData.studentIdCardUrl), deleteStorageAsset(tutorData.idCardUrl)])
       await deleteDoc(tutorRef)
-      
-      toast.success('已拒絕申請')
+      toast.success('已拒絕教師申請')
       await fetchPendingData()
     } catch (error) {
       console.error('拒絕教師失敗:', error)
-      toast.error(`操作失敗：${error instanceof Error ? error.message : '未知錯誤'}`)
+      toast.error(error instanceof Error ? error.message : '拒絕教師失敗')
     } finally {
       setProcessing(false)
     }
   }
 
-  // 處理案件審核
   const handleCaseApprove = async (docId: string) => {
     if (processing) return
     setProcessing(true)
-    
     try {
-      console.log('開始審核案件，文檔 ID:', docId)
-      
-      if (!docId) {
-        throw new Error('案件ID無效')
-      }
+      const caseRef = doc(db, 'cases', docId)
+      const caseSnapshot = await getDoc(caseRef)
+      if (!caseSnapshot.exists()) throw new Error('找不到案件資料')
 
-      // 直接使用文檔 ID 獲取案件
-      const caseRef = doc(db, 'cases', docId);
-      const caseSnapshot = await getDoc(caseRef);
-      
-      if (!caseSnapshot.exists()) {
-        throw new Error('找不到該案件')
-      }
-      
-      const caseData = caseSnapshot.data();
-      console.log('找到案件資料:', caseData)
+      const caseData = caseSnapshot.data() as TutorCase
+      const normalized = normalizeCase(caseData)
 
-      // 更新案件狀態
       await updateDoc(caseRef, {
         pending: 'approved',
-        approvedAt: new Date().toISOString()
-      });
+        approvedAt: new Date().toISOString(),
+      })
 
-      console.log('案件狀態已更新為 approved')
-
-      // 將審核通過的案件加入 approvedCases 集合
-      const approvedCaseData = {
+      await addDoc(collection(db, 'approvedCases'), {
         caseId: docId,
         caseNumber: caseData.caseNumber,
         subject: caseData.subject,
         grade: caseData.grade,
-        location: caseData.location,
-        availableTime: caseData.availableTime,
-        teacherRequirements: caseData.teacherRequirements,
-        studentDescription: caseData.studentDescription,
-        hourlyFee: caseData.hourlyFee,
-        status: caseData.status,
-        region: caseData.region,
-        approvedAt: new Date().toISOString()
-      }
-
-      await addDoc(collection(db, 'approvedCases'), approvedCaseData);
-      console.log('已加入 approvedCases 集合')
-
-      toast.success('案件已通過審核')
-      
-      // 發送新案件郵件通知給所有已審核的教師
-      const notificationData: CaseNotificationData = {
-        caseNumber: caseData.caseNumber,
-        subject: caseData.subject,
-        hourlyFee: caseData.hourlyFee,
-        location: caseData.location,
+        location: normalized.location,
         availableTime: caseData.availableTime,
         teacherRequirements: caseData.teacherRequirements || '',
-        studentDescription: caseData.studentDescription || ''
-      };
-      await sendNewCaseNotification(notificationData);
-      
+        studentDescription: caseData.studentDescription,
+        hourlyFee: caseData.hourlyFee,
+        budgetRange: normalized.budgetRange,
+        status: caseData.status,
+        region: caseData.region,
+        documentStatus: normalized.documentStatus,
+        approvedAt: new Date().toISOString(),
+      })
+
+      toast.success('案件已通過審核')
+      await sendNewCaseNotification(buildCaseNotificationData(caseData))
       await fetchPendingData()
     } catch (error) {
-      console.error('Error approving case:', error)
-      toast.error(`審核失敗：${error instanceof Error ? error.message : '未知錯誤'}`)
+      console.error('審核案件失敗:', error)
+      toast.error(error instanceof Error ? error.message : '審核案件失敗')
     } finally {
       setProcessing(false)
     }
   }
 
-  // 處理案件拒絕
   const handleCaseReject = async (docId: string) => {
     if (processing) return
     setProcessing(true)
-    
     try {
-      console.log('開始拒絕案件，文檔 ID:', docId)
-      
-      if (!docId) {
-        throw new Error('案件ID無效')
-      }
+      const caseRef = doc(db, 'cases', docId)
+      const caseSnapshot = await getDoc(caseRef)
+      if (!caseSnapshot.exists()) throw new Error('找不到案件資料')
 
-      // 直接使用文檔 ID 獲取案件
-      const caseRef = doc(db, 'cases', docId);
-      const caseSnapshot = await getDoc(caseRef);
-      
-      if (!caseSnapshot.exists()) {
-        throw new Error('找不到該案件')
-      }
-      
-      const caseData = caseSnapshot.data();
-      console.log('找到案件資料:', caseData)
-
-      // 刪除 storage 中的身分證照片
-      if (caseData.idCardUrl) {
-        try {
-          console.log('刪除身分證照片:', caseData.idCardUrl)
-          
-          // 從 URL 中提取檔案路徑
-          const getStoragePath = (url: string) => {
-            try {
-              // 如果是 gs:// URL
-              if (url.startsWith('gs://')) {
-                return url.replace(/^gs:\/\/[^\/]+\//, '')
-              }
-              // 如果是 https:// URL，需要解析
-              const urlObj = new URL(url)
-              const pathMatch = urlObj.pathname.match(/\/v0\/b\/[^\/]+\/o\/(.+)/)
-              return pathMatch ? decodeURIComponent(pathMatch[1]) : null
-            } catch (error) {
-              console.error('解析 URL 失敗:', error)
-              return null
-            }
-          }
-
-          const storagePath = getStoragePath(caseData.idCardUrl)
-          if (storagePath) {
-            const imageRef = ref(storage, storagePath)
-            await deleteObject(imageRef)
-            console.log('身分證照片已刪除')
-          }
-        } catch (error) {
-          console.error('刪除身分證照片失敗:', error)
-          // 繼續執行，即使照片刪除失敗
-        }
-      }
-
-      // 刪除案件文檔
-      await deleteDoc(caseRef);
-      console.log('案件文檔已刪除')
-      
+      const caseData = caseSnapshot.data() as TutorCase
+      await deleteStorageAsset(caseData.idCardUrl)
+      await deleteDoc(caseRef)
       toast.success('已拒絕案件')
       await fetchPendingData()
     } catch (error) {
       console.error('拒絕案件失敗:', error)
-      toast.error(`操作失敗：${error instanceof Error ? error.message : '未知錯誤'}`)
+      toast.error(error instanceof Error ? error.message : '拒絕案件失敗')
     } finally {
       setProcessing(false)
     }
   }
 
-  return (
-    <div className="container mx-auto py-8">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">管理員後台</h1>
-        </div>
-        <div className="flex flex-row items-center gap-2">
-          <p className="text-sm text-gray-500">
-            閒置時間: {Math.floor(inactiveTime / 1000)} 秒
-          </p>
-        <Button variant="outline" onClick={handleLogout}>
-            登出
-          </Button>
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (nextUser) => {
+      if (!nextUser) {
+        setUser(null)
+        setLoading(false)
+        return
+      }
+
+      try {
+        const adminSnapshot = await getDocs(query(collection(db, 'admins'), where('email', '==', nextUser.email)))
+        if (adminSnapshot.empty) {
+          await signOut(auth)
+          toast.error('您沒有管理員權限')
+          setUser(null)
+        } else {
+          setUser(nextUser)
+          await fetchPendingData()
+        }
+      } catch (error) {
+        console.error('檢查管理員權限失敗:', error)
+        toast.error('管理員權限驗證失敗')
+      } finally {
+        setLoading(false)
+      }
+    })
+
+    return () => unsubscribe()
+  }, [])
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth)
+      toast.success('已登出')
+    } catch (error) {
+      console.error('登出失敗:', error)
+      toast.error('登出失敗')
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#f7f3e8]">
+        <div className="inline-flex items-center gap-3 rounded-full border border-brand-200 bg-white px-5 py-3 text-brand-800 shadow-[0_14px_40px_rgba(67,102,78,0.08)]">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          載入管理後台中...
         </div>
       </div>
-      
-      <Tabs defaultValue="tutors">
-        <TabsList>
-          <TabsTrigger value="tutors">
-            待審核教師
-            {pendingTutors.length > 0 && (
-              <span className="ml-2 bg-red-500 text-white px-2 py-1 rounded-full text-sm">
-                {pendingTutors.length}
-              </span>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="cases">
-            待審核案件
-            {pendingCases.length > 0 && (
-              <span className="ml-2 bg-red-500 text-white px-2 py-1 rounded-full text-sm">
-                {pendingCases.length}
-              </span>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="search">
-            🔍 搜尋系統
-            {searchResults.tutor !== null || searchResults.case !== null && (
-              <Badge variant="secondary" className="ml-2">
-                找到資料
-              </Badge>
-            )}
-          </TabsTrigger>
-        </TabsList>
+    )
+  }
 
-        <TabsContent value="tutors">
-          <Card>
-            <CardHeader>
-              <CardTitle>待審核教師列表</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {pendingTutors.map((tutor) => (
-                <div key={tutor.id} className="border p-4 rounded mb-4">
-                  <h3 className="font-bold">{tutor.name}</h3>
-                  <p>電話：{tutor.phoneNumber}</p>
-                  <p>電子郵件：{tutor.email}</p>
-                  <p>科目：{tutor.subjects.join(', ')}</p>
-                  <p>經驗：{tutor.experience}</p>
-                  <p>學校：{tutor.school}</p>
-                  <p>專長：{tutor.expertise}</p>
-                  <p>學位：{tutor.major}</p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <span>接收新案件通知：</span>
-                    <Badge variant={tutor.receiveNewCaseNotifications ? "default" : "secondary"}>
-                      {tutor.receiveNewCaseNotifications ? "✅ 是" : "❌ 否"}
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 mt-4">
-                    <div>
-                      <h4 className="font-semibold mb-2">學生證</h4>
-                      <Image
-                        src={tutor.studentIdCardUrl} 
-                        alt="學生證" 
-                        width={500}
-                        height={300}
-                        className="w-full rounded-lg shadow-md"
-                      />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold mb-2">身分證</h4>
-                      <Image
-                        src={tutor.idCardUrl} 
-                        alt="身分證" 
-                        width={500}
-                        height={300}
-                        className="w-full rounded-lg shadow-md"
-                      />
-                    </div>
-                  </div>
-                  <div className="mt-2 flex gap-2">
-                    <Button 
-                      variant="destructive" 
-                      onClick={() => {
-                        console.log('點擊拒絕教師按鈕，教師 ID:', tutor.id, '文檔 ID:', tutor.docId)
-                        handleTutorReject(tutor.docId) // 使用 docId
-                      }}
-                      disabled={processing}
-                    >
-                      {processing ? '處理中...' : '不通過'}
-                    </Button>
-                    <Button 
-                      onClick={() => {
-                        console.log('點擊通過教師按鈕，教師 ID:', tutor.id, '文檔 ID:', tutor.docId)
-                        handleTutorApprove(tutor.docId) // 使用 docId
-                      }}
-                      disabled={processing}
-                    >
-                      {processing ? '處理中...' : '通過審核'}
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </TabsContent>
+  if (!user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#f7f3e8] px-4">
+        <Card className="w-full max-w-lg rounded-[2rem] border-brand-100 bg-white/95 shadow-[0_26px_90px_rgba(67,102,78,0.08)]">
+          <CardHeader className="text-center">
+            <CardTitle className="font-display text-3xl text-brand-900">管理後台登入</CardTitle>
+            <p className="mt-2 text-sm leading-7 text-neutral-600">登入後可查看待審核教師、案件狀態、補件連結與搜尋資料。</p>
+          </CardHeader>
+          <CardContent>
+            <LoginForm />
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
-        <TabsContent value="cases">
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                待審核案件列表 
-                <span className="text-sm font-normal text-gray-500 ml-2">
-                  (共 {pendingCases.length} 件)
-                </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {pendingCases.length === 0 ? (
-                <p className="text-center text-gray-500 py-8">目前沒有待審核的案件</p>
-              ) : (
-                pendingCases.map((case_) => (
-                  <div key={case_.id} className="border p-4 rounded mb-4">
-                    <h3 className="font-bold">案件編號：{case_.caseNumber}</h3>
-                    <div className="text-xs text-gray-500 mb-2">
-                      文檔 ID: {case_.docId} | 自定義 ID: {case_.id || '無'}
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 my-2">
-                      <p>家長：{case_.parentName}</p>
-                      <p>電話：{case_.parentPhone}</p>
-                      <p>科目：{case_.subject}</p>
-                      <p>時薪：${case_.hourlyFee}</p>
-                    </div>
-                    <p>地點：{case_.location}</p>
-                    <p>時段：{case_.availableTime}</p>
-                    {case_.idCardUrl && (
-                      <div className="mt-4">
-                        <h4 className="font-semibold mb-2">身分證照片</h4>
-                        <div className="relative">
-                          <Image
-                            src={case_.idCardUrl} 
-                            alt="身分證" 
-                            width={500}
-                            height={300}
-                            className="w-full rounded-lg shadow-md"
-                            loading="lazy"
-                            onError={(e) => {
-                              console.error('圖片載入失敗:', case_.idCardUrl);
-                              // 設置一個預設圖片或錯誤提示
-                              e.currentTarget.src = '/placeholder.png';
-                            }}
-                          />
+  return (
+    <div className="min-h-screen bg-[#f7f3e8] px-4 py-6 text-neutral-900 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <div className="rounded-[2rem] border border-white/70 bg-[linear-gradient(145deg,rgba(255,255,255,0.96),rgba(245,250,242,0.9))] p-6 shadow-[0_30px_90px_rgba(67,102,78,0.12)] md:p-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-3xl">
+              <div className="inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50/80 px-4 py-2 text-xs font-semibold tracking-[0.28em] text-brand-700">
+                <LayoutDashboard className="h-4 w-4" />
+                OPERATIONS DASHBOARD
+              </div>
+              <h1 className="mt-5 font-display text-3xl text-brand-900 md:text-5xl">把待審核案件、教師名單與補件流程放進同一個工作台</h1>
+              <p className="mt-4 max-w-2xl text-base leading-8 text-neutral-600">這裡會同時顯示媒合新案、案件補件狀態與教師待審核列表。資料以新的 budgetRange、半完整地址與補件狀態為主，但仍向後相容既有案件。</p>
+            </div>
+            <Button variant="outline" className="rounded-full border-brand-300 bg-white text-brand-800 hover:bg-brand-50" onClick={handleLogout}>
+              <LogOut className="h-4 w-4" />
+              登出
+            </Button>
+          </div>
+
+          <div className="mt-6 grid gap-3 md:grid-cols-4">
+            <MetricCard label="待審核教師" value={String(pendingTutors.length)} hint="等待審核的教師資料" />
+            <MetricCard label="待審核案件" value={String(pendingCases.length)} hint="等待顧問確認的新需求" />
+            <MetricCard label="待補件案件" value={String(followUpCount)} hint="尚未完成證件補件" />
+            <MetricCard label="搜尋模式" value="Case + Tutor" hint="教師編號與案件編號雙入口" />
+          </div>
+        </div>
+
+        <Tabs defaultValue="cases" className="space-y-5">
+          <TabsList className="h-auto w-full justify-start gap-2 rounded-[1.5rem] border border-brand-100 bg-white/90 p-2 shadow-[0_12px_30px_rgba(67,102,78,0.05)]">
+            <TabsTrigger value="cases" className="rounded-[1rem] px-4 py-3">待審核案件</TabsTrigger>
+            <TabsTrigger value="tutors" className="rounded-[1rem] px-4 py-3">待審核教師</TabsTrigger>
+            <TabsTrigger value="search" className="rounded-[1rem] px-4 py-3">搜尋系統</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="cases" className="space-y-5">
+            <DashboardSection title="待審核案件" subtitle="優先檢查需求是否完整、預算與地址是否清楚，以及是否需要先發送補件連結。">
+              <div className="space-y-4">
+                {pendingCases.length === 0 ? (
+                  <div className="rounded-[1.5rem] border border-dashed border-brand-200 bg-[#fffdf8] px-4 py-12 text-center text-neutral-500">目前沒有待審核案件</div>
+                ) : (
+                  pendingCases.map((caseItem) => {
+                    const normalizedCase = normalizeCase(caseItem)
+                    return (
+                      <div key={caseItem.docId} className="rounded-[1.6rem] border border-brand-100 bg-[#fffdf8] p-5 shadow-[0_16px_40px_rgba(67,102,78,0.05)]">
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="space-y-4">
+                            <div className="flex flex-wrap items-center gap-3">
+                              <Badge className="bg-brand-100 text-brand-800">案件編號 {caseItem.caseNumber}</Badge>
+                              <Badge className={statusStyles[caseItem.status]}>{caseItem.status}</Badge>
+                              <DocumentStatusBadge status={normalizedCase.documentStatus} />
+                            </div>
+                            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                              <div>
+                                <div className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-500">聯絡人</div>
+                                <div className="mt-2 text-sm leading-6 text-neutral-700">{caseItem.parentName}<br />{caseItem.parentPhone}</div>
+                              </div>
+                              <div>
+                                <div className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-500">課程需求</div>
+                                <div className="mt-2 text-sm leading-6 text-neutral-700">{caseItem.subject}<br />{normalizedCase.budgetRange}</div>
+                              </div>
+                              <div>
+                                <div className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-500">地址</div>
+                                <div className="mt-2 text-sm leading-6 text-neutral-700">{normalizedCase.location || '尚未填寫'}</div>
+                              </div>
+                              <div>
+                                <div className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-500">可上課時段</div>
+                                <div className="mt-2 text-sm leading-6 text-neutral-700">{caseItem.availableTime}</div>
+                              </div>
+                            </div>
+                            <div className="grid gap-3 md:grid-cols-2">
+                              <div className="rounded-[1.2rem] bg-white p-4">
+                                <div className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-500">學生狀況</div>
+                                <div className="mt-2 text-sm leading-7 text-neutral-700">{caseItem.studentDescription}</div>
+                              </div>
+                              <div className="rounded-[1.2rem] bg-white p-4">
+                                <div className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-500">老師條件</div>
+                                <div className="mt-2 text-sm leading-7 text-neutral-700">{caseItem.teacherRequirements || '未特別指定'}</div>
+                              </div>
+                            </div>
+                            {caseItem.idCardUrl && (
+                              <div className="max-w-lg overflow-hidden rounded-[1.3rem] border border-brand-100 bg-white">
+                                <Image src={caseItem.idCardUrl} alt="案件證件照片" width={800} height={480} className="w-full object-cover" />
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex w-full flex-col gap-3 lg:w-[18rem]">
+                            <Button className="rounded-full bg-brand-500 text-white hover:bg-brand-600" onClick={() => handleCaseApprove(caseItem.docId)} disabled={processing}>
+                              通過審核
+                            </Button>
+                            <Button variant="outline" className="rounded-full border-red-300 text-red-600 hover:bg-red-50" onClick={() => handleCaseReject(caseItem.docId)} disabled={processing}>
+                              不通過
+                            </Button>
+                            <CopyableLinkButton
+                              label={normalizedCase.documentStatus === 'requested' ? '重新產生連結' : '產生補件連結'}
+                              onClick={() => handleGenerateDocumentLink(caseItem.docId)}
+                              disabled={generatingLinkId === caseItem.docId}
+                            />
+                            <div className="rounded-[1.2rem] border border-brand-100 bg-white p-4 text-sm leading-7 text-neutral-600">
+                              <div className="font-semibold text-brand-900">補件狀態</div>
+                              <div className="mt-2">{normalizedCase.documentStatusLabel}</div>
+                              {caseItem.documentRequestExpiresAt && <div className="mt-2 text-xs text-neutral-500">連結到期：{new Date(caseItem.documentRequestExpiresAt).toLocaleString('zh-TW')}</div>}
+                            </div>
+                          </div>
                         </div>
-                        <p className="text-xs text-gray-500 mt-1 break-all">
-                          圖片 URL: {case_.idCardUrl}
-                        </p>
                       </div>
-                    )}
-                    <div className="mt-4 flex gap-2">
-                      <Button 
-                        variant="destructive" 
-                        onClick={() => {
-                          console.log('點擊拒絕按鈕，案件 ID:', case_.id, '文檔 ID:', case_.docId)
-                          handleCaseReject(case_.docId) // 使用 docId 而不是 id
-                        }}
-                        disabled={processing}
-                      >
-                        {processing ? '處理中...' : '不通過'}
-                      </Button>
-                      <Button 
-                        onClick={() => {
-                          console.log('點擊通過按鈕，案件 ID:', case_.id, '文檔 ID:', case_.docId)
-                          handleCaseApprove(case_.docId) // 使用 docId 而不是 id
-                        }}
-                        disabled={processing}
-                      >
-                        {processing ? '處理中...' : '通過審核'}
-                      </Button>
+                    )
+                  })
+                )}
+              </div>
+            </DashboardSection>
+          </TabsContent>
+
+          <TabsContent value="tutors">
+            <DashboardSection title="待審核教師" subtitle="保留原本教師審核邏輯，改成更一致的營運面板視圖。">
+              <div className="space-y-4">
+                {pendingTutors.length === 0 ? (
+                  <div className="rounded-[1.5rem] border border-dashed border-brand-200 bg-[#fffdf8] px-4 py-12 text-center text-neutral-500">目前沒有待審核教師</div>
+                ) : (
+                  pendingTutors.map((tutor) => (
+                    <div key={tutor.docId} className="rounded-[1.6rem] border border-brand-100 bg-[#fffdf8] p-5 shadow-[0_16px_40px_rgba(67,102,78,0.05)]">
+                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-100 text-brand-700">
+                              <UserRound className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <div className="text-xl font-semibold text-brand-900">{tutor.name}</div>
+                              <div className="text-sm text-neutral-500">{tutor.school} · {tutor.major}</div>
+                            </div>
+                          </div>
+                          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                            <div>
+                              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-500">聯絡方式</div>
+                              <div className="mt-2 text-sm leading-6 text-neutral-700">{tutor.phoneNumber}<br />{tutor.email}</div>
+                            </div>
+                            <div>
+                              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-500">授課科目</div>
+                              <div className="mt-2 text-sm leading-6 text-neutral-700">{tutor.subjects.join('、')}</div>
+                            </div>
+                            <div>
+                              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-500">教學經驗</div>
+                              <div className="mt-2 text-sm leading-6 text-neutral-700">{tutor.experience}</div>
+                            </div>
+                            <div>
+                              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-500">通知設定</div>
+                              <div className="mt-2 text-sm leading-6 text-neutral-700">{tutor.receiveNewCaseNotifications ? '接收新案件通知' : '不接收新案件通知'}</div>
+                            </div>
+                          </div>
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div className="overflow-hidden rounded-[1.2rem] border border-brand-100 bg-white">
+                              <Image src={tutor.studentIdCardUrl} alt="學生證" width={800} height={480} className="w-full object-cover" />
+                            </div>
+                            <div className="overflow-hidden rounded-[1.2rem] border border-brand-100 bg-white">
+                              <Image src={tutor.idCardUrl} alt="身分證" width={800} height={480} className="w-full object-cover" />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex w-full flex-col gap-3 lg:w-[16rem]">
+                          <Button className="rounded-full bg-brand-500 text-white hover:bg-brand-600" onClick={() => handleTutorApprove(tutor.docId)} disabled={processing}>
+                            通過審核
+                          </Button>
+                          <Button variant="outline" className="rounded-full border-red-300 text-red-600 hover:bg-red-50" onClick={() => handleTutorReject(tutor.docId)} disabled={processing}>
+                            不通過
+                          </Button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                  ))
+                )}
+              </div>
+            </DashboardSection>
+          </TabsContent>
 
-        <TabsContent value="search">
-          <div className="space-y-6">
-            {/* 搜尋表單 */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  🔍 智能搜尋系統
-                  <Badge variant="outline">已審核通過資料</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                  {/* 教師編號搜尋 */}
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium mb-2">教師編號</label>
-                    <Input
-                      placeholder="輸入教師編號 (如: T001)"
-                      value={tutorCode}
-                      onChange={(e) => setTutorCode(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                      className="w-full"
-                    />
-                  </div>
-
-                  {/* 案件編號搜尋 */}
+          <TabsContent value="search">
+            <div className="space-y-5">
+              <DashboardSection title="搜尋系統" subtitle="可直接用教師編號或案件編號查詢，並針對案件狀態與補件流程做後續操作。">
+                <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
                   <div>
-                    <label className="block text-sm font-medium mb-2">案件編號</label>
-                    <Input
-                      placeholder="輸入案件編號 (如: CWBKOXV)"
-                      value={caseNumber}
-                      onChange={(e) => setCaseNumber(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                      className="w-full"
-                    />
+                    <LabelledField label="教師編號">
+                      <Input value={tutorCode} onChange={(event) => setTutorCode(event.target.value)} placeholder="例如：T001" />
+                    </LabelledField>
+                  </div>
+                  <div>
+                    <LabelledField label="案件編號">
+                      <Input value={caseNumber} onChange={(event) => setCaseNumber(event.target.value)} placeholder="例如：CABC123" />
+                    </LabelledField>
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <Button className="rounded-full bg-brand-500 text-white hover:bg-brand-600" onClick={handleSearch} disabled={searching}>
+                      {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                      開始搜尋
+                    </Button>
+                    <Button variant="outline" className="rounded-full border-brand-300 bg-white text-brand-800 hover:bg-brand-50" onClick={clearSearch}>
+                      清除
+                    </Button>
                   </div>
                 </div>
+              </DashboardSection>
 
-                {/* 搜尋按鈕 */}
-                <div className="flex gap-2">
-                  <Button 
-                    onClick={handleSearch} 
-                    disabled={searching}
-                    className="flex items-center gap-2"
-                  >
-                    {searching ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        搜尋中...
-                      </>
-                    ) : (
-                      <>
-                        🔍 開始搜尋
-                      </>
-                    )}
-                  </Button>
-                  
-                  <Button 
-                    variant="outline" 
-                    onClick={clearSearch}
-                    disabled={searching}
-                  >
-                    🗑️ 清除條件
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* 搜尋結果 */}
-            {searchResults.tutor !== null && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    👨‍🏫 教師搜尋結果
-                    <Badge>{searchResults.tutor ? '找到' : '無'}</Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {searchResults.tutor ? (
-                    <div className="grid gap-4">
-                      <div className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                        <div className="flex justify-between items-start mb-3">
-                          <h3 className="font-bold text-lg text-blue-600">{searchResults.tutor.name}</h3>
-                          <Badge variant="secondary" className="bg-green-100 text-green-800">
-                            ✅ 已審核
-                          </Badge>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
-                          <div>
-                            <p className="text-sm text-gray-600">聯絡資訊</p>
-                            <p>📞 {searchResults.tutor.phoneNumber}</p>
-                            <p>📧 {searchResults.tutor.email}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-600">學歷背景</p>
-                            <p>🏫 {searchResults.tutor.school}</p>
-                            <p>🎓 {searchResults.tutor.major}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-600">教學經驗</p>
-                            <p>{searchResults.tutor.experience}</p>
-                          </div>
-                        </div>
-
-                        <div className="mb-3">
-                          <p className="text-sm text-gray-600 mb-1">教學專長</p>
-                          <p className="text-sm">{searchResults.tutor.expertise}</p>
-                        </div>
-
-                        <div className="mb-3">
-                          <p className="text-sm text-gray-600 mb-2">授課科目</p>
-                          <div className="flex flex-wrap gap-1">
-                           {searchResults.tutor.subjects?.map((subject, index) => (
-                              <Badge key={index} variant="outline" className="text-xs">
-                                {subject}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="mb-3">
-                          <p className="text-sm text-gray-600 mb-1">新案件通知設定</p>
-                          <Badge variant={searchResults.tutor.receiveNewCaseNotifications ? "default" : "secondary"}>
-                            {searchResults.tutor.receiveNewCaseNotifications ? "✅ 接收通知" : "❌ 不接收通知"}
-                          </Badge>
-                        </div>
-
-                          {/* 證件照片 */}
-                          <div className="mt-6">
-                            <p className="text-sm font-medium text-gray-600 mb-4">證件照片</p>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              {/* 身分證照片 */}
-                              {searchResults.tutor.idCardUrl && (
-                                <div>
-                                  <p className="text-sm text-gray-600 mb-2">身分證</p>
-                                  <div className="relative aspect-[3/2] overflow-hidden rounded-lg border">
-                                    <Image
-                                      src={searchResults.tutor.idCardUrl}
-                                      alt="身分證"
-                                      fill
-                                      className="object-cover"
-                                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                                    />
-                                  </div>
-                                </div>
-                              )}
-                              
-                              {/* 學生證照片 */}
-                              {searchResults.tutor.studentIdCardUrl && (
-                                <div>
-                                  <p className="text-sm text-gray-600 mb-2">學生證</p>
-                                  <div className="relative aspect-[3/2] overflow-hidden rounded-lg border">
-                                    <Image
-                                      src={searchResults.tutor.studentIdCardUrl}
-                                      alt="學生證"
-                                      fill
-                                      className="object-cover"
-                                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                                    />
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
+              {searchResults.tutor && (
+                <DashboardSection title="教師搜尋結果" subtitle="教師資料維持原本審核欄位，但用新的儀表板版型呈現。">
+                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]">
+                    <div className="rounded-[1.5rem] border border-brand-100 bg-[#fffdf8] p-5">
+                      <div className="text-2xl font-semibold text-brand-900">{searchResults.tutor.name}</div>
+                      <div className="mt-3 grid gap-3 md:grid-cols-2">
+                        <SummaryBlock label="聯絡方式" value={`${searchResults.tutor.phoneNumber}\n${searchResults.tutor.email}`} />
+                        <SummaryBlock label="教學背景" value={`${searchResults.tutor.school}\n${searchResults.tutor.major}`} />
+                        <SummaryBlock label="授課科目" value={searchResults.tutor.subjects.join('、')} />
+                        <SummaryBlock label="教學經驗" value={searchResults.tutor.experience} />
                       </div>
-                   ) : (
-                     <p className="text-center text-gray-500 py-8">找不到符合的教師資料</p>
-                   )}
-                  </CardContent>
-                </Card>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1">
+                      {searchResults.tutor.idCardUrl && (
+                        <div className="overflow-hidden rounded-[1.5rem] border border-brand-100 bg-white">
+                          <Image src={searchResults.tutor.idCardUrl} alt="身分證" width={640} height={420} className="w-full object-cover" />
+                        </div>
+                      )}
+                      {searchResults.tutor.studentIdCardUrl && (
+                        <div className="overflow-hidden rounded-[1.5rem] border border-brand-100 bg-white">
+                          <Image src={searchResults.tutor.studentIdCardUrl} alt="學生證" width={640} height={420} className="w-full object-cover" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </DashboardSection>
               )}
 
-            {searchResults.case !== null && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    📚 案件搜尋結果
-                    <Badge>{searchResults.case ? '找到' : '無'}</Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {searchResults.case ? (
-                    <div className="grid gap-4">
-                      <div className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                        <div className="flex justify-between items-start mb-3">
-                          <h3 className="font-bold text-lg text-purple-600">
-                            案件編號：{searchResults.case.caseNumber}
-                          </h3>
-                          <Badge variant="secondary" className="bg-green-100 text-green-800">
-                            ✅ 已審核
-                          </Badge>
+              {searchResults.case && (() => {
+                const normalizedCase = normalizeCase(searchResults.case)
+                return (
+                  <DashboardSection title="案件搜尋結果" subtitle="支援新的 budgetRange、地址摘要與補件連結流程，也能更新案件狀態。">
+                    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
+                      <div className="space-y-4 rounded-[1.5rem] border border-brand-100 bg-[#fffdf8] p-5">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <Badge className="bg-brand-100 text-brand-800">案件編號 {searchResults.case.caseNumber}</Badge>
+                          <Badge className={statusStyles[searchResults.case.status]}>{searchResults.case.status}</Badge>
+                          <DocumentStatusBadge status={normalizedCase.documentStatus} />
                         </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
-                          <div>
-                            <p className="text-sm text-gray-600">家長資訊</p>
-                            <p>👤 {searchResults.case.parentName}</p>
-                            <p>📞 {searchResults.case.parentPhone}</p>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <SummaryBlock label="家長資訊" value={`${searchResults.case.parentName}\n${searchResults.case.parentPhone}`} />
+                          <SummaryBlock label="課程資訊" value={`${searchResults.case.subject}\n${normalizedCase.budgetRange}`} />
+                          <SummaryBlock label="地址" value={normalizedCase.location || '未填寫'} />
+                          <SummaryBlock label="可上課時間" value={searchResults.case.availableTime} />
+                        </div>
+                        <SummaryBlock label="學生狀況" value={searchResults.case.studentDescription} />
+                        <SummaryBlock label="教師要求" value={searchResults.case.teacherRequirements || '未特別指定'} />
+                        {searchResults.case.idCardUrl && (
+                          <div className="overflow-hidden rounded-[1.5rem] border border-brand-100 bg-white">
+                            <Image src={searchResults.case.idCardUrl} alt="身分證照片" width={720} height={420} className="w-full object-cover" />
                           </div>
-                          <div>
-                            <p className="text-sm text-gray-600">課程資訊</p>
-                            <p>📖 {searchResults.case.subject}</p>
-                            <p>💰 時薪 ${searchResults.case.hourlyFee}</p>
-                          </div>
-                        </div>
+                        )}
+                      </div>
 
-                        <div className="mb-3">
-                          <p className="text-sm text-gray-600">上課地點</p>
-                          <p>📍 {searchResults.case.location}</p>
-                        </div>
-
-                        <div className="mb-3">
-                          <p className="text-sm text-gray-600">可上課時間</p>
-                          <p>⏰ {searchResults.case.availableTime}</p>
-                        </div>
-
-                        {/* 案件狀態顯示和修改 */}
-                        <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                          <div className="mb-3">
-                            <p className="text-sm font-medium text-gray-700 mb-2">案件狀態</p>
-                            {searchResults.case.status && (() => {
-                              const statusStyle = getStatusBadgeStyle(searchResults.case.status);
-                              return (
-                                <Badge 
-                                  variant={statusStyle.variant}
-                                  className={statusStyle.className}
-                                >
-                                  {statusStyle.icon} {searchResults.case.status}
-                                </Badge>
-                              );
-                            })()}
-                          </div>
-                          
-                          {/* 狀態更新控制項 */}
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
-                            <div className="md:col-span-2">
-                              <label className="block text-xs text-gray-600 mb-1">更新狀態</label>
-                              <Select 
-                                value={selectedStatus} 
-                                onValueChange={(value) => setSelectedStatus(value as '急徵' | '已徵到' | '有人接洽' | '')}
-                                disabled={updatingStatus}
-                              >
-                                <SelectTrigger className="h-8">
-                                  <SelectValue placeholder="選擇新狀態..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="急徵">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-red-500">🚨</span>
-                                      急徵
-                                    </div>
-                                  </SelectItem>
-                                  <SelectItem value="有人接洽">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-yellow-500">💬</span>
-                                      有人接洽
-                                    </div>
-                                  </SelectItem>
-                                  <SelectItem value="已徵到">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-green-500">✅</span>
-                                      已徵到
-                                    </div>
-                                  </SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <Button 
-                              size="sm"
-                              onClick={() => {
-                                if (selectedStatus && searchResults.case) {
-                                  handleCaseStatusUpdate(
-                                    searchResults.case.docId, 
-                                    selectedStatus as '急徵' | '已徵到' | '有人接洽'
-                                  );
-                                }
-                              }}
-                              disabled={!selectedStatus || updatingStatus}
-                              className="h-8"
-                            >
-                              {updatingStatus ? (
-                                <div className="flex items-center gap-1">
-                                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                                  更新中...
-                                </div>
-                              ) : (
-                                '🔄 更新'
-                              )}
+                      <div className="space-y-4">
+                        <div className="rounded-[1.5rem] border border-brand-100 bg-white p-5 shadow-[0_14px_40px_rgba(67,102,78,0.06)]">
+                          <div className="text-sm font-semibold tracking-[0.22em] text-brand-500">案件狀態</div>
+                          <div className="mt-4 grid gap-3">
+                            <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value as typeof selectedStatus)}>
+                              <SelectTrigger className="h-11 rounded-2xl border-brand-200 bg-[#fffdf8]">
+                                <SelectValue placeholder="選擇新狀態" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="急徵">急徵</SelectItem>
+                                <SelectItem value="有人接洽">有人接洽</SelectItem>
+                                <SelectItem value="已徵到">已徵到</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Button className="rounded-full bg-brand-500 text-white hover:bg-brand-600" onClick={() => selectedStatus && handleCaseStatusUpdate(searchResults.case!.docId, selectedStatus)} disabled={!selectedStatus || updatingStatus}>
+                              {updatingStatus ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                              更新案件狀態
                             </Button>
                           </div>
                         </div>
 
-                        {searchResults.case.teacherRequirements && (
-                          <div className="mb-3">
-                            <p className="text-sm text-gray-600">教師要求</p>
-                            <p className="text-sm bg-yellow-50 p-2 rounded border-l-4 border-yellow-400">
-                              {searchResults.case.teacherRequirements}
-                            </p>
+                        <div className="rounded-[1.5rem] border border-brand-100 bg-white p-5 shadow-[0_14px_40px_rgba(67,102,78,0.06)]">
+                          <div className="text-sm font-semibold tracking-[0.22em] text-brand-500">補件狀態</div>
+                          <div className="mt-3 flex items-center gap-3">
+                            <DocumentStatusBadge status={normalizedCase.documentStatus} />
+                            {searchResults.case.documentRequestExpiresAt && <span className="text-xs text-neutral-500">到期：{new Date(searchResults.case.documentRequestExpiresAt).toLocaleString('zh-TW')}</span>}
                           </div>
-                        )}
-
-                                                  {searchResults.case.studentDescription && (
-                           <div>
-                             <p className="text-sm text-gray-600">學生狀況</p>
-                             <p className="text-sm bg-blue-50 p-2 rounded border-l-4 border-blue-400">
-                               {searchResults.case.studentDescription}
-                             </p>
-                           </div>
-                          )}
-
-                          {/* 案件相關照片 */}
-                          {searchResults.case.idCardUrl && (
-                            <div className="mt-6">
-                              <p className="text-sm font-medium text-gray-600 mb-4">身分證照片</p>
-                              <div className="max-w-lg">
-                                <div className="relative aspect-[3/2] overflow-hidden rounded-lg border">
-                                  <Image
-                                    src={searchResults.case.idCardUrl}
-                                    alt="身分證"
-                                    fill
-                                    className="object-cover"
-                                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          )}
+                          <div className="mt-4 flex flex-col gap-2">
+                            <CopyableLinkButton
+                              label={normalizedCase.documentStatus === 'requested' ? '重新產生連結' : '產生補件連結'}
+                              onClick={() => handleGenerateDocumentLink(searchResults.case!.docId)}
+                              disabled={generatingLinkId === searchResults.case!.docId}
+                            />
+                            <Button type="button" variant="outline" size="sm" className="rounded-full border-brand-300 bg-white text-brand-800 hover:bg-brand-50" onClick={() => handleGenerateDocumentLink(searchResults.case!.docId)} disabled={generatingLinkId === searchResults.case!.docId}>
+                              <Link2 className="h-4 w-4" />
+                              補件狀態與連結操作
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                   ) : (
-                     <p className="text-center text-gray-500 py-8">找不到符合的案件資料</p>
-                   )}
-                  </CardContent>
-                </Card>
-              )}
+                    </div>
+                  </DashboardSection>
+                )
+              })()}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  )
+}
 
-            {/* 無搜尋結果 */}
-            {!searching && 
-             searchResults.tutor === null && 
-             searchResults.case === null && 
-             (tutorCode || caseNumber) && (
-              <Card>
-                <CardContent className="text-center py-8">
-                  <div className="text-6xl mb-4">🔍</div>
-                  <h3 className="text-lg font-semibold mb-2">找不到符合條件的資料</h3>
-                  <p className="text-gray-600 mb-4">
-                    請嘗試調整搜尋條件或關鍵字
-                  </p>
-                  <Button variant="outline" onClick={clearSearch}>
-                    重新搜尋
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </TabsContent>
-      </Tabs>
+function LabelledField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="block space-y-2 text-sm font-medium text-brand-900">
+      <span>{label}</span>
+      {children}
+    </label>
+  )
+}
+
+function SummaryBlock({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[1.2rem] border border-brand-100 bg-white p-4">
+      <div className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-500">{label}</div>
+      <div className="mt-2 whitespace-pre-line text-sm leading-7 text-neutral-700">{value}</div>
     </div>
   )
 }

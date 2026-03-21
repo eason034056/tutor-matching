@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { ApprovedCase } from '@/server/types/index'
+import { normalizeCase } from '@/lib/case-utils'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -162,8 +163,8 @@ export default function TutorCasesClient() {
                       <TableCell className="font-medium text-left">{tutorCase.caseNumber}</TableCell>
                       <TableCell className="text-left">{tutorCase.subject}</TableCell>
                       <TableCell className="w-20 text-left">{tutorCase.grade}</TableCell>
-                      <TableCell className="text-left">${tutorCase.hourlyFee}</TableCell>
-                      <TableCell className="w-20 text-left">{tutorCase.location}</TableCell>
+                      <TableCell className="text-left">{normalizeCase(tutorCase).budgetRange}</TableCell>
+                      <TableCell className="w-20 text-left">{normalizeCase(tutorCase).location}</TableCell>
                       <TableCell className="text-left">{tutorCase.availableTime}</TableCell>
                       <TableCell className="text-left">{tutorCase.teacherRequirements}</TableCell>
                       <TableCell className="text-left">{tutorCase.studentDescription}</TableCell>

@@ -29,9 +29,16 @@ export const DOCUMENT_STATUS_META: Record<
   submitted: { label: '已完成', tone: 'success' },
 }
 
-export const normalizeBudgetRange = (budgetRange?: string | null, hourlyFee?: number | null) => {
+export const normalizeBudgetRange = (
+  budgetRange?: string | null,
+  hourlyFee?: string | number | null
+) => {
   if (budgetRange?.trim()) {
     return budgetRange.trim()
+  }
+
+  if (typeof hourlyFee === 'string' && hourlyFee.trim()) {
+    return hourlyFee.trim()
   }
 
   if (typeof hourlyFee === 'number' && Number.isFinite(hourlyFee)) {

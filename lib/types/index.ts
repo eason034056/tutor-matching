@@ -49,7 +49,7 @@ export interface TutorCase {
     region: string;
     availableTime: string;
     teacherRequirements?: string;
-    hourlyFee?: number;
+    hourlyFee?: number | string;
     budgetRange?: string;
     message?: string;
     status: '急徵' | '已徵到' | '有人接洽';
@@ -72,7 +72,7 @@ export interface ApprovedCase {
     availableTime: string;
     studentDescription: string;
     teacherRequirements?: string;
-    hourlyFee?: number;
+    hourlyFee?: number | string;
     budgetRange?: string;
     status: '急徵' | '已徵到' | '有人接洽';
     approvedAt: string;

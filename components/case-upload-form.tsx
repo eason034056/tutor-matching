@@ -29,7 +29,6 @@ import TermsDialog from '@/components/TermsDialog'
 import { buildLocationSummary, isRoadNameValid } from '@/lib/address-utils'
 import { budgetRangeOptions, gradeOptions, schedulePresetOptions, subjectOptions } from '@/lib/case-form-options'
 import { cn } from '@/lib/utils'
-import { sendWebhookNotification } from '@/webhook-config'
 
 type SubmitStatus = 'idle' | 'success' | 'error'
 type StepKey = 'matching' | 'student' | 'contact'
@@ -569,7 +568,7 @@ export default function CaseUploadForm() {
         region: formData.lessonMode === 'online' ? onlineOption : formData.city,
         availableTime: availableTimeSummary,
         teacherRequirements: formData.teacherRequirements.trim(),
-        budgetRange: formData.budgetRange,
+        hourlyFee: formData.budgetRange,
         message: formData.message.trim(),
         status: '急徵',
         pending: 'pending',
@@ -591,7 +590,6 @@ export default function CaseUploadForm() {
       queueScrollToTop()
       setSubmitStatus('success')
       setSubmitMessage('已收到需求，我們將盡快安排家教老師與您聯繫。')
-      await sendWebhookNotification('new_case', caseData)
       resetForm()
     } catch (error) {
       console.error('送出需求失敗:', error)

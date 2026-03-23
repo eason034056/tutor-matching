@@ -30,8 +30,8 @@ export default function TutorRegistrationPage() {
             <h1 className="mt-5 font-display text-[2.2rem] leading-[1.04] text-brand-900 sm:text-5xl lg:text-[3.65rem]">
               完成教師登錄，開始接到適合你的家教案件
             </h1>
-            <p className="mt-5 max-w-2xl text-base leading-8 text-neutral-600 sm:text-lg">
-              這份表單為 mobile-first 設計，先填基本資料與教學背景，再上傳學生證與身分證。每張證件選檔後會立即上傳，失敗可單張重試。
+            <p className="mt-5 text-base leading-8 text-neutral-600 sm:text-lg">
+              親愛的家教老師您好，歡迎加入青椒老師家教中心！請按照以下步驟完成註冊流程。若有需要，隨時可聯繫我們協助您順利完成註冊。
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">

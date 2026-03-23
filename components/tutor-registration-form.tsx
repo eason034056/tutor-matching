@@ -1,990 +1,475 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
-import * as z from "zod"
+import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle2, Loader2, RefreshCcw, UserCheck } from "lucide-react"
+
+import BasicInfoStep from "@/components/tutor-registration/basic-info-step"
+import DocumentsStep from "@/components/tutor-registration/documents-step"
+import TeachingProfileStep from "@/components/tutor-registration/teaching-profile-step"
+import { useTutorDocumentUpload } from "@/components/tutor-registration/use-tutor-document-upload"
 import { Button } from "@/components/ui/button"
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
-import { Checkbox } from "@/components/ui/checkbox"
-import { toast } from "sonner"
-import { processImageComplete } from "@/lib/imageUtils";
-import Image from 'next/image'
-import { XCircle, AlertCircle, Loader2, GraduationCap, Clock, ArrowRight, UserCheck, FileText, CheckCircle, CreditCard } from 'lucide-react'
-import { useRouter } from "next/navigation";
-import { sendWebhookNotification } from "@/webhook-config";
-import TermsDialog from "@/components/TermsDialog"
+import { Form } from "@/components/ui/form"
+import {
+  type TutorDocumentUploadSlot,
+  type TutorDocumentUploadSlots,
+} from "@/lib/tutor-document-upload"
+import {
+  createTutorFormDefaults,
+  createTutorFormSchema,
+  normalizeTutorSubjects,
+  type TutorFormSeed,
+  type TutorFormValues,
+} from "@/lib/tutor-form"
+import { sendWebhookNotification } from "@/webhook-config"
 
-// 定義表單驗證規則
-const formSchema = z.object({
-  name: z.string()
-    .min(2, { message: "姓名至少需要2個字" })
-    .max(50, { message: "姓名不能超過50個字" }),
-  email: z.string()
-    .email({ message: "請輸入有效的電子郵件格式" })
-    .min(1, { message: "請輸入電子郵件" }),
-  phoneNumber: z.string()
-    .min(10, { message: "請輸入有效的手機號碼（10位數字）" })
-    .max(15, { message: "電話號碼不能超過15位數字" })
-    .regex(/^[0-9-+\s()]*$/, { message: "手機號碼只能包含數字" }),
-  subjects: z.string()
-    .min(1, { message: "請輸入教學科目" })
-    .max(200, { message: "教學科目不能超過200個字" }),
-  experience: z.string()
-    .min(1, { message: "請輸入教學經驗" })
-    .max(500, { message: "教學經驗描述不能超過500個字" }),
-  school: z.string()
-    .min(1, { message: "請輸入就讀學校" })
-    .max(100, { message: "學校名稱不能超過100個字" }),
-  major: z.string()
-    .min(1, { message: "請輸入主修科系" })
-    .max(100, { message: "主修科系不能超過100個字" }),
-  expertise: z.string()
-    .min(1, { message: "請輸入專長" })
-    .max(300, { message: "專長描述不能超過300個字" }),
-  receiveNewCaseNotifications: z.boolean().default(true),
-  agreedToTerms: z.boolean().refine((val) => val === true, {
-    message: "請閱讀並同意服務條款"
-  }),
-  studentIdCard: z.any()
-    .refine((files) => {
-      if (!files || files.length === 0) return false;
-      const file = files[0];
-      // 🔧 修復：只檢查檔案類型，大小由 processImageComplete 自動處理
-      // 檢查檔案類型 - 支援所有圖片格式
-      if (file && !file.type.startsWith('image/')) return false;
-      return true;
-    }, "請上傳學生證照片（支援所有圖片格式，系統會自動壓縮大檔案）"),
-  idCard: z.any()
-    .refine((files) => {
-      if (!files || files.length === 0) return false;
-      const file = files[0];
-      // 🔧 修復：只檢查檔案類型，大小由 processImageComplete 自動處理
-      // 檢查檔案類型 - 支援所有圖片格式
-      if (file && !file.type.startsWith('image/')) return false;
-      return true;
-    }, "請上傳身分證照片（支援所有圖片格式，系統會自動壓縮大檔案）"),
-})
+type TutorRegistrationFormProps = {
+  mode?: "registration" | "resubmission"
+  resubmissionToken?: string
+  phoneTail?: string
+  initialValues?: TutorFormSeed & { tutorCode?: string }
+  existingDocuments?: {
+    studentIdCardUrl?: string
+    idCardUrl?: string
+  }
+}
 
-export default function TutorRegistrationForm() {
+type StepConfig = {
+  key: "basic" | "teaching" | "documents"
+  title: string
+  subtitle: string
+  fields: Array<keyof TutorFormValues>
+}
+
+const stepConfigs: StepConfig[] = [
+  {
+    key: "basic",
+    title: "基本資料",
+    subtitle: "姓名、Email、電話",
+    fields: ["name", "email", "phoneNumber"],
+  },
+  {
+    key: "teaching",
+    title: "教學背景",
+    subtitle: "科目、經驗、學校與專長",
+    fields: ["subjects", "experience", "school", "major", "expertise"],
+  },
+  {
+    key: "documents",
+    title: "證件與送出",
+    subtitle: "上傳學生證、身分證並送審",
+    fields: ["agreedToTerms"],
+  },
+]
+
+const uploadStateLabel: Record<TutorDocumentUploadSlot["state"], string> = {
+  idle: "未上傳",
+  processing: "處理中",
+  uploading: "上傳中",
+  uploaded: "完成",
+  failed: "失敗",
+}
+
+const readJsonResponse = async (response: Response) => {
+  const contentType = response.headers.get("content-type") || ""
+  if (!contentType.includes("application/json")) {
+    const text = await response.text()
+    throw new Error(text || "伺服器回應格式錯誤")
+  }
+
+  return response.json()
+}
+
+const buildStepClassName = (index: number, currentStep: number) => {
+  if (index < currentStep) {
+    return "border-brand-500 bg-brand-500 text-white shadow-[0_12px_30px_rgba(66,122,91,0.2)]"
+  }
+
+  if (index === currentStep) {
+    return "border-brand-300 bg-white text-brand-800 shadow-[0_10px_24px_rgba(66,122,91,0.08)]"
+  }
+
+  return "border-brand-100 bg-[#f4efe3]/80 text-neutral-500"
+}
+
+const getSummaryValue = (value: string) => {
+  const normalized = value.trim()
+  return normalized || "尚未填寫"
+}
+
+const getUploadSummary = (slots: TutorDocumentUploadSlots) => {
+  const student = uploadStateLabel[slots.studentIdCard.state]
+  const idCard = uploadStateLabel[slots.idCard.state]
+  return `學生證 ${student} / 身分證 ${idCard}`
+}
+
+export default function TutorRegistrationForm({
+  mode = "registration",
+  resubmissionToken,
+  phoneTail,
+  initialValues,
+  existingDocuments,
+}: TutorRegistrationFormProps) {
+  const isResubmission = mode === "resubmission"
+  const router = useRouter()
+  const stepTopRef = useRef<HTMLDivElement | null>(null)
+  const successCardRef = useRef<HTMLDivElement | null>(null)
+
+  const [currentStep, setCurrentStep] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle')
-  const [submitMessage, setSubmitMessage] = useState('')
-  const [tutorCode, setTutorCode] = useState('')
-  const [previews, setPreviews] = useState({
-    studentIdCard: '',
-    idCard: ''
-  })
-  // 檔案上傳錯誤狀態
-  const [fileErrors, setFileErrors] = useState({
-    studentIdCard: '',
-    idCard: ''
-  })
-  const [fileInfos, setFileInfos] = useState({
-    studentIdCard: '',
-    idCard: ''
-  })
-  // 壓縮進度狀態
-  const [isCompressing, setIsCompressing] = useState({
-    studentIdCard: false,
-    idCard: false
+  const [submitStatus, setSubmitStatus] = useState<"idle" | "success" | "error">("idle")
+  const [submitMessage, setSubmitMessage] = useState("")
+  const [tutorCode, setTutorCode] = useState(initialValues?.tutorCode || "")
+
+  const schema = useMemo(
+    () =>
+      createTutorFormSchema({
+        requireStudentIdCard: false,
+        requireIdCard: false,
+        requireTerms: !isResubmission,
+      }),
+    [isResubmission]
+  )
+
+  const form = useForm<TutorFormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: createTutorFormDefaults(initialValues, !isResubmission),
   })
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: "",
-      email: "",
-      phoneNumber: "",
-      subjects: "",
-      experience: "",
-      school: "",
-      major: "",
-      expertise: "",
-      receiveNewCaseNotifications: true,
-      agreedToTerms: false,
-    },
-  })
+  const {
+    slots,
+    isAnyUploading,
+    selectFile,
+    retryUpload,
+    resetUploads,
+    getSubmissionDocumentUrls,
+  } = useTutorDocumentUpload(existingDocuments)
 
-  const router = useRouter();
+  useEffect(() => {
+    form.reset(createTutorFormDefaults(initialValues, !isResubmission))
+    setTutorCode(initialValues?.tutorCode || "")
+    setCurrentStep(0)
+  }, [form, initialValues, isResubmission])
 
-  const handleImagePreview = async (
-    file: File, 
-    type: 'studentIdCard' | 'idCard'
+  useEffect(() => {
+    if (submitStatus !== "success") return
+
+    const timer = window.setTimeout(() => {
+      successCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    }, 0)
+
+    return () => window.clearTimeout(timer)
+  }, [submitStatus])
+
+  const submitRegistration = async (
+    values: TutorFormValues,
+    documentUrls: { studentIdCardUrl: string; idCardUrl: string }
   ) => {
-    try {
-      const originalSizeInMB = (file.size / (1024 * 1024)).toFixed(1)
-      console.log(`檔案資訊: 名稱=${file.name}, 大小=${originalSizeInMB}MB, 類型=${file.type}, 上傳類型=${type}`)
-
-      // 檢查檔案類型 - 支援所有圖片格式
-      if (!file.type.startsWith('image/')) {
-        // 設置UI錯誤訊息
-        setFileErrors(prev => ({
-          ...prev,
-          [type]: `不支援的檔案格式！您選擇的是：${file.type}，請選擇圖片格式`
-        }))
-        setFileInfos(prev => ({ ...prev, [type]: '' }))
-        setPreviews(prev => ({ ...prev, [type]: '' }))
-        
-        toast.error('不支援的檔案格式！請選擇圖片檔案')
-        return
-      }
-
-      // 清除之前的錯誤訊息
-      setFileErrors(prev => ({ ...prev, [type]: '' }))
-      
-      // 🔧 修復：使用新的 processImageComplete 函數進行完整處理
-      // 顯示處理進度
-      setIsCompressing(prev => ({ ...prev, [type]: true }))
-      setFileInfos(prev => ({ 
-        ...prev, 
-        [type]: `🔄 正在處理圖片 (${originalSizeInMB}MB)...`
-      }))
-      
-      toast.info(`📦 正在處理${type === 'studentIdCard' ? '學生證' : '身分證'}圖片，請稍候...`)
-      
-      try {
-        // 完整處理圖片（壓縮 + 浮水印 + 二次壓縮）
-        const processedFile = await processImageComplete(file, 5)
-        const finalSizeInMB = (processedFile.size / (1024 * 1024)).toFixed(1)
-        
-        console.log(`圖片處理完成: ${file.name} -> ${processedFile.name}, ${originalSizeInMB}MB -> ${finalSizeInMB}MB`)
-        
-        // 更新UI狀態
-        if (originalSizeInMB !== finalSizeInMB) {
-          setFileInfos(prev => ({ 
-            ...prev, 
-            [type]: `✅ 處理完成！從 ${originalSizeInMB}MB 優化至 ${finalSizeInMB}MB` 
-          }))
-          toast.success(`🎉 ${type === 'studentIdCard' ? '學生證' : '身分證'}處理成功！從 ${originalSizeInMB}MB 優化至 ${finalSizeInMB}MB`)
-        } else {
-          setFileInfos(prev => ({ 
-            ...prev, 
-            [type]: `✅ 圖片處理完成！大小：${finalSizeInMB}MB`
-          }))
-          toast.success(`🎉 ${type === 'studentIdCard' ? '學生證' : '身分證'}處理完成！大小：${finalSizeInMB}MB`)
-        }
-        
-        // 更新表單數據
-        // 創建一個FileList-like對象來符合表單期望的類型
-        const fileList = Object.assign([processedFile], {
-          item: (index: number) => index === 0 ? processedFile : null,
-          length: 1
-        }) as FileList
-        form.setValue(type, fileList)
-        
-        // 顯示預覽
-        const previewUrl = URL.createObjectURL(processedFile)
-        setPreviews(prev => ({
-          ...prev,
-          [type]: previewUrl
-        }))
-        
-        // 重置提交狀態
-        if (submitStatus !== 'idle') {
-          setSubmitStatus('idle')
-        }
-        
-      } catch (processingError) {
-        console.error('圖片處理失敗:', processingError)
-        setFileErrors(prev => ({ 
-          ...prev, 
-          [type]: '圖片處理失敗！請嘗試選擇其他圖片或確認檔案是否有效' 
-        }))
-        setFileInfos(prev => ({ ...prev, [type]: '' }))
-        setPreviews(prev => ({ ...prev, [type]: '' }))
-        toast.error('圖片處理失敗，請嘗試選擇其他圖片')
-        return
-      } finally {
-        setIsCompressing(prev => ({ ...prev, [type]: false }))
-      }
-      
-    } catch (error) {
-      console.error('圖片預覽失敗:', error)
-      
-      // 設置UI錯誤訊息
-      setFileErrors(prev => ({
-        ...prev,
-        [type]: '圖片處理失敗！請確認檔案是否為有效的圖片格式，或嘗試選擇其他圖片'
-      }))
-      setFileInfos(prev => ({ ...prev, [type]: '' }))
-      setPreviews(prev => ({ ...prev, [type]: '' }))
-      
-      toast.error('預覽圖片失敗，請確認檔案是否為有效的圖片格式')
-    } finally {
-      setIsCompressing(prev => ({ ...prev, [type]: false }))
+    const generatedTutorCode = tutorCode || Math.random().toString(36).slice(2, 8).toUpperCase()
+    const submitData = {
+      name: values.name.trim(),
+      email: values.email.trim(),
+      phoneNumber: values.phoneNumber.trim(),
+      subjects: normalizeTutorSubjects(values.subjects),
+      experience: values.experience.trim(),
+      school: values.school.trim(),
+      major: values.major.trim(),
+      expertise: values.expertise.trim(),
+      receiveNewCaseNotifications: values.receiveNewCaseNotifications,
+      studentIdCardUrl: documentUrls.studentIdCardUrl,
+      idCardUrl: documentUrls.idCardUrl,
+      tutorCode: generatedTutorCode,
+      isActive: false,
+      status: "pending",
+      createdAt: new Date().toISOString(),
     }
+
+    const response = await fetch("/api/tutors/pending", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(submitData),
+    })
+    const data = await readJsonResponse(response)
+
+    if (!response.ok) {
+      throw new Error(data.error || data.details || "提交失敗")
+    }
+
+    setTutorCode(generatedTutorCode)
+    setSubmitMessage(`您的教師編號是 ${generatedTutorCode}，請妥善保存。我們會在 1-2 個工作天內完成審核。`)
+    await sendWebhookNotification("new_tutor", submitData)
   }
 
-  // 上傳圖片到 API - 改善錯誤處理
-  const uploadImage = async (file: File, folder: string, subfolder: string): Promise<string> => {
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('folder', folder)
-    formData.append('subfolder', subfolder)
-
-    try {
-      const response = await fetch('/api/upload-image', {
-        method: 'POST',
-        body: formData,
-      })
-
-      if (!response.ok) {
-        // 檢查回應的Content-Type是否為JSON
-        const contentType = response.headers.get('content-type')
-        if (contentType && contentType.includes('application/json')) {
-          const error = await response.json()
-          throw new Error(error.error || error.details || `圖片上傳失敗 (${response.status})`)
-        } else {
-          // 如果不是JSON，讀取為純文字
-          const errorText = await response.text()
-          console.error('伺服器回傳非JSON格式錯誤:', errorText)
-          
-          // 根據HTTP狀態碼提供更友善的錯誤訊息
-          if (response.status === 413) {
-            throw new Error('圖片檔案太大，請選擇小於5MB的圖片')
-          } else if (response.status === 415) {
-            throw new Error('不支援的圖片格式，請選擇JPG、PNG或WebP格式')
-          } else if (response.status >= 500) {
-            throw new Error('伺服器暫時無法處理請求，請稍後再試')
-          } else {
-            throw new Error(`圖片上傳失敗 (錯誤代碼: ${response.status})`)
-          }
-        }
-      }
-
-      // 檢查成功回應是否為JSON格式
-      const contentType = response.headers.get('content-type')
-      if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('伺服器回應格式錯誤')
-      }
-
-      const result = await response.json()
-      if (!result.url) {
-        throw new Error('伺服器未回傳圖片網址')
-      }
-      
-      return result.url
-    } catch (error) {
-      console.error('圖片上傳詳細錯誤:', error)
-      throw error
+  const submitResubmission = async (
+    values: TutorFormValues,
+    documentUrls: { studentIdCardUrl: string; idCardUrl: string }
+  ) => {
+    if (!resubmissionToken || !phoneTail) {
+      throw new Error("缺少補件驗證資訊")
     }
+
+    const submitData = {
+      phoneTail,
+      name: values.name.trim(),
+      email: values.email.trim(),
+      phoneNumber: values.phoneNumber.trim(),
+      subjects: normalizeTutorSubjects(values.subjects),
+      experience: values.experience.trim(),
+      school: values.school.trim(),
+      major: values.major.trim(),
+      expertise: values.expertise.trim(),
+      receiveNewCaseNotifications: values.receiveNewCaseNotifications,
+      studentIdCardUrl: documentUrls.studentIdCardUrl,
+      idCardUrl: documentUrls.idCardUrl,
+    }
+
+    const response = await fetch(`/api/tutor-resubmission/${resubmissionToken}/submit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(submitData),
+    })
+    const data = await readJsonResponse(response)
+
+    if (!response.ok) {
+      throw new Error(data.error || "重新送審失敗")
+    }
+
+    setSubmitMessage("已收到你更新後的申請資料，我們會重新安排審核。")
   }
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  const onSubmit = async (values: TutorFormValues) => {
     try {
+      if (isAnyUploading) {
+        throw new Error("證件上傳仍在進行中，請等待完成後再送出。")
+      }
+
+      const documentUrls = getSubmissionDocumentUrls()
+      if (!documentUrls) {
+        throw new Error("請完成學生證與身分證上傳後再送出。")
+      }
+
       setIsSubmitting(true)
-      setSubmitStatus('idle')
-      
-      // 處理圖片上傳
-      const uploadImages = async () => {
-        const imageUrls: { studentIdCard: string; idCard: string } = {
-          studentIdCard: '',
-          idCard: ''
-        };
-        
-        if (values.studentIdCard && values.studentIdCard[0]) {
-          console.log('開始上傳學生證...')
-          imageUrls.studentIdCard = await uploadImage(values.studentIdCard[0], 'tutors', 'student-ids')
-          console.log('學生證上傳完成:', imageUrls.studentIdCard)
-        }
-        
-        if (values.idCard && values.idCard[0]) {
-          console.log('開始上傳身分證...')
-          imageUrls.idCard = await uploadImage(values.idCard[0], 'tutors', 'id-cards')
-          console.log('身分證上傳完成:', imageUrls.idCard)
-        }
-        
-        return imageUrls;
-      };
+      setSubmitStatus("idle")
 
-      console.log('開始上傳圖片...')
-      const imageUrls = await uploadImages();
-      console.log('圖片上傳完成:', imageUrls)
-      
-      const generatedTutorCode = Math.random().toString(36).substring(2, 8).toUpperCase()
-      
-      // 準備提交資料
-      const submitData = {
-        ...values,
-        studentIdCardUrl: imageUrls.studentIdCard,
-        idCardUrl: imageUrls.idCard,
-        tutorCode: generatedTutorCode,
-        isActive: false,
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-        subjects: values.subjects.split(' ').map(s => s.trim()),
+      if (isResubmission) {
+        await submitResubmission(values, documentUrls)
+      } else {
+        await submitRegistration(values, documentUrls)
       }
 
-      console.log('準備提交資料:', submitData)
-      
-      // 提交表單資料 - 改善錯誤處理
-      const response = await fetch('/api/tutors/pending', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(submitData),
-      });
-      
-      let data;
-      try {
-        // 檢查回應的Content-Type是否為JSON
-        const contentType = response.headers.get('content-type')
-        if (contentType && contentType.includes('application/json')) {
-          data = await response.json()
-          console.log('API Response:', data)
-        } else {
-          // 如果不是JSON，讀取為純文字並拋出錯誤
-          const errorText = await response.text()
-          console.error('伺服器回傳非JSON格式:', errorText)
-          throw new Error('伺服器回應格式錯誤，請稍後再試')
-        }
-      } catch (jsonError) {
-        console.error('JSON解析錯誤:', jsonError)
-        throw new Error('伺服器回應解析失敗，請稍後再試')
-      }
-
-      if (!response.ok) {
-        const errorMessage = data?.error || data?.details || `提交失敗 (錯誤代碼: ${response.status})`
-        throw new Error(errorMessage)
-      }
-
-      // 成功狀態
-      setSubmitStatus('success')
-      setTutorCode(generatedTutorCode)
-      setSubmitMessage(`您的教師編號是 ${generatedTutorCode}，請妥善保存。我們會在 1-2 個工作天內完成審核。`)
-
-      // 觸發 n8n webhook 發送管理員通知
-      await sendWebhookNotification('new_tutor', submitData)
-
+      setSubmitStatus("success")
     } catch (error) {
-      console.error('提交失敗:', error)
-      setSubmitStatus('error')
-      setSubmitMessage(error instanceof Error ? error.message : '提交失敗，請稍後再試')
+      setSubmitStatus("error")
+      setSubmitMessage(error instanceof Error ? error.message : "提交失敗，請稍後再試")
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  useEffect(() => {
-    return () => {
-      URL.revokeObjectURL(previews.studentIdCard)
-      URL.revokeObjectURL(previews.idCard)
-    }
-  }, [previews])
-
-  // 處理重置表單
-  const handleReset = () => {
-    form.reset({
-      name: "",
-      email: "",
-      phoneNumber: "",
-      subjects: "",
-      experience: "",
-      school: "",
-      major: "",
-      expertise: "",
-      receiveNewCaseNotifications: true,
-      agreedToTerms: false, // 重置條款同意狀態
-    })
-    setPreviews({
-      studentIdCard: '',
-      idCard: ''
-    })
-    setFileErrors({
-      studentIdCard: '',
-      idCard: ''
-    })
-    setFileInfos({
-      studentIdCard: '',
-      idCard: ''
-    })
-    setIsCompressing({
-      studentIdCard: false,
-      idCard: false
-    })
-    setSubmitStatus('idle')
+  const scrollToStepTop = () => {
+    if (!stepTopRef.current) return
+    stepTopRef.current.scrollIntoView({ behavior: "smooth", block: "start" })
   }
 
-  // 如果提交成功，顯示成功頁面
-  if (submitStatus === 'success') {
+  const goPrev = () => {
+    if (currentStep === 0 || isSubmitting) return
+    setCurrentStep((step) => Math.max(step - 1, 0))
+    scrollToStepTop()
+  }
+
+  const goNext = async () => {
+    if (currentStep >= stepConfigs.length - 1 || isSubmitting) return
+    const fieldsToValidate = stepConfigs[currentStep].fields
+    const isValid = await form.trigger(fieldsToValidate, { shouldFocus: true })
+    if (!isValid) return
+
+    setCurrentStep((step) => Math.min(step + 1, stepConfigs.length - 1))
+    scrollToStepTop()
+  }
+
+  const resetRegistrationForm = () => {
+    form.reset(createTutorFormDefaults(undefined, !isResubmission))
+    resetUploads()
+    setCurrentStep(0)
+    setSubmitStatus("idle")
+    setSubmitMessage("")
+    if (!isResubmission) {
+      setTutorCode("")
+    }
+  }
+
+  const values = form.watch()
+  const currentStepConfig = stepConfigs[currentStep]
+  const isFinalStep = currentStep === stepConfigs.length - 1
+  const hasCompletedDocumentUploads = Boolean(getSubmissionDocumentUrls())
+  const canSubmit = !isSubmitting && !isAnyUploading && hasCompletedDocumentUploads
+
+  if (submitStatus === "success") {
     return (
-      <div className="min-h-[600px] flex items-center justify-center p-4">
-        <div className="max-w-md mx-auto text-center">
-          <div className="animate-bounce mb-6">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-4">
-              <UserCheck className="w-12 h-12 text-green-600" />
-            </div>
-          </div>
-          
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            註冊成功！
-          </h2>
-          
-          <div className="bg-green-50 border border-green-200 rounded-xl p-6 mb-6">
-            <div className="flex items-start space-x-3">
-              <GraduationCap className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-              <div className="text-left">
-                <p className="text-green-800 font-medium mb-2">歡迎加入我們的教師團隊</p>
-                <p className="text-green-700 text-sm leading-relaxed">
-                  {submitMessage}
-                </p>
-              </div>
-            </div>
-          </div>
+      <div
+        ref={successCardRef}
+        className="scroll-mt-28 rounded-[2rem] border border-brand-100 bg-white/95 p-6 text-center shadow-[0_24px_70px_rgba(67,102,78,0.08)] md:scroll-mt-32 md:p-8"
+      >
+        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-brand-100 text-brand-700">
+          {isResubmission ? <RefreshCcw className="h-10 w-10" /> : <UserCheck className="h-10 w-10" />}
+        </div>
+        <h2 className="mt-6 font-display text-3xl text-brand-900 md:text-4xl">
+          {isResubmission ? "重新送審成功" : "註冊成功"}
+        </h2>
+        <p className="mt-4 text-base leading-8 text-neutral-600">{submitMessage}</p>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
-            <div className="text-center">
-              <p className="text-blue-800 font-semibold mb-2">您的教師編號</p>
-              <div className="bg-white border border-blue-200 rounded-lg px-4 py-3">
-                <span className="text-2xl font-mono font-bold text-blue-600 tracking-wider">
-                  {tutorCode}
-                </span>
-              </div>
-              <p className="text-blue-600 text-xs mt-2">請截圖保存此編號</p>
-            </div>
+        {tutorCode ? (
+          <div className="mx-auto mt-6 max-w-sm rounded-[1.4rem] border border-brand-100 bg-[#f8f5ea] px-4 py-5">
+            <div className="text-sm font-semibold tracking-[0.22em] text-brand-500">教師編號</div>
+            <div className="mt-3 text-3xl font-semibold tracking-[0.24em] text-brand-900">{tutorCode}</div>
           </div>
+        ) : null}
 
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
-            <div className="flex items-center justify-center space-x-2 text-amber-700">
-              <Clock className="w-4 h-4" />
-              <span className="text-sm font-medium">預計審核時間：1-2 個工作天</span>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <Button 
-              onClick={handleReset}
-              className="w-full bg-brand-500 hover:bg-brand-600 text-white"
-            >
-              <ArrowRight className="w-4 h-4 mr-2" />
-              註冊新教師
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+          {!isResubmission ? (
+            <Button className="rounded-full bg-brand-500 text-white hover:bg-brand-600" onClick={resetRegistrationForm}>
+              再登錄一位教師
             </Button>
-            
-            <Button 
-              onClick={() => router.push('/')}
-              variant="outline"
-              className="w-full"
-            >
-              返回首頁
-            </Button>
-          </div>
+          ) : null}
+          <Button
+            variant="outline"
+            className="rounded-full border-brand-300 bg-white text-brand-800 hover:bg-brand-50"
+            onClick={() => router.push("/")}
+          >
+            返回首頁
+          </Button>
         </div>
       </div>
     )
   }
 
-  // 如果提交失敗，顯示錯誤狀態
-  if (submitStatus === 'error') {
+  if (submitStatus === "error") {
     return (
-      <div className="min-h-[600px] flex items-center justify-center p-4">
-        <div className="max-w-md mx-auto text-center">
-          <div className="animate-pulse mb-6">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-red-100 rounded-full mb-4">
-              <XCircle className="w-12 h-12 text-red-600" />
-            </div>
-          </div>
-          
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            註冊失敗
-          </h2>
-          
-          <div className="bg-red-50 border border-red-200 rounded-xl p-6 mb-6">
-            <div className="flex items-start space-x-3">
-              <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
-              <div className="text-left">
-                <p className="text-red-800 font-medium mb-2">註冊過程中發生錯誤</p>
-                <p className="text-red-700 text-sm leading-relaxed">
-                  {submitMessage}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <Button 
-              onClick={() => setSubmitStatus('idle')}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              <ArrowRight className="w-4 h-4 mr-2" />
-              重新填寫表單
-            </Button>
-          </div>
+      <div className="rounded-[2rem] border border-red-200 bg-white/95 p-6 text-center shadow-[0_24px_70px_rgba(120,53,15,0.08)] md:p-8">
+        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-red-100 text-red-700">
+          <AlertCircle className="h-10 w-10" />
         </div>
+        <h2 className="mt-6 font-display text-3xl text-neutral-900 md:text-4xl">送出失敗</h2>
+        <p className="mt-4 text-base leading-8 text-neutral-600">{submitMessage}</p>
+        <Button className="mt-8 rounded-full bg-brand-500 text-white hover:bg-brand-600" onClick={() => setSubmitStatus("idle")}>
+          返回表單
+        </Button>
       </div>
     )
   }
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>姓名</FormLabel>
-              <FormControl>
-                <Input {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        
-        <FormField
-          control={form.control}
-          name="email"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>電子郵件</FormLabel>
-              <FormControl>
-                <Input {...field} type="email" placeholder="例如：your.name@email.com" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+    <div ref={stepTopRef} className="space-y-5">
+      <div className="rounded-[1.9rem] border border-brand-100 bg-[linear-gradient(145deg,rgba(255,255,255,0.96),rgba(245,250,242,0.92))] p-5 shadow-[0_24px_70px_rgba(67,102,78,0.08)] md:p-6">
+        <p className="text-xs font-semibold tracking-[0.26em] text-brand-500">
+          {isResubmission ? "TUTOR RESUBMISSION" : "TUTOR REGISTRATION"}
+        </p>
+        <h2 className="mt-3 font-display text-2xl text-brand-900 md:text-3xl">
+          {isResubmission ? "更新資料後重新送審" : "三步完成教師登錄"}
+        </h2>
+        <p className="mt-2 text-sm leading-7 text-neutral-600">
+          {isResubmission
+            ? "你可以沿用原本證件，也可以替換其中任一張。每次選檔會立即上傳並回報狀態。"
+            : "表單採 mobile-first 流程，每一步都會先驗證，避免最後一次送出才發現錯誤。"}
+        </p>
 
-        <FormField
-          control={form.control}
-          name="phoneNumber"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>電話號碼</FormLabel>
-              <FormControl>
-                <Input {...field} placeholder="例如：0912345678 或 02-12345678" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="subjects"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>可教授科目</FormLabel>
-              <FormControl>
-                <Input {...field} placeholder="請用空格分隔多個科目，例如：國文 國中英文 國中數學 高中數學" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="experience"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>教學經驗</FormLabel>
-              <FormControl>
-                <Input {...field} placeholder="例如：5年補教經驗，曾任職補習班講師"/>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="school"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>就讀學校</FormLabel>
-              <FormControl>
-                <Input {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="major"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>主修科系</FormLabel>
-              <FormControl>
-                <Input {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="expertise"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>專長</FormLabel>
-              <FormControl>
-                <Input {...field} placeholder="例如：高中數學、大學微積分"/>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="receiveNewCaseNotifications"
-          render={({ field }) => (
-            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 bg-blue-50/50">
-              <FormControl>
-                <Checkbox
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                />
-              </FormControl>
-              <div className="space-y-1 leading-none">
-                <FormLabel className="text-sm font-medium">
-                  📧 接收新案件通知
-                </FormLabel>
-                <p className="text-xs text-muted-foreground">
-                  當有新的家教案件審核通過時，我願意透過電子郵件接收通知
-                </p>
-              </div>
-            </FormItem>
-          )}
-        />
-
-        <div className="space-y-6">
-          <div className="flex items-center space-x-3 mb-6">
-            <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-              <FileText className="w-5 h-5 text-emerald-600" />
+        <div className="mt-5 grid grid-cols-3 gap-2">
+          {stepConfigs.map((step, index) => (
+            <div key={step.key} className={`rounded-[1.2rem] px-3 py-3 text-center ${buildStepClassName(index, currentStep)}`}>
+              <div className="text-xs font-semibold tracking-[0.16em]">步驟 {index + 1}</div>
+              <div className="mt-1 text-sm font-semibold">{step.title}</div>
             </div>
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">證件上傳</h2>
-              <p className="text-sm text-gray-500">請上傳清晰的證件照片，系統會自動加上浮水印保護</p>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+            {currentStep === 0 ? <BasicInfoStep form={form} /> : null}
+            {currentStep === 1 ? <TeachingProfileStep form={form} /> : null}
+            {currentStep === 2 ? (
+              <DocumentsStep
+                form={form}
+                isResubmission={isResubmission}
+                slots={slots}
+                onSelectFile={selectFile}
+                onRetryUpload={retryUpload}
+              />
+            ) : null}
+
+            <div className="sticky bottom-0 z-20 rounded-[1.2rem] border border-brand-100 bg-white/95 p-3 shadow-[0_-8px_24px_rgba(67,102,78,0.08)] backdrop-blur mobile-safe-bottom">
+              <div className="flex items-center gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-11 flex-1 rounded-full border-brand-300 bg-white text-brand-800 hover:bg-brand-50"
+                  onClick={goPrev}
+                  disabled={currentStep === 0 || isSubmitting}
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  上一步
+                </Button>
+
+                {!isFinalStep ? (
+                  <Button
+                    type="button"
+                    className="min-h-11 flex-1 rounded-full bg-brand-500 text-white hover:bg-brand-600"
+                    onClick={goNext}
+                    disabled={isSubmitting}
+                  >
+                    下一步
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button
+                    type="submit"
+                    className="min-h-11 flex-1 rounded-full bg-brand-500 text-white hover:bg-brand-600"
+                    disabled={!canSubmit}
+                  >
+                    {isSubmitting ? (
+                      <span className="inline-flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        {isResubmission ? "重新送審中..." : "送出中..."}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4" />
+                        {isResubmission ? "送出更新資料" : "提交教師申請"}
+                      </span>
+                    )}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </form>
+        </Form>
+
+        <aside className="hidden space-y-4 lg:block">
+          <div className="rounded-[1.6rem] border border-brand-100 bg-white/95 p-4 shadow-[0_14px_36px_rgba(67,102,78,0.06)]">
+            <div className="text-xs font-semibold tracking-[0.22em] text-brand-500">CURRENT STEP</div>
+            <div className="mt-2 text-lg font-semibold text-brand-900">{currentStepConfig.title}</div>
+            <p className="mt-2 text-sm leading-6 text-neutral-600">{currentStepConfig.subtitle}</p>
+          </div>
+
+          <div className="rounded-[1.6rem] border border-brand-100 bg-white/95 p-4 shadow-[0_14px_36px_rgba(67,102,78,0.06)]">
+            <div className="text-xs font-semibold tracking-[0.22em] text-brand-500">FORM SUMMARY</div>
+            <div className="mt-3 space-y-2 text-sm leading-7 text-neutral-700">
+              <div>姓名：{getSummaryValue(values.name)}</div>
+              <div>Email：{getSummaryValue(values.email)}</div>
+              <div>電話：{getSummaryValue(values.phoneNumber)}</div>
+              <div>科目：{getSummaryValue(values.subjects)}</div>
+              <div>教學經驗：{getSummaryValue(values.experience)}</div>
+              <div>學校：{getSummaryValue(values.school)}</div>
+              <div>科系：{getSummaryValue(values.major)}</div>
+              <div>專長：{getSummaryValue(values.expertise)}</div>
+              <div>證件上傳：{getUploadSummary(slots)}</div>
             </div>
           </div>
-          
-          <FormField
-            control={form.control}
-            name="studentIdCard"
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            render={({ field: { value: _value, onChange, ...field } }) => (
-              <FormItem>
-                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6">
-                  <div className="flex items-center space-x-3 mb-4">
-                    <GraduationCap className="w-6 h-6 text-emerald-600" />
-                    <h3 className="text-lg font-medium text-emerald-900">學生證照片</h3>
-                  </div>
-                  
-                  {/* 簡化的上傳說明 */}
-                  <div className="bg-white rounded-lg p-4 mb-4 border border-emerald-100">
-                    <div className="text-sm text-emerald-800 space-y-1">
-                      <div className="flex items-center space-x-2">
-                        <CheckCircle className="w-4 h-4 text-emerald-600" />
-                        <span>支援所有圖片格式 (JPG、PNG、WebP、GIF、TIFF 等)</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <CheckCircle className="w-4 h-4 text-emerald-600" />
-                        <span>系統自動壓縮大檔案至 5MB 以下</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <CheckCircle className="w-4 h-4 text-emerald-600" />
-                        <span>自動加入浮水印保護並上傳</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <FormControl>
-                    <div className="relative">
-                      <div className="relative">
-                        <Input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0]
-                            if (file) {
-                              onChange(e.target.files)
-                              handleImagePreview(file, 'studentIdCard')
-                            }
-                          }}
-                          {...field}
-                          disabled={isCompressing.studentIdCard}
-                          className={`w-full h-32 border-2 border-dashed rounded-lg transition-all duration-200 opacity-0 absolute inset-0 cursor-pointer ${
-                            isCompressing.studentIdCard ? 'cursor-not-allowed' : 'cursor-pointer'
-                          }`}
-                        />
-                        <div className={`w-full h-32 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-center transition-all duration-200 ${
-                          isCompressing.studentIdCard 
-                            ? 'border-gray-300 bg-gray-50 cursor-not-allowed' 
-                            : 'border-emerald-300 hover:border-emerald-400 bg-emerald-50/50 cursor-pointer hover:bg-emerald-50/80'
-                        }`}>
-                          {!isCompressing.studentIdCard ? (
-                            <>
-                              <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mb-3">
-                                <GraduationCap className="w-6 h-6 text-emerald-600" />
-                              </div>
-                              <p className="text-sm font-medium text-emerald-700 mb-1">點擊或拖拽上傳學生證照片</p>
-                              <p className="text-xs text-emerald-600">支援所有圖片格式</p>
-                            </>
-                          ) : (
-                            <>
-                              <Loader2 className="w-8 h-8 text-gray-400 animate-spin mb-2" />
-                              <p className="text-sm text-gray-500">正在處理圖片...</p>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </FormControl>
-
-                  {/* 狀態反饋 */}
-                  {fileErrors.studentIdCard && (
-                    <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4">
-                      <div className="flex items-start space-x-3">
-                        <XCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <h4 className="text-sm font-medium text-red-800">上傳失敗</h4>
-                          <p className="text-sm text-red-600 mt-1">{fileErrors.studentIdCard}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {fileInfos.studentIdCard && !fileErrors.studentIdCard && (
-                    <div className="mt-4 bg-emerald-100 border border-emerald-300 rounded-lg p-4">
-                      <div className="flex items-start space-x-3">
-                        <div className="flex-shrink-0 mt-0.5">
-                          {isCompressing.studentIdCard ? (
-                            <Loader2 className="h-5 w-5 text-emerald-600 animate-spin" />
-                          ) : (
-                            <CheckCircle className="h-5 w-5 text-emerald-600" />
-                          )}
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-emerald-800">
-                            {fileInfos.studentIdCard}
-                          </p>
-                          <p className="text-xs text-emerald-600 mt-1">
-                            {isCompressing.studentIdCard 
-                              ? '系統正在優化圖片品質與大小...' 
-                              : '學生證上傳成功！請繼續上傳身分證。'
-                            }
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 預覽圖片 */}
-                  {previews.studentIdCard && (
-                    <div className="mt-4">
-                      <p className="text-sm font-medium text-emerald-800 mb-2">預覽（已加浮水印保護）</p>
-                      <div className="relative overflow-hidden rounded-lg border border-emerald-200">
-                        <Image
-                          src={previews.studentIdCard} 
-                          alt="學生證預覽" 
-                          width={400}
-                          height={240}
-                          className="w-full h-auto"
-                        />
-                      </div>
-                    </div>
-                  )}
-                  
-                  <FormMessage className="mt-2" />
-                </div>
-              </FormItem>
-            )}
-          />
-          
-          <FormField
-            control={form.control}
-            name="idCard"
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            render={({ field: { value: _value, onChange, ...field } }) => (
-              <FormItem>
-                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6">
-                  <div className="flex items-center space-x-3 mb-4">
-                    <CreditCard className="w-6 h-6 text-emerald-600" />
-                    <h3 className="text-lg font-medium text-emerald-900">身分證照片</h3>
-                  </div>
-                  
-                  {/* 簡化的上傳說明 */}
-                  <div className="bg-white rounded-lg p-4 mb-4 border border-emerald-100">
-                    <div className="text-sm text-emerald-800 space-y-1">
-                      <div className="flex items-center space-x-2">
-                        <CheckCircle className="w-4 h-4 text-emerald-600" />
-                        <span>支援所有圖片格式 (JPG、PNG、WebP、GIF、TIFF 等)</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <CheckCircle className="w-4 h-4 text-emerald-600" />
-                        <span>系統自動壓縮大檔案至 5MB 以下</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <CheckCircle className="w-4 h-4 text-emerald-600" />
-                        <span>自動加入浮水印保護並上傳</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <FormControl>
-                    <div className="relative">
-                      <div className="relative">
-                        <Input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0]
-                            if (file) {
-                              onChange(e.target.files)
-                              handleImagePreview(file, 'idCard')
-                            }
-                          }}
-                          {...field}
-                          disabled={isCompressing.idCard}
-                          className={`w-full h-32 border-2 border-dashed rounded-lg transition-all duration-200 opacity-0 absolute inset-0 cursor-pointer ${
-                            isCompressing.idCard ? 'cursor-not-allowed' : 'cursor-pointer'
-                          }`}
-                        />
-                        <div className={`w-full h-32 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-center transition-all duration-200 ${
-                          isCompressing.idCard 
-                            ? 'border-gray-300 bg-gray-50 cursor-not-allowed' 
-                            : 'border-emerald-300 hover:border-emerald-400 bg-emerald-50/50 cursor-pointer hover:bg-emerald-50/80'
-                        }`}>
-                          {!isCompressing.idCard ? (
-                            <>
-                              <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mb-3">
-                                <CreditCard className="w-6 h-6 text-emerald-600" />
-                              </div>
-                              <p className="text-sm font-medium text-emerald-700 mb-1">點擊或拖拽上傳身分證照片</p>
-                              <p className="text-xs text-emerald-600">支援所有圖片格式</p>
-                            </>
-                          ) : (
-                            <>
-                              <Loader2 className="w-8 h-8 text-gray-400 animate-spin mb-2" />
-                              <p className="text-sm text-gray-500">正在處理圖片...</p>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </FormControl>
-
-                  {/* 狀態反饋 */}
-                  {fileErrors.idCard && (
-                    <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4">
-                      <div className="flex items-start space-x-3">
-                        <XCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <h4 className="text-sm font-medium text-red-800">上傳失敗</h4>
-                          <p className="text-sm text-red-600 mt-1">{fileErrors.idCard}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {fileInfos.idCard && !fileErrors.idCard && (
-                    <div className="mt-4 bg-emerald-100 border border-emerald-300 rounded-lg p-4">
-                      <div className="flex items-start space-x-3">
-                        <div className="flex-shrink-0 mt-0.5">
-                          {isCompressing.idCard ? (
-                            <Loader2 className="h-5 w-5 text-emerald-600 animate-spin" />
-                          ) : (
-                            <CheckCircle className="h-5 w-5 text-emerald-600" />
-                          )}
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-emerald-800">
-                            {fileInfos.idCard}
-                          </p>
-                          <p className="text-xs text-emerald-600 mt-1">
-                            {isCompressing.idCard 
-                              ? '系統正在優化圖片品質與大小...' 
-                              : '身分證上傳成功！現在可以提交表單了。'
-                            }
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 預覽圖片 */}
-                  {previews.idCard && (
-                    <div className="mt-4">
-                      <p className="text-sm font-medium text-emerald-800 mb-2">預覽（已加浮水印保護）</p>
-                      <div className="relative overflow-hidden rounded-lg border border-emerald-200">
-                        <Image
-                          src={previews.idCard} 
-                          alt="身分證預覽" 
-                          width={400}
-                          height={240}
-                          className="w-full h-auto"
-                        />
-                      </div>
-                    </div>
-                  )}
-                  
-                  <FormMessage className="mt-2" />
-                </div>
-              </FormItem>
-            )}
-          />
-        </div>
-
-        <FormField
-          control={form.control}
-          name="agreedToTerms"
-          render={({ field }) => (
-            <FormItem className="space-y-4">
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                <div className="flex items-start space-x-3">
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                  <div className="flex-1">
-                    <FormLabel className="text-sm font-medium cursor-pointer">
-                      我已閱讀並同意服務條款 *
-                    </FormLabel>
-                    <div className="mt-2">
-                      <TermsDialog onAgree={() => form.setValue('agreedToTerms', true)}>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="text-blue-600 border-blue-300 hover:bg-blue-50"
-                        >
-                          <FileText className="w-4 h-4 mr-2" />
-                          查看服務條款
-                        </Button>
-                      </TermsDialog>
-                    </div>
-                    <p className="text-xs text-amber-700 mt-2">
-                      ⚠️ 註冊前請先閱讀並同意我們的服務條款
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? (
-            <div className="flex items-center justify-center">
-              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-              提交中...
-            </div>
-          ) : (
-            '提交'
-          )}
-        </Button>
-      </form>
-    </Form>
+        </aside>
+      </div>
+    </div>
   )
 }

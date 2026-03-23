@@ -1,5 +1,44 @@
 'use client';
 
+const heicExtensionPattern = /\.(heic|heif)$/i
+
+const isHeicLikeFile = (file: File) => {
+  const normalizedType = (file.type || '').toLowerCase()
+  const normalizedName = (file.name || '').toLowerCase()
+  return (
+    normalizedType.includes('heic') ||
+    normalizedType.includes('heif') ||
+    heicExtensionPattern.test(normalizedName)
+  )
+}
+
+const toJpegFileName = (originalName: string) => {
+  const normalized = originalName.trim() || 'photo'
+  if (normalized.includes('.')) {
+    return normalized.replace(/\.[^.]+$/, '.jpg')
+  }
+  return `${normalized}.jpg`
+}
+
+const convertHeicToJpeg = async (file: File): Promise<File> => {
+  const { default: heic2any } = await import('heic2any')
+  const converted = await heic2any({
+    blob: file,
+    toType: 'image/jpeg',
+    quality: 0.92,
+  })
+
+  const outputBlob = Array.isArray(converted) ? converted[0] : converted
+  if (!(outputBlob instanceof Blob)) {
+    throw new Error('HEIC 轉檔失敗，請改用 JPG 或 PNG。')
+  }
+
+  return new File([outputBlob], toJpegFileName(file.name), {
+    type: 'image/jpeg',
+    lastModified: Date.now(),
+  })
+}
+
 // 🔧 新增：檢測瀏覽器是否支援 WebP
 function isWebPSupported(): boolean {
   try {
@@ -253,45 +292,22 @@ function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number):
   });
 }
 
-// 🔧 新增：完整的圖片處理函數（壓縮 + 浮水印 + 二次壓縮）
+// 完整處理流程（僅客端壓縮）。浮水印統一交由 server 端處理，避免重複加印。
 export async function processImageComplete(file: File, maxSizeMB: number = 5): Promise<File> {
-  console.log(`開始完整圖片處理: ${file.name}, 原始大小: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
-  
-  // 第一步：如果檔案太大，先進行初步壓縮
-  let processedFile = file;
-  if (file.size > maxSizeMB * 1024 * 1024) {
-    console.log('檔案超過限制，進行初步壓縮...');
-    processedFile = await compressImage(file, maxSizeMB);
-    console.log(`初步壓縮完成: ${(processedFile.size / 1024 / 1024).toFixed(2)}MB`);
+  let normalizedFile = file;
+  if (isHeicLikeFile(file)) {
+    console.log(`偵測到 HEIC/HEIF，開始轉換: ${file.name}`);
+    normalizedFile = await convertHeicToJpeg(file);
+    console.log(`HEIC 轉換完成: ${normalizedFile.name}`);
   }
-  
-  // 第二步：添加浮水印
-  console.log('添加浮水印...');
-  const watermarkedBlob = await addWatermark(processedFile);
-  console.log(`浮水印添加完成: ${(watermarkedBlob.size / 1024 / 1024).toFixed(2)}MB`);
-  
-  // 第三步：檢查浮水印後的檔案是否超過限制，如需要進行二次壓縮
-  if (watermarkedBlob.size > maxSizeMB * 1024 * 1024) {
-    console.log('添加浮水印後檔案超過限制，進行二次壓縮...');
-    
-    // 將 blob 轉為 File 以便進行壓縮
-    const watermarkedFile = new File([watermarkedBlob], processedFile.name, {
-      type: watermarkedBlob.type,
-      lastModified: Date.now()
-    });
-    
-    // 進行二次壓縮
-    const finalFile = await compressImage(watermarkedFile, maxSizeMB);
-    console.log(`二次壓縮完成: ${(finalFile.size / 1024 / 1024).toFixed(2)}MB`);
-    return finalFile;
+
+  console.log(`開始圖片壓縮: ${normalizedFile.name}, 原始大小: ${(normalizedFile.size / 1024 / 1024).toFixed(2)}MB`);
+
+  if (normalizedFile.size <= maxSizeMB * 1024 * 1024) {
+    return normalizedFile;
   }
-  
-  // 如果浮水印後檔案大小合適，直接返回
-  const finalFile = new File([watermarkedBlob], processedFile.name, {
-    type: watermarkedBlob.type,
-    lastModified: Date.now()
-  });
-  
-  console.log(`圖片處理完成: ${(finalFile.size / 1024 / 1024).toFixed(2)}MB`);
-  return finalFile;
-} 
+
+  const compressedFile = await compressImage(normalizedFile, maxSizeMB);
+  console.log(`圖片壓縮完成: ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+  return compressedFile;
+}

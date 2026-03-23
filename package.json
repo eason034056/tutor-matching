@@ -30,6 +30,7 @@
     "express": "^4.21.1",
     "firebase": "^11.9.0",
     "firebase-admin": "^13.4.0",
+    "heic2any": "^0.0.4",
     "katex": "^0.16.22",
     "lucide-react": "^0.460.0",
     "markdown-it": "^14.1.0",

@@ -1,0 +1,112 @@
+.root {
+  position: relative;
+  min-height: 100dvh;
+  overflow: hidden;
+  background: #f7f3e8;
+  color: #1f3a2d;
+}
+
+.shell {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  height: 100dvh;
+  max-height: 100dvh;
+  width: 100%;
+}
+
+.displayHeading {
+  font-family: var(--font-solver-display), "Noto Serif TC", "Noto Serif", "Palatino Linotype", serif;
+  letter-spacing: -0.02em;
+}
+
+.ambientLayer {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.orbA {
+  position: absolute;
+  top: -12rem;
+  left: -9rem;
+  width: 36rem;
+  height: 36rem;
+  border-radius: 9999px;
+  background: radial-gradient(circle at center, rgba(180, 205, 147, 0.5), rgba(180, 205, 147, 0));
+  filter: blur(4px);
+  animation: driftA 16s ease-in-out infinite;
+}
+
+.orbB {
+  position: absolute;
+  right: -11rem;
+  top: 9rem;
+  width: 32rem;
+  height: 32rem;
+  border-radius: 9999px;
+  background: radial-gradient(circle at center, rgba(66, 122, 91, 0.2), rgba(66, 122, 91, 0));
+  animation: driftB 18s ease-in-out infinite;
+}
+
+.grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.14;
+  background-image: radial-gradient(rgba(32, 58, 45, 0.22) 0.4px, transparent 0.4px);
+  background-size: 8px 8px;
+  mix-blend-mode: multiply;
+}
+
+.drawerPanel {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.97), rgba(245, 250, 242, 0.94));
+  backdrop-filter: blur(12px);
+}
+
+.mainPanel {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.66), rgba(255, 255, 255, 0.92));
+  backdrop-filter: blur(8px);
+}
+
+.chatScroller {
+  overscroll-behavior: contain;
+}
+
+.stickyComposer {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+@keyframes driftA {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(20px, 14px, 0) scale(1.08);
+  }
+}
+
+@keyframes driftB {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(-24px, 10px, 0) scale(1.06);
+  }
+}
+
+@media (max-width: 767px) {
+  .shell {
+    min-height: 100dvh;
+    height: 100dvh;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orbA,
+  .orbB {
+    animation: none !important;
+  }
+}

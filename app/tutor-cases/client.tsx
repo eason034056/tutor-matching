@@ -319,7 +319,7 @@ export default function TutorCasesClient() {
                     所有家教案件
                   </CardTitle>
                   <p className="mt-3 max-w-2xl text-sm leading-7 text-neutral-600 md:text-base">
-                    手機優先瀏覽最新案件，先看重點條件再決定是否應徵。急徵案件會優先排列，幫你更快找到可接案件。
+                    歡迎來到家教案件專區！這裡匯整了最新、最適合的家教案件，您可依地區與條件挑選，有疑問請隨時詢問，祝您順利找到理想案件！
                   </p>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-sm md:w-[250px]">
@@ -338,7 +338,7 @@ export default function TutorCasesClient() {
 
           <Card className="overflow-hidden rounded-[1.8rem] border border-brand-100/80 bg-white/95 shadow-[0_22px_70px_rgba(67,102,78,0.1)]">
             <CardContent className="p-4 md:p-6">
-              <div className="sticky top-[5rem] z-20 mb-5 rounded-2xl border border-brand-100 bg-[linear-gradient(145deg,rgba(255,255,255,0.96),rgba(245,250,242,0.92))] p-3 shadow-[0_14px_30px_rgba(66,122,91,0.08)] backdrop-blur md:static md:p-4 md:shadow-none">
+              <div className="sticky top-0 z-30 mb-6 rounded-2xl border border-brand-100 bg-[linear-gradient(145deg,rgba(255,255,255,0.98),rgba(245,250,242,0.96))] p-3 shadow-[0_14px_30px_rgba(66,122,91,0.1)] backdrop-blur md:static md:p-4 md:shadow-none">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div className="w-full md:w-[220px]">
                     <Select value={selectedRegion} onValueChange={handleRegionChange}>
@@ -355,7 +355,7 @@ export default function TutorCasesClient() {
                     </Select>
                   </div>
 
-                  <div className="flex min-h-11 items-center gap-2 overflow-x-auto pb-1 md:justify-end md:pb-0">
+                  <div className="flex min-h-11 flex-wrap items-center gap-2 pt-1 md:justify-end md:pt-0">
                     {STATUS_FILTER_OPTIONS.map((option) => (
                       <button
                         key={option.value}
@@ -371,16 +371,6 @@ export default function TutorCasesClient() {
                         {option.label}
                       </button>
                     ))}
-                    {hasActiveFilters ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={clearFilters}
-                        className="min-h-10 shrink-0 rounded-full px-4 text-brand-700 hover:bg-brand-50 hover:text-brand-800"
-                      >
-                        清除
-                      </Button>
-                    ) : null}
                   </div>
                 </div>
               </div>
@@ -623,7 +613,7 @@ export default function TutorCasesClient() {
 
       <Dialog open={Boolean(selectedApplyCase)} onOpenChange={(open) => !open && setSelectedApplyCase(null)}>
         {selectedApplyCase ? (
-          <DialogContent className="left-0 top-auto grid max-h-[92vh] w-full max-w-none translate-x-0 translate-y-0 gap-0 rounded-t-[1.6rem] rounded-b-none border border-brand-100 bg-[#fffdf8] p-0 shadow-[0_-24px_70px_rgba(31,58,45,0.26)] data-[state=closed]:slide-out-to-bottom-8 data-[state=open]:slide-in-from-bottom-8 motion-reduce:transition-none md:left-[50%] md:top-[50%] md:max-h-[86vh] md:w-full md:max-w-[540px] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-[1.6rem] md:border-brand-100 md:data-[state=closed]:slide-out-to-top-[48%] md:data-[state=open]:slide-in-from-top-[48%]">
+          <DialogContent className="left-0 right-0 bottom-0 top-auto z-50 grid max-h-[92vh] w-full max-w-none translate-x-0 translate-y-0 overflow-hidden gap-0 rounded-t-[1.6rem] rounded-b-none border border-brand-100 bg-[#fffdf8] p-0 shadow-[0_-24px_70px_rgba(31,58,45,0.26)] data-[state=closed]:slide-out-to-bottom-8 data-[state=open]:slide-in-from-bottom-8 motion-reduce:transition-none md:left-[50%] md:right-auto md:top-[50%] md:bottom-auto md:max-h-[86vh] md:w-full md:max-w-[540px] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-[1.6rem] md:border-brand-100 md:data-[state=closed]:slide-out-to-top-[48%] md:data-[state=open]:slide-in-from-top-[48%]">
             {renderApplyDialogBody(selectedApplyCase)}
           </DialogContent>
         ) : null}

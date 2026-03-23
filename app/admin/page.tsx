@@ -20,10 +20,21 @@ import LoginForm from '@/components/auth/LoginForm'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Textarea } from '@/components/ui/textarea'
 import { buildCaseNotificationData, normalizeCase, type CaseDocumentStatus } from '@/lib/case-utils'
+import { TUTOR_REVISION_REASON_OPTIONS, type TutorRevisionReasonCode } from '@/lib/tutor-review'
 import { auth, db, storage } from '@/server/config/firebase'
 import type { CaseNotificationData, Tutor, TutorCase } from '@/server/types'
 import { sendNewCaseEmailNotification } from '@/webhook-config'
@@ -84,6 +95,16 @@ function CopyableLinkButton({ label, onClick, disabled }: { label: string; onCli
   )
 }
 
+const parseJsonResponse = async (response: Response) => {
+  const contentType = response.headers.get('content-type') || ''
+  if (!contentType.includes('application/json')) {
+    const fallbackText = await response.text()
+    throw new Error(fallbackText || '伺服器回應格式錯誤')
+  }
+
+  return response.json()
+}
+
 export default function AdminPage() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
@@ -97,6 +118,9 @@ export default function AdminPage() {
   const [selectedStatus, setSelectedStatus] = useState<'急徵' | '已徵到' | '有人接洽' | ''>('')
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [generatingLinkId, setGeneratingLinkId] = useState<string | null>(null)
+  const [revisionDialogTutor, setRevisionDialogTutor] = useState<PendingTutor | null>(null)
+  const [selectedRevisionReasons, setSelectedRevisionReasons] = useState<TutorRevisionReasonCode[]>([])
+  const [revisionNote, setRevisionNote] = useState('')
 
   const followUpCount = useMemo(
     () => pendingCases.filter((caseItem) => normalizeCase(caseItem).documentStatus !== 'submitted').length,
@@ -289,24 +313,14 @@ export default function AdminPage() {
     if (processing) return
     setProcessing(true)
     try {
-      const tutorRef = doc(db, 'tutors', docId)
-      const tutorSnapshot = await getDoc(tutorRef)
-      if (!tutorSnapshot.exists()) throw new Error('找不到教師資料')
-
-      const tutorData = tutorSnapshot.data() as Tutor
-      await updateDoc(tutorRef, { status: 'approved', approvedAt: new Date().toISOString() })
-      await addDoc(collection(db, 'approvedTutors'), {
-        tutorId: tutorData.id,
-        experience: tutorData.experience,
-        subjects: tutorData.subjects,
-        expertise: tutorData.expertise,
-        major: tutorData.major,
-        name: tutorData.name,
-        email: tutorData.email,
-        school: tutorData.school,
-        approvedAt: new Date().toISOString(),
-        receiveNewCaseNotifications: tutorData.receiveNewCaseNotifications,
+      const response = await fetch(`/api/admin/tutors/${docId}/approve`, {
+        method: 'POST',
       })
+      const result = await parseJsonResponse(response)
+      if (!response.ok) {
+        throw new Error(result.error || '審核教師失敗')
+      }
+
       toast.success('教師已通過審核')
       await fetchPendingData()
     } catch (error) {
@@ -339,24 +353,61 @@ export default function AdminPage() {
   }
 
   const handleTutorReject = async (docId: string) => {
-    if (processing) return
+    const tutor = pendingTutors.find((item) => item.docId === docId) || null
+    setRevisionDialogTutor(tutor)
+    setSelectedRevisionReasons([])
+    setRevisionNote('')
+  }
+
+  const handleTutorRevisionSubmit = async () => {
+    if (!revisionDialogTutor || processing) return
+
     setProcessing(true)
     try {
-      const tutorRef = doc(db, 'tutors', docId)
-      const tutorSnapshot = await getDoc(tutorRef)
-      if (!tutorSnapshot.exists()) throw new Error('找不到教師資料')
+      const response = await fetch(`/api/admin/tutors/${revisionDialogTutor.docId}/request-revision`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          reasonCodes: selectedRevisionReasons,
+          note: revisionNote,
+        }),
+      })
+      const result = await parseJsonResponse(response)
 
-      const tutorData = tutorSnapshot.data() as Tutor
-      await Promise.all([deleteStorageAsset(tutorData.studentIdCardUrl), deleteStorageAsset(tutorData.idCardUrl)])
-      await deleteDoc(tutorRef)
-      toast.success('已拒絕教師申請')
+      if (!response.ok) {
+        throw new Error(result.error || '退回補件失敗')
+      }
+
+      toast.success('已寄出補件通知，教師可重新提交案件')
+      setRevisionDialogTutor(null)
+      setSelectedRevisionReasons([])
+      setRevisionNote('')
       await fetchPendingData()
     } catch (error) {
-      console.error('拒絕教師失敗:', error)
-      toast.error(error instanceof Error ? error.message : '拒絕教師失敗')
+      console.error('退回教師補件失敗:', error)
+      toast.error(error instanceof Error ? error.message : '退回補件失敗')
     } finally {
       setProcessing(false)
     }
+  }
+
+  const toggleRevisionReason = (reasonCode: TutorRevisionReasonCode, checked: boolean) => {
+    setSelectedRevisionReasons((prev) => {
+      if (checked) {
+        return [...prev, reasonCode]
+      }
+
+      return prev.filter((item) => item !== reasonCode)
+    })
+  }
+
+  const closeRevisionDialog = () => {
+    if (processing) return
+    setRevisionDialogTutor(null)
+    setSelectedRevisionReasons([])
+    setRevisionNote('')
   }
 
   const handleCaseApprove = async (docId: string) => {
@@ -655,7 +706,7 @@ export default function AdminPage() {
                             通過審核
                           </Button>
                           <Button variant="outline" className="rounded-full border-red-300 text-red-600 hover:bg-red-50" onClick={() => handleTutorReject(tutor.docId)} disabled={processing}>
-                            不通過
+                            退回補件
                           </Button>
                         </div>
                       </div>
@@ -794,6 +845,64 @@ export default function AdminPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <Dialog open={Boolean(revisionDialogTutor)} onOpenChange={(open) => (!open ? closeRevisionDialog() : null)}>
+        <DialogContent className="max-w-2xl rounded-[2rem] border border-brand-100 bg-[#fffdf8] p-0">
+          <DialogHeader className="border-b border-brand-100 px-6 py-5">
+            <DialogTitle className="font-display text-2xl text-brand-900">退回補件</DialogTitle>
+            <DialogDescription className="mt-2 text-sm leading-7 text-neutral-600">
+              {revisionDialogTutor
+                ? `為 ${revisionDialogTutor.name} 選擇需要補充的項目。送出後會寄 email 通知，老師可回到原申請重新提交案件。`
+                : '選擇退件理由後，系統會自動寄送補件通知。'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5 px-6 py-5">
+            <div className="grid gap-3 md:grid-cols-2">
+              {TUTOR_REVISION_REASON_OPTIONS.map((option) => (
+                <label key={option.code} className="flex items-start gap-3 rounded-[1.25rem] border border-brand-100 bg-white px-4 py-4">
+                  <Checkbox
+                    checked={selectedRevisionReasons.includes(option.code)}
+                    onCheckedChange={(checked) => toggleRevisionReason(option.code, Boolean(checked))}
+                  />
+                  <div>
+                    <div className="text-sm font-semibold text-brand-900">{option.label}</div>
+                    <div className="mt-1 text-xs text-neutral-500">{option.code}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-brand-900">補充說明</label>
+              <Textarea
+                value={revisionNote}
+                onChange={(event) => setRevisionNote(event.target.value)}
+                placeholder="可補充具體需要修改的欄位、重拍建議或其他提醒。若勾選 other，這裡必須填寫。"
+                className="min-h-[140px] rounded-[1.25rem] border-brand-200 bg-white"
+              />
+              <div className="text-xs text-neutral-500">
+                已選擇 {selectedRevisionReasons.length} 個退件理由
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="border-t border-brand-100 px-6 py-5">
+            <Button type="button" variant="outline" className="rounded-full border-brand-300 bg-white text-brand-800 hover:bg-brand-50" onClick={closeRevisionDialog} disabled={processing}>
+              取消
+            </Button>
+            <Button
+              type="button"
+              className="rounded-full bg-brand-500 text-white hover:bg-brand-600"
+              onClick={handleTutorRevisionSubmit}
+              disabled={processing || selectedRevisionReasons.length === 0 || (selectedRevisionReasons.includes('other') && !revisionNote.trim())}
+            >
+              {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              寄送退回補件通知
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

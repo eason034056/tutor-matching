@@ -1,3 +1,5 @@
+import type { TutorRevisionReasonCode } from '@/lib/tutor-review'
+
 export interface Tutor {
     id: string;
     name: string;
@@ -9,15 +11,23 @@ export interface Tutor {
     major: string;
     expertise: string;
     tutorCode: string;
-    status: 'pending' | 'approved' | 'rejected';
+    status: 'pending' | 'revision_requested' | 'approved' | 'rejected';
     isActive: boolean; 
     studentIdCardUrl: string;
     idCardUrl: string;
     receiveNewCaseNotifications: boolean; // 是否接收新案件通知
+    approvedAt?: string | null;
+    revisionReasonCodes?: TutorRevisionReasonCode[];
+    revisionNote?: string | null;
+    revisionRequestedAt?: string | null;
+    revisionTokenHash?: string | null;
+    revisionExpiresAt?: string | null;
+    revisionSubmittedAt?: string | null;
 }
 
 export interface ApprovedTutor {
     tutorId: string;
+    tutorCode: string;
     experience: string;
     subjects: string[];
     expertise: string;

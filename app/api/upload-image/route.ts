@@ -1,164 +1,122 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { adminStorage } from '@/lib/firebase/firebase-admin'
-import { addWatermark } from '@/lib/imageUtils.server'
+import { randomUUID } from "node:crypto"
+
+import { NextRequest, NextResponse } from "next/server"
+
+import { adminStorage } from "@/lib/firebase/firebase-admin"
+import { addWatermark } from "@/lib/imageUtils.server"
+
+type UploadErrorCode =
+  | "MISSING_PARAMS"
+  | "INVALID_UPLOAD_TARGET"
+  | "INVALID_FILE_TYPE"
+  | "FILE_TOO_LARGE"
+  | "UPLOAD_FAILED"
+  | "SERVER_ERROR"
+
+const MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+const ALLOWED_UPLOAD_TARGETS: Record<string, Set<string>> = {
+  tutors: new Set(["student-ids", "id-cards"]),
+  cases: new Set(["document-follow-up"]),
+}
+
+const normalizeStorageBucket = (rawBucket: string | undefined) => {
+  const trimmed = (rawBucket || "").trim().replace(/^['"]|['"]$/g, "")
+  if (!trimmed) return ""
+  if (trimmed.startsWith("gs://")) {
+    return trimmed.replace("gs://", "").replace(/\/+$/, "")
+  }
+  return trimmed.replace(/\/+$/, "")
+}
+
+const sanitizeFileName = (fileName: string) => {
+  const normalized = fileName.trim().toLowerCase()
+  const replaced = normalized.replace(/[^a-z0-9._-]+/g, "-")
+  return replaced.replace(/^-+|-+$/g, "").slice(0, 80) || "image"
+}
+
+const isFileLike = (value: FormDataEntryValue | null): value is File =>
+  Boolean(value && typeof value === "object" && "arrayBuffer" in value && "size" in value && "type" in value)
+
+const isAllowedTarget = (folder: string, subfolder: string) => {
+  const allowedSubfolders = ALLOWED_UPLOAD_TARGETS[folder]
+  if (!allowedSubfolders) return false
+  return allowedSubfolders.has(subfolder)
+}
+
+const buildErrorResponse = (status: number, error: string, errorCode: UploadErrorCode) =>
+  NextResponse.json(
+    {
+      success: false,
+      error,
+      errorCode,
+    },
+    { status }
+  )
 
 export async function POST(request: NextRequest) {
   try {
-    // 處理 CORS 預檢請求
-    if (request.method === 'OPTIONS') {
-      return new NextResponse(null, {
-        status: 200,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        },
-      })
-    }
-
-    console.log('開始處理圖片上傳請求...')
-
     const formData = await request.formData()
-    const file = formData.get('file') as File
-    const folder = formData.get('folder') as string // 'cases' 或 'tutors'
-    const subfolder = formData.get('subfolder') as string // 'id-cards' 或 'student-ids'
+    const fileValue = formData.get("file")
+    const folder = String(formData.get("folder") || "").trim()
+    const subfolder = String(formData.get("subfolder") || "").trim()
 
-    console.log('收到的參數:', { folder, subfolder, fileName: file?.name })
-
-    if (!file || !folder || !subfolder) {
-      console.error('缺少必要參數:', { file: !!file, folder, subfolder })
-      return NextResponse.json(
-        { error: '缺少必要參數' },
-        { status: 400 }
-      )
+    if (!isFileLike(fileValue) || !folder || !subfolder) {
+      return buildErrorResponse(400, "缺少必要參數", "MISSING_PARAMS")
     }
 
-    console.log(`開始上傳圖片到 ${folder}/${subfolder}`)
+    if (!isAllowedTarget(folder, subfolder)) {
+      return buildErrorResponse(400, "不支援的上傳目標", "INVALID_UPLOAD_TARGET")
+    }
 
-    // 將 File 對象轉換為 Buffer
-    const arrayBuffer = await file.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
+    if (!fileValue.type.startsWith("image/")) {
+      return buildErrorResponse(400, "僅支援圖片檔案", "INVALID_FILE_TYPE")
+    }
 
-    // 添加浮水印
-    console.log('開始添加浮水印...')
-    const watermarkedBuffer = await addWatermark(buffer)
-    console.log('浮水印添加完成')
-    
-    // 生成文件名
-    const timestamp = Date.now()
-    const fileName = `${timestamp}-${file.name}`
+    if (fileValue.size > MAX_UPLOAD_BYTES) {
+      return buildErrorResponse(413, "檔案大小不可超過 20MB", "FILE_TOO_LARGE")
+    }
+
+    const fileBuffer = Buffer.from(await fileValue.arrayBuffer())
+    const watermarkedBuffer = await addWatermark(fileBuffer)
+    const safeName = sanitizeFileName(fileValue.name)
+    const fileName = `${Date.now()}-${randomUUID()}-${safeName}`
     const filePath = `${folder}/${subfolder}/${fileName}`
-    console.log('準備上傳文件:', filePath)
 
-    // 上傳到 Firebase Storage
-    console.log('開始上傳到 Firebase Storage...')
-    const bucket = adminStorage.bucket()
-    console.log('Storage bucket 名稱:', bucket.name)
-    
-    // 檢查 bucket 是否存在
-    try {
-      const [exists] = await bucket.exists()
-      console.log('Bucket 是否存在:', exists)
-      
-      if (!exists) {
-        console.error('Bucket 不存在，嘗試使用預設 bucket...')
-        // 嘗試使用預設的 bucket 名稱
-        const defaultBucket = adminStorage.bucket(`${process.env.FIREBASE_ADMIN_PROJECT_ID}.firebasestorage.app`)
-        console.log('嘗試使用預設 bucket:', defaultBucket.name)
-        
-        const [defaultExists] = await defaultBucket.exists()
-        console.log('預設 bucket 是否存在:', defaultExists)
-        
-        if (defaultExists) {
-          const fileUpload = defaultBucket.file(filePath)
-          await fileUpload.save(watermarkedBuffer, {
-            metadata: {
-              contentType: file.type,
-            },
-          })
-          console.log('文件上傳完成（使用預設 bucket）')
-          
-          // 生成下載 URL
-          const [url] = await fileUpload.getSignedUrl({
-            action: 'read',
-            expires: '03-01-2500',
-          })
-          
-          return NextResponse.json({
-            success: true,
-            url,
-            fileName,
-            filePath,
-          })
-        } else {
-          throw new Error('預設 bucket 也不存在')
-        }
-      }
-    } catch (bucketError) {
-      console.error('檢查 bucket 失敗:', bucketError)
-    }
-    
-    const fileUpload = bucket.file(filePath)
-    
-    await fileUpload.save(watermarkedBuffer, {
+    const configuredBucket = normalizeStorageBucket(
+      process.env.FIREBASE_STORAGE_BUCKET || process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    )
+    const bucket = configuredBucket ? adminStorage.bucket(configuredBucket) : adminStorage.bucket()
+    const uploadedFile = bucket.file(filePath)
+
+    await uploadedFile.save(watermarkedBuffer, {
       metadata: {
-        contentType: file.type,
+        contentType: fileValue.type,
       },
     })
-    console.log('文件上傳完成')
 
-    // 生成下載 URL
-    console.log('生成下載 URL...')
-    const [url] = await fileUpload.getSignedUrl({
-      action: 'read',
-      expires: '03-01-2500', // 很長的過期時間
+    const [url] = await uploadedFile.getSignedUrl({
+      action: "read",
+      expires: "03-01-2500",
     })
-
-    console.log(`圖片上傳成功: ${filePath}`)
-    console.log('下載 URL:', url)
 
     return NextResponse.json({
       success: true,
       url,
-      fileName,
       filePath,
     })
-
   } catch (error) {
-    console.error('圖片上傳失敗:', error)
-    console.error('錯誤詳情:', {
-      message: error instanceof Error ? error.message : '未知錯誤',
-      stack: error instanceof Error ? error.stack : undefined,
-    })
-    
-    // 檢查環境變數
-    console.log('環境變數檢查:', {
-      hasProjectId: !!process.env.FIREBASE_ADMIN_PROJECT_ID,
-      hasClientEmail: !!process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
-      hasPrivateKey: !!process.env.FIREBASE_ADMIN_PRIVATE_KEY,
-      hasStorageBucket: !!process.env.FIREBASE_STORAGE_BUCKET,
-      projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
-      storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-    })
-
-    return NextResponse.json(
-      { 
-        error: '圖片上傳失敗',
-        details: error instanceof Error ? error.message : '未知錯誤'
-      },
-      { status: 500 }
-    )
+    const message = error instanceof Error ? error.message : "圖片上傳失敗"
+    return buildErrorResponse(500, message || "圖片上傳失敗", "UPLOAD_FAILED")
   }
 }
 
-// 處理 OPTIONS 請求
 export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,
     headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
     },
   })
-} 
+}

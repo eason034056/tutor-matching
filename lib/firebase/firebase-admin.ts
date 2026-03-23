@@ -5,6 +5,19 @@ import { getStorage } from 'firebase-admin/storage';
 // 檢查是否已經初始化
 const apps = getApps();
 
+function normalizeStorageBucket(rawBucket: string | undefined, projectId: string) {
+  const trimmed = (rawBucket || '').trim().replace(/^['"]|['"]$/g, '');
+  if (!trimmed) {
+    return `${projectId}.appspot.com`;
+  }
+
+  if (trimmed.startsWith('gs://')) {
+    return trimmed.replace('gs://', '').replace(/\/+$/, '');
+  }
+
+  return trimmed.replace(/\/+$/, '');
+}
+
 function validateEnvironmentVariables() {
   const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
@@ -14,14 +27,16 @@ function validateEnvironmentVariables() {
     throw new Error('Missing required Firebase Admin SDK credentials');
   }
 
-  // 構建完整的 bucket URL
-  const bucketUrl = `gs://tutor-matching-5c608.appspot.com`;
+  const storageBucket = normalizeStorageBucket(
+    process.env.FIREBASE_STORAGE_BUCKET || process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    projectId
+  );
 
   return {
     projectId,
     clientEmail,
     privateKey,
-    bucketUrl,
+    storageBucket,
   };
 }
 
@@ -29,9 +44,9 @@ function validateEnvironmentVariables() {
 if (!apps.length) {
   try {
     console.log('初始化 Firebase Admin...');
-    const { projectId, clientEmail, privateKey, bucketUrl } = validateEnvironmentVariables();
+    const { projectId, clientEmail, privateKey, storageBucket } = validateEnvironmentVariables();
 
-    console.log('使用的 Storage Bucket:', bucketUrl);
+    console.log('使用的 Storage Bucket:', storageBucket);
 
     const config = {
       credential: cert({
@@ -39,7 +54,7 @@ if (!apps.length) {
         clientEmail,
         privateKey: privateKey.replace(/\\n/g, '\n'),
       }),
-      storageBucket: bucketUrl,
+      storageBucket,
     };
 
     console.log('Firebase Admin 配置:', {

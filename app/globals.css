@@ -207,129 +207,13 @@
     display: none;
   }
 
-  /* Solver 頁面高度覆蓋 - 修復移動端瀏覽器 UI 遮擋問題 */
-  .solver-container {
-    /* 使用動態視窗高度，適應移動端瀏覽器 UI */
-    height: 100vh !important;
-    height: 100dvh !important; /* 動態視窗高度 - 支援的瀏覽器會使用這個 */
-    max-height: 100vh !important;
-    max-height: 100dvh !important;
-    overflow: hidden !important;
-  }
-
-  /* 確保側邊欄高度正確並可滾動 */
-  .solver-container .sidebar {
-    height: 100vh !important;
-    height: 100dvh !important;
-    max-height: 100vh !important;
-    max-height: 100dvh !important;
-    overflow: hidden !important;
-  }
-
-  /* 側邊欄內的滾動區域 */
-  .solver-container .sidebar .threads-list {
-    flex: 1 1 0% !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-  }
-
-  /* 聊天記錄區域的滾動 */
-  .solver-container .chat-messages {
-    flex: 1 1 0% !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-    min-height: 0 !important;
-  }
-
-  /* 聊天頁面的主內容區域 */
-  .solver-container .chat-container {
-    height: 100vh !important;
-    height: 100dvh !important;
-    max-height: 100vh !important;
-    max-height: 100dvh !important;
-    overflow: hidden !important;
-  }
-
-  /* 防止 solver 頁面整體滾動 */
-  body.solver-no-scroll {
-    overflow: hidden !important;
-  }
-
-  /* 覆蓋根layout對solver頁面的影響 */
-  .solver-container,
-  .solver-container * {
-    box-sizing: border-box;
-  }
-
-  /* 移動端優化：為底部按鈕添加安全區域 */
+  /* 移動端安全區域：給 sticky footer / bottom-sheet 類元件重用 */
   .mobile-safe-bottom {
     padding-bottom: max(1rem, env(safe-area-inset-bottom)) !important;
   }
 
-  /* 移動端優化：確保滾動容器有足夠的底部空間 */
-  .mobile-scroll-container {
-    /* 為移動端瀏覽器 UI 預留空間 */
-    padding-bottom: max(2rem, calc(env(safe-area-inset-bottom) + 1rem)) !important;
-  }
-
-  /* 移動端優化：懸浮按鈕樣式 */
-  .mobile-floating-button {
-    position: sticky !important;
-    bottom: max(1rem, env(safe-area-inset-bottom)) !important;
-    z-index: 50 !important;
-    margin-top: auto !important;
-  }
-
-  /* 移動端優化：當虛擬鍵盤出現時的佈局調整 */
-  .mobile-keyboard-adjust {
-    /* 檢測虛擬鍵盤並調整佈局 */
-    height: 100vh !important;
-    height: 100dvh !important;
-    height: calc(var(--vh, 1vh) * 100) !important; /* 使用 JavaScript 動態計算的高度 */
-  }
-
-  /* 移動端優化：確保內容可以正確滾動到底部 */
-  .mobile-content-area {
-    /* 確保內容區域可以完全滾動，不被瀏覽器 UI 遮擋 */
-    min-height: calc(100vh - 4rem) !important;
-    min-height: calc(100dvh - 4rem) !important;
-    min-height: calc(calc(var(--vh, 1vh) * 100) - 4rem) !important; /* 使用動態高度 */
-  }
-
   /* 移動端優化：智能檢測和調整 */
   @media (max-width: 768px) {
-    .mobile-floating-button {
-      /* 在小螢幕上增加按鈕的可見度 */
-      box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1) !important;
-    }
-
-    .mobile-scroll-container {
-      /* 移動端增加更多底部空間 */
-      padding-bottom: max(3rem, calc(env(safe-area-inset-bottom) + 2rem)) !important;
-    }
-
-    /* 當虛擬鍵盤出現時的特殊處理 */
-    .mobile-keyboard-adjust {
-      /* 使用更精確的高度計算 */
-      height: calc(var(--vh, 1vh) * 100) !important;
-      max-height: calc(var(--vh, 1vh) * 100) !important;
-    }
-
-    /* 聊天界面移動端優化 */
-    .chat-messages {
-      padding-left: 1rem !important;
-      padding-right: 1rem !important;
-    }
-
-    /* 聊天氣泡在移動端的寬度限制 */
-    .chat-messages .max-w-3xl {
-      max-width: calc(100vw - 4rem) !important;
-    }
-
-    .chat-messages .max-w-md {
-      max-width: calc(85vw - 2rem) !important;
-    }
-
     /* 確保數學公式在移動端正確顯示 */
     .prose .katex-display {
       font-size: 0.9em !important;

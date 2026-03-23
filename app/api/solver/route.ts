@@ -55,6 +55,99 @@ function formatTimeForTitle(timestamp: number): string {
   }
 }
 
+function createThreadTitleFromMessage(message: string, timestamp: number): string {
+  const normalized = message.replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return formatTimeForTitle(timestamp);
+  }
+
+  const MAX_LENGTH = 26;
+  if (normalized.length <= MAX_LENGTH) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, MAX_LENGTH)}…`;
+}
+
+function createFallbackTitleFromFirstAnswer(firstAssistantAnswer: string, userMessage: string, timestamp: number): string {
+  const normalizedAnswer = firstAssistantAnswer
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/\$\$[\s\S]*?\$\$/g, ' ')
+    .replace(/\$[^$]*\$/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!normalizedAnswer) {
+    return createThreadTitleFromMessage(userMessage, timestamp);
+  }
+
+  const MAX_LENGTH = 26;
+  if (normalizedAnswer.length <= MAX_LENGTH) {
+    return normalizedAnswer;
+  }
+
+  return `${normalizedAnswer.slice(0, MAX_LENGTH)}…`;
+}
+
+function normalizeGeneratedTitle(rawTitle: string, timestamp: number): string {
+  const normalized = rawTitle
+    .replace(/^標題[:：]\s*/i, '')
+    .replace(/[`"'「」]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!normalized) {
+    return formatTimeForTitle(timestamp);
+  }
+
+  const MAX_LENGTH = 26;
+  if (normalized.length <= MAX_LENGTH) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, MAX_LENGTH)}…`;
+}
+
+async function generateThreadTitleWithDeepSeek(
+  userMessage: string,
+  firstAssistantAnswer: string,
+  timestamp: number
+): Promise<string> {
+  const fallbackTitle = createFallbackTitleFromFirstAnswer(firstAssistantAnswer, userMessage, timestamp);
+  if (!firstAssistantAnswer.trim()) {
+    return fallbackTitle;
+  }
+
+  try {
+    const completion = await openrouter.chat.completions.create({
+      model: 'deepseek/deepseek-chat-v3-0324',
+      temperature: 0.2,
+      max_tokens: 48,
+      messages: [
+        {
+          role: 'system',
+          content:
+            '你是標題助手。請根據「第一則 AI 回答」產生一個繁體中文對話標題。規則：不超過16字、不可換行、不加引號、不加句號、不要輸出任何前綴。只輸出標題本身。',
+        },
+        {
+          role: 'user',
+          content: `使用者提問：${userMessage}\n\n第一則 AI 回答：${firstAssistantAnswer}`,
+        },
+      ],
+    });
+
+    const rawTitle = completion.choices?.[0]?.message?.content ?? '';
+    if (!rawTitle) {
+      return fallbackTitle;
+    }
+
+    return normalizeGeneratedTitle(rawTitle, timestamp);
+  } catch (error) {
+    console.error('[WARN] DeepSeek thread title generation failed, fallback to local title:', error);
+    return fallbackTitle;
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     // 解析前端傳來的資料
@@ -71,13 +164,15 @@ export async function POST(request: NextRequest) {
 
     let currentThreadId = threadId;
     let isNewThreadCreated = false;
+    let threadCreatedAt: number | null = null;
 
     // 如果沒有 threadId 或是新 thread，建立一個新的 thread
     if (isNewThread || !threadId) {
       const createdAt = Date.now();
+      threadCreatedAt = createdAt;
       const threadData: Omit<ChatThread, 'id'> = {
         userId,
-        title: formatTimeForTitle(createdAt),
+        title: createThreadTitleFromMessage(message, createdAt),
         hasImage: !!questionImageUrl,
         createdAt,
         lastUpdated: createdAt
@@ -154,6 +249,19 @@ export async function POST(request: NextRequest) {
       timestamp: Date.now()
     };
     await adminDb.collection('chat_messages').add(aiMessageData);
+
+    // 新對話在拿到第一則 AI 回答後，再用 DeepSeek 生成正式 title
+    if (isNewThreadCreated && currentThreadId && threadCreatedAt) {
+      try {
+        const generatedTitle = await generateThreadTitleWithDeepSeek(message, aiResponse, threadCreatedAt);
+        await adminDb.collection('chat_threads').doc(currentThreadId).update({
+          title: generatedTitle,
+          lastUpdated: Date.now()
+        });
+      } catch (titleError) {
+        console.error('[WARN] Failed to update thread title from first assistant answer:', titleError);
+      }
+    }
 
     // 回傳 AI 回覆、threadId、是否新 thread、完整 thread 訊息
     return NextResponse.json({

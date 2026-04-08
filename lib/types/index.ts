@@ -54,7 +54,7 @@ export interface TutorCase {
     lessonMode?: 'in_person' | 'online';
     idNumber?: string;
     studentGender: string;
-    lineId?: string;
+    lineId: string;
     department: string;
     grade: string;
     studentDescription: string;

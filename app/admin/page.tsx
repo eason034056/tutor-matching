@@ -7,6 +7,8 @@ import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, query, updateDoc, 
 import { deleteObject, ref } from 'firebase/storage'
 import {
   Copy,
+  FileText,
+  Instagram,
   LayoutDashboard,
   Link2,
   Loader2,
@@ -34,6 +36,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { buildCaseNotificationData, normalizeCase, type CaseDocumentStatus } from '@/lib/case-utils'
+import { generateDcardPostText } from '@/lib/dcard-post-generator'
+import { generateIgStoryImage } from '@/lib/ig-story-generator'
 import { TUTOR_REVISION_REASON_OPTIONS, type TutorRevisionReasonCode } from '@/lib/tutor-review'
 import { auth, db, storage } from '@/server/config/firebase'
 import type { CaseNotificationData, Tutor, TutorCase } from '@/server/types'
@@ -121,6 +125,10 @@ export default function AdminPage() {
   const [revisionDialogTutor, setRevisionDialogTutor] = useState<PendingTutor | null>(null)
   const [selectedRevisionReasons, setSelectedRevisionReasons] = useState<TutorRevisionReasonCode[]>([])
   const [revisionNote, setRevisionNote] = useState('')
+  // Dcard 貼文預覽/編輯 Dialog
+  const [dcardDialogOpen, setDcardDialogOpen] = useState(false)
+  const [dcardTitle, setDcardTitle] = useState('')
+  const [dcardBody, setDcardBody] = useState('')
 
   const followUpCount = useMemo(
     () => pendingCases.filter((caseItem) => normalizeCase(caseItem).documentStatus !== 'submitted').length,
@@ -270,6 +278,61 @@ export default function AdminPage() {
       setGeneratingLinkId(null)
     }
   }
+
+  // ── 行銷工具：IG Story 圖片生成 ──
+  const handleGenerateIgStory = async (caseData: PendingCase) => {
+    try {
+      const normalized = normalizeCase(caseData)
+      const blob = await generateIgStoryImage({
+        subject: normalized.subject || '',
+        budgetRange: normalized.budgetRange,
+        location: normalized.location || '',
+        availableTime: normalized.availableTime || '',
+        studentDescription: normalized.studentDescription || '',
+        teacherRequirements: normalized.teacherRequirements || '',
+      })
+      // 💡 同時下載 + 開新分頁預覽，方便管理員直接使用
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `IG-Story-${caseData.caseNumber}.png`
+      link.click()
+      window.open(url, '_blank')
+      toast.success('IG Story 圖片已產生並下載')
+    } catch (error) {
+      console.error('IG Story generation failed:', error)
+      toast.error('IG Story 圖片產生失敗')
+    }
+  }
+
+  // ── 行銷工具：Dcard 貼文預覽 ──
+  const handleGenerateDcardPost = (caseData: PendingCase) => {
+    const normalized = normalizeCase(caseData)
+    const { title, body } = generateDcardPostText({
+      subject: normalized.subject || '',
+      budgetRange: normalized.budgetRange,
+      location: normalized.location || '',
+      availableTime: normalized.availableTime || '',
+      studentDescription: normalized.studentDescription || '',
+      teacherRequirements: normalized.teacherRequirements || '',
+      grade: caseData.grade || '',
+      studentGender: caseData.studentGender || '',
+      department: caseData.department || '',
+    })
+    setDcardTitle(title)
+    setDcardBody(body)
+    setDcardDialogOpen(true)
+  }
+
+  const handleCopyDcardPost = async () => {
+    try {
+      await navigator.clipboard.writeText(`${dcardTitle}\n\n${dcardBody}`)
+      toast.success('已複製 Dcard 貼文內容到剪貼簿')
+    } catch {
+      toast.error('複製失敗，請手動選取複製')
+    }
+  }
+
 
   const handleCaseStatusUpdate = async (caseDocId: string, newStatus: '急徵' | '已徵到' | '有人接洽') => {
     if (updatingStatus) return
@@ -841,6 +904,20 @@ export default function AdminPage() {
                             </Button>
                           </div>
                         </div>
+
+                        <div className="rounded-[1.5rem] border border-brand-100 bg-white p-5 shadow-[0_14px_40px_rgba(67,102,78,0.06)]">
+                          <div className="text-sm font-semibold tracking-[0.22em] text-brand-500">行銷工具</div>
+                          <div className="mt-4 flex flex-col gap-2">
+                            <Button type="button" variant="outline" size="sm" className="rounded-full border-brand-300 bg-white text-brand-800 hover:bg-brand-50" onClick={() => handleGenerateIgStory(searchResults.case!)}>
+                              <Instagram className="h-4 w-4" />
+                              產生 IG Story 圖片
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" className="rounded-full border-brand-300 bg-white text-brand-800 hover:bg-brand-50" onClick={() => handleGenerateDcardPost(searchResults.case!)}>
+                              <FileText className="h-4 w-4" />
+                              複製 Dcard 貼文
+                            </Button>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </DashboardSection>
@@ -904,6 +981,47 @@ export default function AdminPage() {
             >
               {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               寄送退回補件通知
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dcard 貼文預覽 / 編輯 Dialog */}
+      <Dialog open={dcardDialogOpen} onOpenChange={setDcardDialogOpen}>
+        <DialogContent className="max-w-2xl rounded-[2rem] border border-brand-100 bg-[#fffdf8] p-0">
+          <DialogHeader className="border-b border-brand-100 px-6 py-5">
+            <DialogTitle className="font-display text-2xl text-brand-900">Dcard 貼文預覽</DialogTitle>
+            <DialogDescription className="mt-2 text-sm leading-7 text-neutral-600">
+              你可以直接編輯標題與內文，修改完畢後點「複製全部」。
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 px-6 py-5">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-brand-900">標題</label>
+              <Input
+                value={dcardTitle}
+                onChange={(e) => setDcardTitle(e.target.value)}
+                className="rounded-[1.25rem] border-brand-200 bg-white font-semibold"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-brand-900">內文</label>
+              <Textarea
+                value={dcardBody}
+                onChange={(e) => setDcardBody(e.target.value)}
+                className="min-h-[360px] rounded-[1.25rem] border-brand-200 bg-white leading-7"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="border-t border-brand-100 px-6 py-5">
+            <Button type="button" variant="outline" className="rounded-full border-brand-300 bg-white text-brand-800 hover:bg-brand-50" onClick={() => setDcardDialogOpen(false)}>
+              關閉
+            </Button>
+            <Button type="button" className="rounded-full bg-brand-500 text-white hover:bg-brand-600" onClick={handleCopyDcardPost}>
+              <Copy className="h-4 w-4" />
+              複製全部
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -48,6 +48,7 @@ type FieldName =
   | 'parentName'
   | 'parentPhone'
   | 'parentEmail'
+  | 'lineId'
   | 'terms'
 
 type ValidationError = {
@@ -480,6 +481,7 @@ export default function CaseUploadForm() {
       if (formData.parentPhone.trim() && phoneDigits.length < 9) {
         pushError('parentPhone', '請填寫可聯繫的電話號碼')
       }
+      if (!formData.lineId.trim()) pushError('lineId', '請填寫 LINE ID')
       if (formData.parentEmail.trim()) {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
         if (!emailRegex.test(formData.parentEmail.trim())) {
@@ -1060,15 +1062,17 @@ export default function CaseUploadForm() {
                 />
                 {renderFieldError('parentPhone')}
               </div>
-              <div>
-                <Label htmlFor="lineId" className="text-sm font-semibold text-brand-900">LINE ID（選填）</Label>
+              <div ref={setFieldRef('lineId')}>
+                <Label htmlFor="lineId" className={getFieldLabelClassName('lineId')}>LINE ID</Label>
                 <Input
                   id="lineId"
-                  className="mt-3 h-12 rounded-2xl border-brand-200 bg-[#fffdf8] px-4"
+                  aria-invalid={hasFieldError('lineId')}
+                  className={getFieldInputClassName('lineId', 'mt-3 h-12 rounded-2xl border-brand-200 bg-[#fffdf8] px-4')}
                   value={formData.lineId}
                   onChange={(event) => setField('lineId', event.target.value)}
-                  placeholder="若希望顧問用 LINE 聯繫，可先留下"
+                  placeholder="請填寫您的 LINE ID"
                 />
+                {renderFieldError('lineId')}
               </div>
               <div ref={setFieldRef('parentEmail')}>
                 <Label htmlFor="parentEmail" className={getFieldLabelClassName('parentEmail')}>電子信箱（選填）</Label>

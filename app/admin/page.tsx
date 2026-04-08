@@ -592,10 +592,14 @@ export default function AdminPage() {
                               <Badge className={statusStyles[caseItem.status]}>{caseItem.status}</Badge>
                               <DocumentStatusBadge status={normalizedCase.documentStatus} />
                             </div>
-                            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                               <div>
                                 <div className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-500">聯絡人</div>
                                 <div className="mt-2 text-sm leading-6 text-neutral-700">{caseItem.parentName}<br />{caseItem.parentPhone}</div>
+                              </div>
+                              <div>
+                                <div className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-500">Line ID</div>
+                                <div className="mt-2 text-sm leading-6 text-neutral-700">{caseItem.lineId || '未填寫'}</div>
                               </div>
                               <div>
                                 <div className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-500">課程需求</div>
@@ -784,6 +788,7 @@ export default function AdminPage() {
                         </div>
                         <div className="grid gap-3 md:grid-cols-2">
                           <SummaryBlock label="家長資訊" value={`${searchResults.case.parentName}\n${searchResults.case.parentPhone}`} />
+                          <SummaryBlock label="Line ID" value={searchResults.case.lineId || '未填寫'} />
                           <SummaryBlock label="課程資訊" value={`${searchResults.case.subject}\n${normalizedCase.budgetRange}`} />
                           <SummaryBlock label="地址" value={normalizedCase.location || '未填寫'} />
                           <SummaryBlock label="可上課時間" value={searchResults.case.availableTime} />

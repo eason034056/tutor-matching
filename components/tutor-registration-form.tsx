@@ -115,7 +115,6 @@ export default function TutorRegistrationForm({
   const isResubmission = mode === "resubmission"
   const router = useRouter()
   const stepTopRef = useRef<HTMLDivElement | null>(null)
-  const successCardRef = useRef<HTMLDivElement | null>(null)
 
   const [currentStep, setCurrentStep] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -152,16 +151,6 @@ export default function TutorRegistrationForm({
     setTutorCode(initialValues?.tutorCode || "")
     setCurrentStep(0)
   }, [form, initialValues, isResubmission])
-
-  useEffect(() => {
-    if (submitStatus !== "success") return
-
-    const timer = window.setTimeout(() => {
-      successCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
-    }, 0)
-
-    return () => window.clearTimeout(timer)
-  }, [submitStatus])
 
   const submitRegistration = async (
     values: TutorFormValues,
@@ -308,10 +297,7 @@ export default function TutorRegistrationForm({
 
   if (submitStatus === "success") {
     return (
-      <div
-        ref={successCardRef}
-        className="scroll-mt-28 rounded-[2rem] border border-brand-100 bg-white/95 p-6 text-center shadow-[0_24px_70px_rgba(67,102,78,0.08)] md:scroll-mt-32 md:p-8"
-      >
+      <div className="rounded-[2rem] border border-brand-100 bg-white/95 p-6 text-center shadow-[0_24px_70px_rgba(67,102,78,0.08)] md:p-8">
         <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-brand-100 text-brand-700">
           {isResubmission ? <RefreshCcw className="h-10 w-10" /> : <UserCheck className="h-10 w-10" />}
         </div>
@@ -372,7 +358,7 @@ export default function TutorRegistrationForm({
         <p className="mt-2 text-sm leading-7 text-neutral-600">
           {isResubmission
             ? "你可以沿用原本證件，也可以替換其中任一張。每次選檔會立即上傳並回報狀態。"
-            : "表單採 mobile-first 流程，每一步都會先驗證，避免最後一次送出才發現錯誤。"}
+            : ""}
         </p>
 
         <div className="mt-5 grid grid-cols-3 gap-2">

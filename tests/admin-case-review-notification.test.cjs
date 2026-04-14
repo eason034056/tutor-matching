@@ -55,10 +55,18 @@ test('case upload form no longer sends new-case admin webhooks from the client',
   assert.doesNotMatch(source, /webhook-config/)
 })
 
-test('webhook config no longer routes new_case notifications through webhook config', () => {
-  const source = readSource('webhook-config.ts')
+test('tutor registration form no longer uses webhook', () => {
+  const source = readSource('components/tutor-registration-form.tsx')
 
-  assert.doesNotMatch(source, /'new_case'/)
+  assert.doesNotMatch(source, /sendWebhookNotification/)
+  assert.doesNotMatch(source, /webhook-config/)
+})
+
+test('webhook-config.ts has been removed', () => {
+  assert.ok(
+    !fs.existsSync(path.join(projectRoot, 'webhook-config.ts')),
+    'webhook-config.ts should no longer exist'
+  )
 })
 
 test('admin case review notification builder uses redesigned budget and address fields', async () => {

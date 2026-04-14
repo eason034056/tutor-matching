@@ -26,12 +26,12 @@ We believe education should be accessible to everyone, regardless of economic st
 
 ### 👨‍🏫 **Professional Tutor Matching**
 - **📋 Comprehensive Screening**: Rigorous verification and approval process
-- **💬 Automated Workflow**: n8n-powered notification and management system
+- **💬 Automated Workflow**: SMTP-powered notification and management system
 
 ### 🔧 **Advanced Admin System**
 - **📊 Real-time Dashboard**: Monitor tutor applications and case submissions
 - **✅ Approval Workflow**: Streamlined review process for tutors and cases
-- **📧 Automated Notifications**: n8n-powered email system for administrators
+- **📧 Automated Notifications**: Direct SMTP email system for administrators and tutors
 - **🔍 Smart Search**: Advanced filtering and search capabilities
 
 ---
@@ -51,8 +51,7 @@ We believe education should be accessible to everyone, regardless of economic st
   - **Firestore** - Scalable NoSQL database
   - **Storage** - Image upload and management
 - **🤖 Multi-Model AI** - OpenAI GPT-4, Google Gemini, DeepSeek API for specialized problem solving
-- **🔄 n8n Workflows** - Automated notification and task management
-- **📧 SMTP Integration** - Professional email notifications
+- **📧 SMTP Integration** - Direct email notifications via nodemailer
 
 ### **Advanced Features**
 - **🖼️ Image Processing** - Compression, cropping, and watermarking
@@ -79,8 +78,8 @@ graph LR
         C -.-> D
     end
     
-    subgraph "Automation"
-        E[n8n Workflows<br/>SMTP Integration<br/>Admin Notifications]
+    subgraph "Notifications"
+        E[SMTP / nodemailer<br/>Email Notifications]
     end
     
     %% Cross-layer connections
@@ -128,8 +127,7 @@ graph TD
     end
     
     subgraph "Integration Layer"
-        N8N[n8n Workflows]
-        Email[Email Service]
+        Email[SMTP / nodemailer]
     end
     
     %% Clean connections
@@ -146,12 +144,10 @@ graph TD
     Solver --> DB
     
     Admin --> DB
-    Admin --> N8N
+    Admin --> Email
     
     Upload --> Storage
     Upload --> DB
-    
-    N8N --> Email
     
     %% Styling with black text
     classDef ui fill:#bbdefb,stroke:#1976d2,color:#000
@@ -164,7 +160,7 @@ graph TD
     class API,Solver,Admin,Upload logic
     class DB,Storage data
     class OpenAI,Gemini,DeepSeek ai
-    class N8N,Email integration
+    class Email integration
 ```
 
 ### **🚀 AI Processing Pipeline**
@@ -204,7 +200,7 @@ sequenceDiagram
     participant API as API Layer
     participant AI as OpenAI API
     participant DB as Firestore
-    participant N8N as n8n Workflow
+    participant SMTP as SMTP Email
     participant Admin as Admin Panel
     participant Tutor as Tutor
 
@@ -228,13 +224,13 @@ sequenceDiagram
         Tutor->>UI: Submit registration form
         UI->>API: POST /api/tutors/pending
         API->>DB: Store tutor data
-        API->>N8N: Trigger webhook notification
-        N8N->>Admin: Send email notification
+        API->>SMTP: Send admin notification email
+        SMTP->>Admin: Email notification
         Admin->>UI: Review application
         Admin->>API: Approve/Reject decision
         API->>DB: Update tutor status
-        API->>N8N: Trigger approval webhook
-        N8N-->>Tutor: Send confirmation email
+        API->>SMTP: Send approval email
+        SMTP-->>Tutor: Confirmation email
     end
 
     %% Case Matching Flow
@@ -243,12 +239,12 @@ sequenceDiagram
         S->>UI: Submit tutoring case
         UI->>API: POST /api/cases/upload
         API->>DB: Store case data
-        API->>N8N: Trigger case notification
-        N8N->>Admin: Notify pending case
+        API->>SMTP: Send admin notification email
+        SMTP->>Admin: Notify pending case
         Admin->>API: Approve case
         API->>DB: Move to approved cases
-        API->>N8N: Trigger tutor notifications
-        N8N-->>Tutor: Send case opportunities
+        API->>SMTP: Send tutor notification emails
+        SMTP-->>Tutor: Case opportunity emails
         Tutor->>UI: Apply for case
     end
 ```
@@ -281,7 +277,7 @@ sequenceDiagram
 
 ### **👨‍🏫 Tutor Matching Flow**
 1. **Submit Case**: Parent/student describes learning needs
-2. **Auto Processing**: n8n workflow triggers admin notifications
+2. **Auto Processing**: SMTP email triggers admin notifications
 3. **Admin Review**: Case approval and tutor matching
 4. **Tutor Notification**: Qualified tutors receive case details
 5. **Connection**: Direct communication between parties

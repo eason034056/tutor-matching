@@ -23,7 +23,6 @@ import {
   type TutorFormSeed,
   type TutorFormValues,
 } from "@/lib/tutor-form"
-import { sendWebhookNotification } from "@/webhook-config"
 
 type TutorRegistrationFormProps = {
   mode?: "registration" | "resubmission"
@@ -188,7 +187,6 @@ export default function TutorRegistrationForm({
 
     setTutorCode(generatedTutorCode)
     setSubmitMessage(`您的教師編號是 ${generatedTutorCode}，請妥善保存。我們會在 1-2 個工作天內完成審核。`)
-    await sendWebhookNotification("new_tutor", submitData)
   }
 
   const submitResubmission = async (

@@ -35,13 +35,12 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
-import { buildCaseNotificationData, normalizeCase, type CaseDocumentStatus } from '@/lib/case-utils'
+import { normalizeCase, type CaseDocumentStatus } from '@/lib/case-utils'
 import { generateDcardPostText } from '@/lib/dcard-post-generator'
 import { generateIgStoryImage } from '@/lib/ig-story-generator'
 import { TUTOR_REVISION_REASON_OPTIONS, type TutorRevisionReasonCode } from '@/lib/tutor-review'
 import { auth, db, storage } from '@/server/config/firebase'
-import type { CaseNotificationData, Tutor, TutorCase } from '@/server/types'
-import { sendNewCaseEmailNotification } from '@/webhook-config'
+import type { Tutor, TutorCase } from '@/server/types'
 
 type PendingTutor = Tutor & { docId: string }
 type PendingCase = TutorCase & { docId: string }
@@ -163,32 +162,6 @@ export default function AdminPage() {
     } catch (error) {
       console.error('載入待審核資料失敗:', error)
       toast.error('載入待審核資料失敗')
-    }
-  }
-
-  const getApprovedTutorEmails = async () => {
-    try {
-      const snapshot = await getDocs(collection(db, 'approvedTutors'))
-      return snapshot.docs
-        .map((item) => item.data())
-        .filter((item) => Boolean(item.email) && item.receiveNewCaseNotifications === true)
-        .map((item) => item.email as string)
-    } catch (error) {
-      console.error('獲取教師 email 失敗:', error)
-      return []
-    }
-  }
-
-  const sendNewCaseNotification = async (caseData: CaseNotificationData) => {
-    try {
-      const emailList = await getApprovedTutorEmails()
-      const result = await sendNewCaseEmailNotification(caseData, emailList)
-      if (result.success) {
-        toast.success(`已通知 ${emailList.length} 位教師`) 
-      }
-    } catch (error) {
-      console.error('發送新案件通知失敗:', error)
-      toast.error('案件已通過，但郵件通知未成功發送')
     }
   }
 
@@ -477,37 +450,15 @@ export default function AdminPage() {
     if (processing) return
     setProcessing(true)
     try {
-      const caseRef = doc(db, 'cases', docId)
-      const caseSnapshot = await getDoc(caseRef)
-      if (!caseSnapshot.exists()) throw new Error('找不到案件資料')
-
-      const caseData = caseSnapshot.data() as TutorCase
-      const normalized = normalizeCase(caseData)
-
-      await updateDoc(caseRef, {
-        pending: 'approved',
-        approvedAt: new Date().toISOString(),
+      const response = await fetch(`/api/admin/cases/${docId}/approve`, {
+        method: 'POST',
       })
+      const result = await parseJsonResponse(response)
+      if (!response.ok) {
+        throw new Error(result.error || '審核案件失敗')
+      }
 
-      await addDoc(collection(db, 'approvedCases'), {
-        caseId: docId,
-        caseNumber: caseData.caseNumber,
-        subject: caseData.subject,
-        grade: caseData.grade,
-        location: normalized.location,
-        availableTime: caseData.availableTime,
-        teacherRequirements: caseData.teacherRequirements || '',
-        studentDescription: caseData.studentDescription,
-        hourlyFee: caseData.hourlyFee,
-        budgetRange: normalized.budgetRange,
-        status: caseData.status,
-        region: caseData.region,
-        documentStatus: normalized.documentStatus,
-        approvedAt: new Date().toISOString(),
-      })
-
-      toast.success('案件已通過審核')
-      await sendNewCaseNotification(buildCaseNotificationData(caseData))
+      toast.success('案件已通過審核，郵件通知將在背景發送')
       await fetchPendingData()
     } catch (error) {
       console.error('審核案件失敗:', error)

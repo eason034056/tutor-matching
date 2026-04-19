@@ -1,4 +1,3 @@
-import { after } from 'next/server'
 import { NextResponse } from 'next/server'
 
 import { normalizeCase } from '@/lib/case-utils'
@@ -57,25 +56,23 @@ export async function POST(
       throw new Error('儲存已通過案件資料失敗')
     }
 
-    // 💡 用 Next.js after() 在回應送出後才開始寄信
-    //    這樣管理員不用等郵件發完，API 立即回應
-    //    after() 會保證 serverless function 不會在郵件發完前終止
-    after(async () => {
-      try {
-        await notifyApprovedTutors({
-          caseNumber: caseData.caseNumber,
-          subject: caseData.subject,
-          hourlyFee: caseData.hourlyFee,
-          budgetRange: normalized.budgetRange,
-          location: normalized.location,
-          availableTime: caseData.availableTime,
-          teacherRequirements: caseData.teacherRequirements,
-          studentDescription: caseData.studentDescription,
-        })
-      } catch (notifyError) {
-        console.error(`[案件通知 ${caseData.caseNumber}] after() 執行失敗:`, notifyError)
-      }
-    })
+    // 💡 BCC 發送只需 ~1-2 秒，改為同步寄信再回應
+    //    保證 email 一定寄出，不受瀏覽器關閉影響
+    try {
+      await notifyApprovedTutors({
+        caseNumber: caseData.caseNumber,
+        subject: caseData.subject,
+        hourlyFee: caseData.hourlyFee,
+        budgetRange: normalized.budgetRange,
+        location: normalized.location,
+        availableTime: caseData.availableTime,
+        teacherRequirements: caseData.teacherRequirements,
+        studentDescription: caseData.studentDescription,
+      })
+    } catch (notifyError) {
+      // ⚠️ 寄信失敗不影響審核結果（案件狀態已寫入 DB）
+      console.error(`[案件通知 ${caseData.caseNumber}] 發送失敗:`, notifyError)
+    }
 
     return NextResponse.json({ message: '審核通過' })
   } catch (error) {

@@ -245,49 +245,10 @@ export const loadTutorRecipientEmails = async (db: AdminDbLike = adminDb as Admi
   return [...uniqueEmails]
 }
 
-// ── 並行批次發送 ──
+// ── BCC 分 chunk 常數 ──
 
-// 💡 Office 365 限制每分鐘 30 封
-//    每批 5 封同時發，批次間隔 10 秒 → 每分鐘 30 封剛好卡在限制內
-const BATCH_SIZE = 5
-const BATCH_DELAY_MS = 10_000
-
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-
-const sendInBatches = async <T>(
-  items: T[],
-  fn: (item: T) => Promise<{ success: boolean; email: string; error?: string }>,
-  logTag: string = ''
-) => {
-  const results: { success: boolean; email: string; error?: string }[] = []
-  const totalBatches = Math.ceil(items.length / BATCH_SIZE)
-
-  for (let i = 0; i < items.length; i += BATCH_SIZE) {
-    const batchNum = Math.floor(i / BATCH_SIZE) + 1
-
-    // ⚠️ 第二批開始要等待，避免觸發 SMTP 限流
-    if (i > 0) {
-      console.log(`${logTag} 批次 ${batchNum}/${totalBatches}：等待 ${BATCH_DELAY_MS / 1000} 秒...`)
-      await delay(BATCH_DELAY_MS)
-    }
-
-    const batch = items.slice(i, i + BATCH_SIZE)
-    console.log(`${logTag} 批次 ${batchNum}/${totalBatches}：發送 ${batch.length} 封`)
-
-    // 💡 用 allSettled 而非 all — 一封失敗不影響同批其他封
-    const batchResults = await Promise.allSettled(batch.map(fn))
-
-    for (const result of batchResults) {
-      if (result.status === 'fulfilled') {
-        results.push(result.value)
-      } else {
-        results.push({ success: false, email: 'unknown', error: String(result.reason) })
-      }
-    }
-  }
-
-  return results
-}
+// 💡 Office 365 單封郵件上限 500 位收件人，留 1 位給 To（寄件人自己）
+const BCC_CHUNK_SIZE = 499
 
 // ── 發送郵件 ──
 
@@ -302,7 +263,7 @@ export const sendTutorCaseNotificationEmail = async ({
     return { skipped: true, recipientCount: 0, successCount: 0, failedEmails: [] as string[] }
   }
 
-  console.log(`${tag} 開始發送，共 ${recipientEmails.length} 位教師`)
+  console.log(`${tag} 開始發送，共 ${recipientEmails.length} 位教師 (BCC)`)
 
   const transporter = getTransporter()
   const { fromEmail, fromName } = getRequiredSmtpConfig()
@@ -310,35 +271,40 @@ export const sendTutorCaseNotificationEmail = async ({
   const html = buildTutorCaseNotificationHtml(notification)
   const text = buildTutorCaseNotificationText(notification)
 
-  const results = await sendInBatches(
-    recipientEmails,
-    async (email) => {
-      try {
-        await transporter.sendMail({
-          from: `${fromName} <${fromEmail}>`,
-          to: email,
-          subject,
-          html,
-          text,
-        })
-        return { success: true, email }
-      } catch (err) {
-        console.error(`${tag} 發送給 ${email} 失敗:`, err)
-        return { success: false, email, error: String(err) }
-      }
-    },
-    tag
-  )
+  let successCount = 0
+  const failedEmails: string[] = []
 
-  const successCount = results.filter((r) => r.success).length
-  const failedEmails = results.filter((r) => !r.success).map((r) => r.email)
-  const totalBatches = Math.ceil(recipientEmails.length / BATCH_SIZE)
+  // 💡 將收件人分成每組最多 BCC_CHUNK_SIZE 位，逐組 BCC 發送
+  //    每組只算 1 封訊息，不會觸發 Office 365 的 30 封/分鐘限制
+  for (let i = 0; i < recipientEmails.length; i += BCC_CHUNK_SIZE) {
+    const chunk = recipientEmails.slice(i, i + BCC_CHUNK_SIZE)
+    const chunkNum = Math.floor(i / BCC_CHUNK_SIZE) + 1
+    const totalChunks = Math.ceil(recipientEmails.length / BCC_CHUNK_SIZE)
+
+    try {
+      await transporter.sendMail({
+        from: `${fromName} <${fromEmail}>`,
+        to: fromEmail,
+        bcc: chunk.join(', '),
+        subject,
+        html,
+        text,
+      })
+
+      successCount += chunk.length
+      if (totalChunks > 1) {
+        console.log(`${tag} BCC 批次 ${chunkNum}/${totalChunks} 成功：${chunk.length} 位教師`)
+      }
+    } catch (err) {
+      console.error(`${tag} BCC 批次 ${chunkNum}/${totalChunks} 失敗:`, err)
+      failedEmails.push(...chunk)
+    }
+  }
 
   // 最終統計摘要 — 在 Vercel Function Logs 搜尋 "[案件通知" 即可找到
   console.log(
-    `${tag} 發送完成：${successCount}/${recipientEmails.length} 封成功` +
-    (failedEmails.length > 0 ? `，${failedEmails.length} 封失敗` : '') +
-    `（共 ${totalBatches} 批）`
+    `${tag} 發送完成：${successCount}/${recipientEmails.length} 位教師成功` +
+    (failedEmails.length > 0 ? `，${failedEmails.length} 位失敗` : '')
   )
   if (failedEmails.length > 0) {
     console.error(`${tag} 失敗的 email:`, failedEmails.join(', '))

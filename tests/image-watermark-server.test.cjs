@@ -44,7 +44,7 @@ const countChangedPixels = (raw, width, region) => {
   return changed
 }
 
-test('server watermark visibly marks multiple areas of the image', async () => {
+test('server watermark renders centered text without full-image diagonal lines', async () => {
   const { addWatermark } = loadTsModule('lib/imageUtils.server.ts')
   const width = 1200
   const height = 800
@@ -61,14 +61,24 @@ test('server watermark visibly marks multiple areas of the image', async () => {
 
   const watermarked = await addWatermark(source)
   const raw = await sharp(watermarked).removeAlpha().raw().toBuffer()
-  const regions = [
+  const cornerRegions = [
     { x: 0, y: 0, width: 240, height: 160 },
     { x: width - 240, y: 0, width: 240, height: 160 },
     { x: 0, y: height - 160, width: 240, height: 160 },
     { x: width - 240, y: height - 160, width: 240, height: 160 },
-    { x: Math.floor(width / 2) - 120, y: Math.floor(height / 2) - 80, width: 240, height: 160 },
   ]
+  const centerRegion = { x: Math.floor(width / 2) - 220, y: Math.floor(height / 2) - 120, width: 440, height: 240 }
 
-  const markedRegions = regions.filter((region) => countChangedPixels(raw, width, region) > 100)
-  assert.equal(markedRegions.length, regions.length)
+  assert.equal(countChangedPixels(raw, width, centerRegion) > 1000, true)
+  for (const region of cornerRegions) {
+    assert.equal(countChangedPixels(raw, width, region), 0)
+  }
+})
+
+test('server watermark uses a bundled Traditional Chinese font file', () => {
+  const source = fs.readFileSync(path.join(projectRoot, 'lib/imageUtils.server.ts'), 'utf8')
+
+  assert.match(source, /fontfile/)
+  assert.match(source, /NotoSansTC/)
+  assert.doesNotMatch(source, /buildDiagonalLines|<line x1=/)
 })

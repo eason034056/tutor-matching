@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  outputFileTracingIncludes: {
+    '/api/upload-image': ['./assets/fonts/**/*'],
+  },
   images: {
     domains: [
       'firebasestorage.googleapis.com',

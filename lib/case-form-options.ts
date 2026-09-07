@@ -32,11 +32,6 @@ export const gradeOptions = [
   '高一',
   '高二',
   '高三',
-  '大一',
-  '大二',
-  '大三',
-  '大四',
-  '成人',
 ]
 
 export const budgetRangeOptions = [

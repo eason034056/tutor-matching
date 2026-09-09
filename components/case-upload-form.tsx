@@ -1113,7 +1113,6 @@ export default function CaseUploadForm() {
                   <Label htmlFor="terms-agreement" className={cn('cursor-pointer text-sm font-medium', hasFieldError('terms') ? 'text-red-700' : 'text-brand-900')}>
                     我已閱讀並同意服務條款
                   </Label>
-                  <p className="mt-2 text-xs leading-6 text-neutral-600">證件照片與身分證字號不會在此頁收集，補件連結會在顧問確認需求後提供。</p>
                   <div className="mt-3 flex flex-wrap gap-3">
                     <TermsDialog onAgree={() => setHasAgreedToTerms(true)}>
                       <Button type="button" variant="outline" size="sm" className="rounded-full border-brand-300 bg-white text-brand-800 hover:bg-brand-50">
